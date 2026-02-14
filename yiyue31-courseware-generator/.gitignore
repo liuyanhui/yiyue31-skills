@@ -1,0 +1,14 @@
+# Ignore everything
+*
+
+# But track these files
+!.gitignore
+!CLAUDE.md
+!SKILL*.md
+!science/
+science/*
+
+# Then ignore everything in science except SKILL*.md and references/*
+science/*
+!science/SKILL*.md
+!science/references/*
