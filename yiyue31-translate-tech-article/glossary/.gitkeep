@@ -1,0 +1,9 @@
+# Glossary Directory
+
+This directory contains technical term glossaries organized by topic.
+
+Each glossary file follows the format:
+- `glossary/{topic}.md` - Technical terms for a specific topic
+- File naming: lowercase, use hyphens for subtopics (e.g., `react-hooks.md`)
+
+Glossary files are tracked in git and maintained after each translation.

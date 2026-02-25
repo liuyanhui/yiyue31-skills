@@ -1,0 +1,5 @@
+# Ignore generated articles
+articles/
+
+# Keep glossary directory tracked
+!glossary/*.md
