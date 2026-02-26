@@ -7,12 +7,14 @@
 | Neural Network | 神经网络 | Computational model inspired by brain |
 | Transformer | Transformer架构 | Attention-based neural architecture |
 | Large Language Model | 大语言模型 | LLM - GPT, Claude, etc. |
+| MCP | 模型上下文协议 | Model Context Protocol for tool integration |
 | GPT | GPT模型 | Generative Pre-trained Transformer |
 | Token | 标记/词元 | Basic unit of text for LLMs |
 | Embedding | 嵌入/词嵌入 | Vector representation of text |
 | Fine-tuning | 微调 | Adapting pre-trained models |
 | RAG | 检索增强生成 | Retrieval-Augmented Generation |
 | Prompt Engineering | 提示工程 | Crafting effective prompts |
+| Prompt Caching | 提示缓存 | Reusing prompt computation to reduce cost/latency |
 | Zero-shot Learning | 零样本学习 | Learning without examples |
 | Few-shot Learning | 少样本学习 | Learning with few examples |
 | Inference | 推理 | Running model for predictions |
@@ -67,6 +69,7 @@
 | Generative AI | 生成式AI | AI that creates content |
 | Discriminative AI | 判别式AI | AI that classifies/predicts |
 | Supervised Learning | 监督学习 | Learning with labeled data |
+| Subagent | 子智能体 | Agent called by another agent |
 | Unsupervised Learning | 无监督学习 | Learning without labels |
 | Reinforcement Learning | 强化学习 | Learning through rewards |
 | Transfer Learning | 迁移学习 | Applying knowledge to new tasks |
@@ -81,6 +84,7 @@
 | Part-of-Speech Tagging | 词性标注 | Identifying grammatical roles |
 | Parsing | 解析 | Analyzing sentence structure |
 | Syntax | 句法 | Sentence structure rules |
+| System Prompt | 系统提示 | Initial instructions given to model |
 | Semantics | 语义 | Meaning in language |
 | Pragmatics | 语用 | Context-dependent meaning |
 | Chatbot | 聊天机器人 | Conversational AI |
