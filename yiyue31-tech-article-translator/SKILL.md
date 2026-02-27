@@ -1,11 +1,11 @@
 ---
-name: translate-tech-article
+name: yiyue31-tech-article-translator
 description: 翻译英文技术文章为中文。保留技术术语，支持直译和意译两种模式。当用户提供英文技术文章URL或内容时启用。
 ---
 
-# Translate Tech Article Skill
+# Tech Article Translator Skill
 
-> **Skill ID:** `yiyue31-translate-tech-article`
+> **Skill ID:** `yiyue31-tech-article-translator`
 > **Version:** 1.0.0
 > **Category:** Content Creation
 > **Tags:** #translation #tech #chinese #terminology

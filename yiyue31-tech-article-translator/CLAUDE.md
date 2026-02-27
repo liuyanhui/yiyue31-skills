@@ -1,8 +1,8 @@
-# yiyue31-translate-tech-article Documentation Rules
+# yiyue31-tech-article-translator Documentation Rules
 
 ## Purpose
 
-This file contains rules for generating and maintaining `SKILL.md`, `README.md`, `TEST_PLAN.md` and other documentation for the `yiyue31-translate-tech-article` skill.
+This file contains rules for generating and maintaining `SKILL.md`, `README.md`, `TEST_PLAN.md` and other documentation for the `yiyue31-tech-article-translator` skill.
 
 ## Documentation Structure
 

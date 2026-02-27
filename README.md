@@ -29,7 +29,7 @@
 
 ---
 
-### 🌐 yiyue31-translate-tech-article
+### 🌐 yiyue31-tech-article-translator
 
 将英文技术文章翻译为中文，保留技术术语，支持直译和意译两种模式。
 
@@ -41,7 +41,7 @@
 - 输出带 YAML Frontmatter 的规范 Markdown
 - 自动 Git 提交术语表更新
 
-**技能包：** `yiyue31-translate-tech-article.skill`
+**技能包：** `yiyue31-tech-article-translator.skill`
 
 **使用示例：**
 ```
