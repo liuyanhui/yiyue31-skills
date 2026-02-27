@@ -1,10 +1,15 @@
 # Ignore everything
 *
 
-# But track these files
+# But track these files/directories
 !.gitignore
 !CLAUDE.md
 !SKILL*.md
+!*.skill
+!references/
+!references/*
+
+# Track science directory (existing courseware content)
 !science/
 science/*
 
