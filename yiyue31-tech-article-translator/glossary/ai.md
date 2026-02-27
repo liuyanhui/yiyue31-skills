@@ -111,4 +111,5 @@
 | ANI | 弱人工智能 | Artificial Narrow Intelligence |
 | Singularity | 奇点 | Hypothetical AI intelligence explosion |
 | Turing Test | 图灵测试 | AI intelligence evaluation |
+| Claude Code | Claude代码编辑器 | Anthropic's AI-powered CLI tool |
 | | | |
