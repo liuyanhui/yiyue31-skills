@@ -5,6 +5,27 @@ description: Generates structured summaries of technical articles with sections 
 
 # Tech Article Summarizer
 
+## Summary Templates
+
+This skill supports multiple summary templates for different use cases. **Before generating a summary, you will be asked to select a template.**
+
+### Available Templates
+
+| Template | Description | Best For |
+|----------|-------------|----------|
+| **Standard** | Balanced general-purpose tech article (English) | Most technical articles, blog posts, announcements |
+| **Baoyu Template 1** | 技术学习笔记模板（中文） | 技术文章学习笔记、工程师快速复习 |
+| **Baoyu Template 2** | 技术学习笔记模板增强版（中文） | 深度学习、按文章顺序分节整理、突出创新点 |
+
+### Template Management
+
+Templates are stored in `templates/` directory. To add new templates:
+1. Create a new `.md` file in `templates/`
+2. Follow the template structure in `templates/README.md`
+3. Templates will be automatically available for selection
+
+To remove templates: delete the corresponding `.md` file from `templates/` directory.
+
 ## Quick Start
 
 Summarize any technical article with structured output:
@@ -25,9 +46,20 @@ Summarize this article:
 [paste article content]
 ```
 
-## Summary Structure
+## Template Selection Workflow
 
-All summaries follow this structured format:
+When starting a new summary:
+
+1. **Ask the user**: "Which summary template would you like to use?"
+2. **Present options** with brief descriptions:
+   - **Standard**: Balanced tech article format in English (Overview, Key Points, Technical Details, Takeaways, Conclusion)
+   - **Baoyu Template 1**: 技术学习笔记模板（中文）- 简洁版，聚焦核心知识
+   - **Baoyu Template 2**: 技术学习笔记模板增强版（中文）- 按文章顺序分节，突出创新点和实用价值
+3. **Use the selected template's structure** for the summary
+
+## Default Template Structure (Standard)
+
+The standard template follows this format (other templates have different structures):
 
 ```markdown
 # Article Summary: [Original Title]
@@ -120,3 +152,33 @@ Adapt summary emphasis based on content type:
 **Neutral**: Maintain author's voice and intent, don't add opinions
 
 **Readable**: Use clear language and proper formatting for technical content
+
+## Using Different Templates
+
+### Standard Template
+Use for: General technical articles, blog posts, announcements
+- **Language**: English
+- **Sections**: Overview, Key Points, Technical Details, Takeaways, Conclusion
+- **Length**: Medium (300-500 words)
+- **Depth**: Balanced
+
+### Baoyu Template 1
+Use for: 技术文章学习笔记、工程师快速复习
+- **Language**: 中文
+- **Sections**: 标题与概述、关键概念与术语、内容大纲、核心洞见、问题与扩展
+- **Length**: 800-1500字
+- **Features**: 聚焦核心知识，避免冗余，保留英文专有名词
+
+### Baoyu Template 2
+Use for: 深度学习、按文章顺序分节整理
+- **Language**: 中文
+- **Sections**: 文章标题与概述、关键概念与术语、主要内容结构（按引言/背景/方法/实现/结果/结论分节）、核心要点与亮点、潜在问题与延伸
+- **Features**: 按文章顺序分节、突出创新点和实用价值、层级缩进便于复习
+
+## Template Reference
+
+See `templates/` directory for complete template definitions:
+- `templates/standard.md` - Balanced general-purpose template (English)
+- `templates/baoyu-template-1.md` - 技术学习笔记模板（中文）
+- `templates/baoyu-template-2.md` - 技术学习笔记模板增强版（中文）
+- `templates/README.md` - Guide for adding/removing templates
