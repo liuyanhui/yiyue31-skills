@@ -13,9 +13,9 @@ This skill supports multiple summary templates for different use cases. **Before
 
 | Template | Description | Best For |
 |----------|-------------|----------|
-| **Standard** | Balanced general-purpose tech article (English) | Most technical articles, blog posts, announcements |
-| **Concise** | 简洁笔记（中文）- 聚焦核心知识 | 技术文章学习笔记、工程师快速复习 |
-| **Comprehensive** | 全面解析（中文）- 按文章顺序分节整理 | 深度学习、技术参考、设计方案参考 |
+| **Standard** | Balanced general-purpose tech article format (default English, user-specified) | Most technical articles, blog posts, announcements |
+| **Concise** | 简洁笔记 - 聚焦核心知识（默认中文） | 技术文章学习笔记、工程师快速复习 |
+| **Comprehensive** | 全面解析 - 按文章顺序分节整理（默认中文） | 深度学习、技术参考、设计方案参考 |
 
 ### Template Management
 
@@ -157,21 +157,21 @@ Adapt summary emphasis based on content type:
 
 ### Standard Template
 Use for: General technical articles, blog posts, announcements
-- **Language**: English
+- **Language**: Default English, user can specify Chinese
 - **Sections**: Overview, Key Points, Technical Details, Takeaways, Conclusion
 - **Length**: Medium (300-500 words)
 - **Depth**: Balanced
 
 ### Concise（简洁笔记）
 Use for: 技术文章学习笔记、工程师快速复习
-- **Language**: 中文
+- **Language**: Default 中文, user can specify English
 - **Sections**: 标题与概述、关键概念与术语、内容大纲、核心洞见、问题与扩展
 - **Length**: 800-1500字
 - **Features**: 聚焦核心知识，避免冗余，保留英文专有名词
 
 ### Comprehensive（全面解析）
 Use for: 深度学习、按文章顺序分节整理
-- **Language**: 中文
+- **Language**: Default 中文, user can specify English
 - **Sections**: 文章标题与概述、关键概念与术语、主要内容结构（按引言/背景/方法/实现/结果/结论分节）、核心要点与亮点、潜在问题与延伸
 - **Features**: 按文章顺序分节、突出创新点和实用价值、层级缩进便于复习
 
