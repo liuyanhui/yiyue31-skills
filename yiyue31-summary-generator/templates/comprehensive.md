@@ -9,7 +9,10 @@
 # 技术学习笔记：[Original Title]
 
 **来源**: [URL or file path]
+
 **作者**: [if available]
+
+**模板**: Comprehensive（全面解析）
 
 ---
 

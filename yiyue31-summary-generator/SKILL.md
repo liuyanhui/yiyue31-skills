@@ -19,12 +19,15 @@ This skill supports multiple summary templates for different use cases. **Before
 
 ### Template Management
 
-Templates are stored in `templates/` directory. To add new templates:
-1. Create a new `.md` file in `templates/`
-2. Follow the template structure in `templates/README.md`
-3. Templates will be automatically available for selection
+Templates are stored in `templates/` directory. Each template file is self-contained with its own structure, guidelines, and use cases.
 
-To remove templates: delete the corresponding `.md` file from `templates/` directory.
+**To add a new template:**
+1. Create a new `.md` file in `templates/` (e.g., `my-template.md`)
+2. Follow the template structure format used by existing templates
+3. Include sections: Description, Structure (markdown example), Guidelines, Best For
+4. The template will be automatically available for selection
+
+**To remove templates:** Delete the corresponding `.md` file from `templates/` directory.
 
 ## Quick Start
 
@@ -68,6 +71,7 @@ The standard template follows this format (other templates have different struct
 **Author**: [if available]
 **Published**: [if available]
 **Read Time**: [estimated]
+**Template**: Standard（标准摘要）
 
 ---
 
@@ -178,6 +182,6 @@ Use for: 深度学习、按文章顺序分节整理
 ## Template Reference
 
 See `templates/` directory for complete template definitions:
-- `templates/standard.md` - Balanced general-purpose template (English)
-- `templates/concise.md` - 简洁笔记模板（中文）
-- `templates/comprehensive.md` - 全面解析模板（中文）
+- `templates/standard.md` - 平衡型通用技术文章格式（默认中文）
+- `templates/concise.md` - 简洁笔记模板（默认中文）
+- `templates/comprehensive.md` - 全面解析模板（默认中文）

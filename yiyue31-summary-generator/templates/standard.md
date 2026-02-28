@@ -9,9 +9,14 @@ Balanced template for general technical articles with comprehensive coverage of 
 # Article Summary: [Original Title]
 
 **Source**: [URL or file path]
+
 **Author**: [if available]
+
 **Published**: [if available]
+
 **Read Time**: [estimated]
+
+**Template**: Standard（标准摘要）
 
 ---
 
