@@ -14,8 +14,8 @@ This skill supports multiple summary templates for different use cases. **Before
 | Template | Description | Best For |
 |----------|-------------|----------|
 | **Standard** | Balanced general-purpose tech article (English) | Most technical articles, blog posts, announcements |
-| **Baoyu Template 1** | 技术学习笔记模板（中文） | 技术文章学习笔记、工程师快速复习 |
-| **Baoyu Template 2** | 技术学习笔记模板增强版（中文） | 深度学习、按文章顺序分节整理、突出创新点 |
+| **Concise** | 简洁笔记（中文）- 聚焦核心知识 | 技术文章学习笔记、工程师快速复习 |
+| **Comprehensive** | 全面解析（中文）- 按文章顺序分节整理 | 深度学习、技术参考、设计方案参考 |
 
 ### Template Management
 
@@ -53,8 +53,8 @@ When starting a new summary:
 1. **Ask the user**: "Which summary template would you like to use?"
 2. **Present options** with brief descriptions:
    - **Standard**: Balanced tech article format in English (Overview, Key Points, Technical Details, Takeaways, Conclusion)
-   - **Baoyu Template 1**: 技术学习笔记模板（中文）- 简洁版，聚焦核心知识
-   - **Baoyu Template 2**: 技术学习笔记模板增强版（中文）- 按文章顺序分节，突出创新点和实用价值
+   - **Concise**: 简洁笔记（中文）- 聚焦核心知识，快速复习
+   - **Comprehensive**: 全面解析（中文）- 按文章顺序分节，突出创新点和实用价值
 3. **Use the selected template's structure** for the summary
 
 ## Default Template Structure (Standard)
@@ -162,14 +162,14 @@ Use for: General technical articles, blog posts, announcements
 - **Length**: Medium (300-500 words)
 - **Depth**: Balanced
 
-### Baoyu Template 1
+### Concise（简洁笔记）
 Use for: 技术文章学习笔记、工程师快速复习
 - **Language**: 中文
 - **Sections**: 标题与概述、关键概念与术语、内容大纲、核心洞见、问题与扩展
 - **Length**: 800-1500字
 - **Features**: 聚焦核心知识，避免冗余，保留英文专有名词
 
-### Baoyu Template 2
+### Comprehensive（全面解析）
 Use for: 深度学习、按文章顺序分节整理
 - **Language**: 中文
 - **Sections**: 文章标题与概述、关键概念与术语、主要内容结构（按引言/背景/方法/实现/结果/结论分节）、核心要点与亮点、潜在问题与延伸
@@ -179,6 +179,5 @@ Use for: 深度学习、按文章顺序分节整理
 
 See `templates/` directory for complete template definitions:
 - `templates/standard.md` - Balanced general-purpose template (English)
-- `templates/baoyu-template-1.md` - 技术学习笔记模板（中文）
-- `templates/baoyu-template-2.md` - 技术学习笔记模板增强版（中文）
-- `templates/README.md` - Guide for adding/removing templates
+- `templates/concise.md` - 简洁笔记模板（中文）
+- `templates/comprehensive.md` - 全面解析模板（中文）

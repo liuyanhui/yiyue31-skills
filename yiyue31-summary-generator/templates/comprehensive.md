@@ -1,7 +1,7 @@
-# Summary Template: Baoyu Learning Notes (Enhanced)
+# Summary Template: Comprehensive（全面解析）
 
 ## Description
-技术学习笔记模板（增强版），适合学生或工程师快速复习和理解。按文章顺序分节整理，突出创新点和实用价值。
+技术学习笔记模板（增强版），适合学生或工程师深度学习和理解。按文章顺序分节整理，突出创新点和实用价值。
 
 ## Structure
 

@@ -1,4 +1,4 @@
-# Summary Template: Baoyu Learning Notes
+# Summary Template: Concise（简洁笔记）
 
 ## Description
 技术学习笔记模板，适合工程师或学生快速复习。将复杂技术文章转化为易懂、结构化的中文笔记。
