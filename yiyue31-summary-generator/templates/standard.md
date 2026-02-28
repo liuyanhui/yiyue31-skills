@@ -1,7 +1,7 @@
 # Summary Template: Standard Tech Article
 
 ## Description
-Balanced template for general technical articles with comprehensive coverage of main concepts and practical insights. Default English, but can be used for Chinese content if user specifies.
+Balanced template for general technical articles with comprehensive coverage of main concepts and practical insights. Default Chinese, but can be used for English content if user specifies.
 
 ## Structure
 

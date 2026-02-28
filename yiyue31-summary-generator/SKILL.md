@@ -13,7 +13,7 @@ This skill supports multiple summary templates for different use cases. **Before
 
 | Template | Description | Best For |
 |----------|-------------|----------|
-| **Standard** | Balanced general-purpose tech article format (default English, user-specified) | Most technical articles, blog posts, announcements |
+| **Standard** | 平衡型通用技术文章格式（默认中文） | 大多数技术文章、博客文章、公告 |
 | **Concise** | 简洁笔记 - 聚焦核心知识（默认中文） | 技术文章学习笔记、工程师快速复习 |
 | **Comprehensive** | 全面解析 - 按文章顺序分节整理（默认中文） | 深度学习、技术参考、设计方案参考 |
 
@@ -50,11 +50,11 @@ Summarize this article:
 
 When starting a new summary:
 
-1. **Ask the user**: "Which summary template would you like to use?"
+1. **Ask the user**: "你想使用哪个摘要模板？"
 2. **Present options** with brief descriptions:
-   - **Standard**: Balanced tech article format in English (Overview, Key Points, Technical Details, Takeaways, Conclusion)
-   - **Concise**: 简洁笔记（中文）- 聚焦核心知识，快速复习
-   - **Comprehensive**: 全面解析（中文）- 按文章顺序分节，突出创新点和实用价值
+   - **Standard**: 平衡型技术文章格式（默认中文，可指定英文）(Overview, Key Points, Technical Details, Takeaways, Conclusion)
+   - **Concise**: 简洁笔记（默认中文）- 聚焦核心知识，快速复习
+   - **Comprehensive**: 全面解析（默认中文）- 按文章顺序分节，突出创新点和实用价值
 3. **Use the selected template's structure** for the summary
 
 ## Default Template Structure (Standard)
@@ -157,7 +157,7 @@ Adapt summary emphasis based on content type:
 
 ### Standard Template
 Use for: General technical articles, blog posts, announcements
-- **Language**: Default English, user can specify Chinese
+- **Language**: 默认中文，用户可指定英文
 - **Sections**: Overview, Key Points, Technical Details, Takeaways, Conclusion
 - **Length**: Medium (300-500 words)
 - **Depth**: Balanced
