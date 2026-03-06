@@ -1,3 +1,29 @@
+---
+name: Comprehensive
+display_name: 全面解析
+version: 1.1.0
+default_language: zh
+target_length: 1500-3000
+target_reading_time: 5-10 minutes
+sections:
+  - title_overview
+  - key_concepts
+  - main_content_structure
+  - core_highlights
+  - issues_extensions
+guidelines_length:
+  title_overview: 1-2 sentences
+  key_concepts: 8-15 terms
+  main_content_structure: 按文章顺序分节（引言/背景/方法/实现/结果/结论）
+  core_highlights: 8-10 points
+  issues_extensions: 2-3 items each
+features:
+  - 按文章顺序分节
+  - 突出创新点和实用价值
+  - 层级缩进便于复习
+  - 保留技术准确性
+---
+
 # Summary Template: Comprehensive（全面解析）
 
 ## Description

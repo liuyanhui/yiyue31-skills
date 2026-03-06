@@ -1,3 +1,24 @@
+---
+name: Standard
+display_name: 标准摘要
+version: 1.1.0
+default_language: zh
+target_length: 300-500
+target_reading_time: 2-3 minutes
+sections:
+  - overview
+  - key_points
+  - technical_details
+  - takeaways
+  - conclusion
+guidelines_length:
+  overview: 2-3 sentences
+  key_points: 3-7 bullets
+  technical_details: 1-3 paragraphs
+  takeaways: 2-4 bullets
+  conclusion: 1-2 sentences
+---
+
 # Summary Template: Standard Tech Article
 
 ## Description

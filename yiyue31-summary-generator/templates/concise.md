@@ -1,3 +1,29 @@
+---
+name: Concise
+display_name: 简洁笔记
+version: 1.1.0
+default_language: zh
+target_length: 800-1500
+target_reading_time: 3-5 minutes
+sections:
+  - title_overview
+  - key_concepts
+  - content_outline
+  - core_insights
+  -_questions_extensions
+guidelines_length:
+  title_overview: 1-2 sentences
+  key_concepts: 5-10 terms
+  content_outline: hierarchical by section
+  core_insights: 5-8 points
+  questions_extensions: 2-3 items each
+features:
+  - 聚焦核心知识
+  - 避免冗余
+  - 保留英文专有名词
+  - 层级结构便于复习
+---
+
 # Summary Template: Concise（简洁笔记）
 
 ## Description
