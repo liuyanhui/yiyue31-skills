@@ -965,6 +965,22 @@ Offer options:
 - **改变语言** (Change language)
 - **完美，保存** (Perfect, save)
 
+### Markdown Format Requirements
+
+After generating the summary, verify the following:
+
+- [ ] **标题层级**：# → ## → ### 顺序，不跳跃
+- [ ] **列表缩进**：同层级缩进一致（2空格），分隔符统一
+- [ ] **代码块**：``` 后加语言标识，保留原文缩进
+- [ ] **数学公式**：行内用 $，独立用 $$
+- [ ] **表格格式**：| 对齐正确，表头分隔符 ≥3个-
+- [ ] **换行规则**：段落间空一行，列表项间无空行
+- [ ] **空行控制**：连续不超过2行
+- [ ] **链接格式**：[文本](URL) 格式正确
+- [ ] **特殊字符**：| < > 需转义处已处理
+- [ ] **行尾空格**：无多余空格
+- [ ] **中英文空格**：之间保留一个空格
+
 ## Using Different Templates
 
 ### Standard Template
