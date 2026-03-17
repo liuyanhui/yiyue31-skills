@@ -2,8 +2,6 @@
 name: yiyue31-tech-article-translator
 description: 翻译英文文章为中文。保留技术术语，支持直译和意译两种模式。当用户提供英文技术文章URL或内容时启用。当用户输入“翻译”，“translate” "translate article", "translate to Chinese", "改成中文"，"convert to Chinese"等指令时启用。或者当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
 version: 1.0.0 
-category: Content Creation
-tags: #translation #tech #chinese #terminology
 author: Yiyue31
 ---
 
