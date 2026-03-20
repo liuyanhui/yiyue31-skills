@@ -3,8 +3,6 @@ name: Standard
 display_name: 标准摘要
 version: 1.1.0
 default_language: zh
-target_length: 300-500
-target_reading_time: 2-3 minutes
 sections:
   - overview
   - key_points

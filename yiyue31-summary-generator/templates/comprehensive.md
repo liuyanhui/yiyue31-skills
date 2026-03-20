@@ -3,8 +3,6 @@ name: Comprehensive
 display_name: 全面解析
 version: 1.1.0
 default_language: zh
-target_length: 1500-3000
-target_reading_time: 5-10 minutes
 sections:
   - title_overview
   - key_concepts
@@ -12,7 +10,7 @@ sections:
   - core_highlights
   - issues_extensions
 guidelines_length:
-  title_overview: 1-2 sentences
+  title_overview: 1-5 sentences
   key_concepts: 8-15 terms
   main_content_structure: 按文章顺序分节（引言/背景/方法/实现/结果/结论）
   core_highlights: 8-10 points
@@ -46,9 +44,9 @@ features:
 
 **文章标题**：[Original Title]
 
-**概述**：[1-2句话概述文章核心主题和主要目标]
+**概述**：[1-5句话概述文章核心主题和主要目标]
 
-## 2. 关键概念与术语
+## 2. 关键内容提炼
 
 - **[术语/缩写1]**：[简短解释，用简单语言]
 - **[术语/缩写2]**：[简短解释，用简单语言]
@@ -117,6 +115,5 @@ features:
 
 - 技术文章深度学习笔记
 - 工程师技术复习
-- 学生课程学习整理
 - 论文/技术报告理解
 - 知识沉淀和分享
