@@ -122,7 +122,7 @@ author: Yiyue31
 - **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）
 - **图文语言适配**：翻译时精准保留图片引用；译文完成后复核引用图片，确认其主体文字语言与译文语言匹配
 - **尊重原文**：保留原文含义与意图，不增删、不主观篡改
-- **译者注释**：针对目标读者因术语、文化差异、领域知识难以理解的内容，在其后立即加简洁注释（括号内），用通俗语言释义而非仅标英文原文。格式：译文（English original，通俗解释）。注释深度适配读者：普通读者注释更详细，专业读者可简化。仅必要时注释，避免过度标注浅显词汇。
+- **译者注释**：针对目标读者因术语、文化差异、领域知识难以理解的内容，在其后立即加简洁注释（括号内），用通俗语言释义而非仅标英文原文。格式：`中文译文（English original，必要时添加说明）`。注释深度适配读者：普通读者注释更详细，专业读者可简化。仅必要时注释，避免过度标注浅显词汇。
 
 **意译时的额外翻译规则**：
 - **重意不重形**：翻译作者的核心表意，而非单纯逐字直译。若直译生硬、无法传递预期效果，可自由重构句式，用地道目标语言表达相同含义
@@ -165,9 +165,11 @@ author: Yiyue31
 ## 输出格式规范
 
 ### 文件保存位置
+When translating technical documents, always save BOTH the original English version and the Chinese translation. Name them clearly (e.g., 'original-article.md' and 'translated-article-zh.md').
 
 ```
-articles/{YYYY-MM}/{article-name}.md
+articles/{YYYY-MM}/original-{article-name}.md
+articles/{YYYY-MM}/translated-{article-name}-zh.md
 ```
 
 **文件命名规则**：使用翻译后的标题，小写字母，单词间用连字符连接
