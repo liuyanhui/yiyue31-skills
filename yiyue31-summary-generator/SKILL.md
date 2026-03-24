@@ -82,20 +82,58 @@ The complete step-by-step process from input to final output:
 
 ## Article Analysis Workflow
 
-Detailed process for analyzing article before summarization. See `references/article-analysis.py` for complete implementation.
+Detailed process for analyzing article before summarization. See `references/article-analysis.py` for complete implementation with testable functions.
 
 ### Step 1: Initial Scan
 Extract article metadata, detect type, extract themes and technical terms.
 
+**Available Functions:**
+- `extract_title(content)` - Extract article title
+- `extract_author(content)` - Extract author name
+- `word_count(content)` - Count total words
+- `identify_sections(content)` - Identify main sections
+- `analyze_article(content, language)` - Main analysis function
+
 ### Step 2: Article Type Detection
+
 **Indicators for each type:**
-- **Blog Post**: Personal tone ("I", "my"), practical examples
-- **Research Paper**: Abstract section, citations, methodology
-- **Documentation**: API reference format, code examples, technical specs
-- **Tutorial**: Step-by-step format, numbered lists
+
+| Type | Primary Indicators | Secondary Indicators | Summary Emphasis |
+|------|-------------------|---------------------|-----------------|
+| **Blog Post** | Personal tone ("I", "my"), practical examples | How-to focus, implementation tips | Practical takeaways, implementation tips |
+| **Research Paper** | Abstract section, citations, methodology | Results, discussion, conclusion sections | Research questions, findings, methodology |
+| **Documentation** | API reference format, code examples, technical specs | Usage patterns, parameter descriptions | Technical details, usage patterns |
+| **Tutorial** | Step-by-step format, numbered lists | Learning outcomes, prerequisites | Learning outcomes, key steps covered |
+
+**Function:** `detect_article_type(content)` - Returns detected article type
 
 ### Step 3: Section Identification
-See `references/section-patterns.md` for common section patterns by article type.
+
+**Common section patterns:**
+
+**Research Paper Sections:**
+- Abstract / 摘要
+- Introduction / 引言
+- Background / 背景
+- Methodology / 方法
+- Implementation / 实现
+- Results / 结果
+- Discussion / 讨论
+- Conclusion / 结论
+
+**Blog Post Sections:**
+- Introduction / 开头
+- Problem Statement / 问题陈述
+- Solution / 解决方案
+- Examples / 示例
+- Takeaways / 总结
+
+**Tutorial Sections:**
+- Prerequisites / 前置要求
+- Step 1, 2, 3... / 步骤
+- Summary / 总结
+
+**Function:** `identify_sections(content)` - Returns list of section titles
 
 ### Step 4: Theme Extraction
 1. Identify heading structure (H1, H2, H3)
@@ -104,7 +142,10 @@ See `references/section-patterns.md` for common section patterns by article type
 4. Note code examples and their purposes
 5. Capture author's stated objectives
 
+**Function:** `extract_themes(content, top_n=5)` - Returns top N themes
+
 ### Step 5: Technical Term Extraction
+
 **Rules:**
 - Preserve: camelCase, PascalCase, snake_case identifiers
 - Preserve: Framework names (React, Vue, Django)
@@ -112,7 +153,16 @@ See `references/section-patterns.md` for common section patterns by article type
 - Translate: General technical terms unless in code context
 - Preserve: Command-line syntax and file extensions
 
-See `references/technical-term-examples.md` for preservation examples.
+**Examples:**
+```
+✅ Preserve: useState, useEffect, mapStateToProps
+✅ Preserve: <Component />, const, function
+✅ Preserve: HTTP, API, JSON, SQL
+❌ Translate: "component" → "组件" (unless in code)
+❌ Translate: "function" → "函数" (unless in code)
+```
+
+**Function:** `extract_technical_terms(content)` - Returns categorized technical terms
 
 ---
 
@@ -167,26 +217,81 @@ See `references/summary-generation.py` for complete implementation of all genera
 
 ### Pre-Presentation Validation Checklist
 
-Before presenting summary to user, run these checks. See `references/quality-validation.py` for complete implementation.
+Before presenting summary to user, run these checks. See `references/quality-validation.py` for complete implementation with testable functions.
 
 #### 1. Coverage Validation
 Check that all major points are covered.
 
+**Function:** `validate_coverage(analysis, summary)`
+- **Returns:** Status, missing sections (if any), action required
+- **Check:** Ensures all article sections are represented in summary
+
 #### 2. Accuracy Validation
 Check technical terms are used correctly.
+
+**Function:** `validate_accuracy(article, summary)`
+- **Returns:** Status, misused terms (if any), action required
+- **Check:** Technical terms from article appear correctly in summary
 
 #### 3. Length Validation
 Check summary length matches template guidelines.
 
+**Function:** `validate_length(summary, template_metadata)`
+- **Returns:** Status, actual word count, expected range
+- **Check:** Summary word count within template target range
+
 #### 4. Structure Validation
 Check all required sections are present.
+
+**Function:** `validate_structure(summary, template_metadata)`
+- **Returns:** Status, missing sections (if any), sections found
+- **Check:** All required section headers present in summary
 
 #### 5. Fabrication Validation
 Ensure no information is fabricated.
 
+**Function:** `validate_fabrication(article, summary)`
+- **Returns:** Status, fabricated facts (if any), action required
+- **Check:** Facts in summary exist in original article
+
+### Running All Validations
+
+**Function:** `run_validation_checks(article, analysis, summary, template_metadata)`
+- **Returns:** List of all validation results
+- **Usage:** Run all checks at once before presenting summary
+
 ### Validation Summary Report
 
-See `references/validation-report-template.md` for report templates.
+**Function:** `generate_validation_report(results)`
+- **Returns:** Markdown formatted validation report
+- **Output Format:**
+
+```markdown
+## ✅ Quality Validation Report
+
+| Check | Status | Details |
+|-------|--------|---------|
+| Coverage | ✅ PASS | All major sections covered |
+| Accuracy | ✅ PASS | Technical terms used correctly |
+| Length | ✅ PASS | 425 words (target: 300-500) |
+| Structure | ✅ PASS | All 5 sections present |
+| Fabrication | ✅ PASS | No fabricated information |
+
+**Overall Status**: READY TO PRESENT
+```
+
+If any check fails:
+
+```markdown
+## ⚠️ Quality Validation Report
+
+| Check | Status | Details |
+|-------|--------|---------|
+| Coverage | ❌ FAIL | Missing: Results section |
+| Length | ⚠️ WARN | 250 words (target: 300-500) |
+
+**Action Required**: Add Results section, expand Technical Details
+```
 
 ---
 
@@ -194,21 +299,124 @@ See `references/validation-report-template.md` for report templates.
 
 ### Feedback Collection
 
-After presenting summary, ask for feedback. See `references/user-feedback.py` for complete implementation including feedback prompt template and refinement handlers.
+After presenting summary, ask for feedback. See `references/user-feedback.py` for complete implementation with testable functions.
+
+**Function:** `generate_feedback_prompt()`
+- **Returns:** Markdown formatted feedback prompt
+- **Prompt Template:**
+
+```markdown
+## 📋 Summary Complete
+
+这份摘要是否符合您的需求？是否需要调整？
+Does this summary meet your needs? Any adjustments needed?
+
+**Options / 选项:**
+1. **调整长度 / Adjust Length** - Make shorter or longer
+2. **重新聚焦 / Refocus** - Emphasize specific topic
+3. **改变语言 / Change Language** - Switch to Chinese/English
+4. **完美，保存 / Perfect, Save** - Finalize summary
+```
 
 ### Refinement Handlers
 
 #### Handler 1: Length Adjustment
+
 **Input:** "Make it shorter" / "Make it longer"
-**Process:** Adjust by ~25% using condense or expand strategy
+**Function:** `adjust_length(summary, direction, template_metadata, article)`
+- **Process:** Adjust by ~25% using condense or expand strategy
+- **Helper Functions:**
+  - `condense_summary(summary, target_length)` - Reduce word count
+  - `expand_summary(summary, target_length, article)` - Add details from article
+
+**Example:**
+```python
+# Make summary shorter
+shorter = adjust_length(summary, "shorter", template_metadata, article)
+
+# Make summary longer
+longer = adjust_length(summary, "longer", template_metadata, article)
+```
 
 #### Handler 2: Refocus on Topic
+
 **Input:** "Focus more on [topic]"
-**Process:** Enhance relevant sections, reduce others to maintain length
+**Function:** `refocus_summary(summary, topic, article)`
+- **Process:** Enhance relevant sections, reduce others to maintain length
+- **Helper Functions:**
+  - `find_topic_sections(article, topic)` - Find sections related to topic
+  - `extract_topic_details(article, topic_sections)` - Extract topic details
+  - `enhance_sections(summary, topic, topic_details)` - Add topic details
+  - `balance_sections(summary)` - Balance section lengths
+
+**Example:**
+```python
+# Focus on performance
+refocused = refocus_summary(summary, "Performance", article)
+```
 
 #### Handler 3: Language Change
+
 **Input:** "Can you provide this in English/Chinese?"
-**Process:** Translate while preserving technical terms and applying language template
+**Function:** `change_language(summary, current_language, target_language, article)`
+- **Process:** Translate while preserving technical terms and applying language template
+- **Helper Functions:**
+  - `translate_to_english(text)` - Chinese to English
+  - `translate_to_chinese(text)` - English to Chinese
+  - `preserve_technical_terms(summary, article)` - Keep technical terms intact
+  - `apply_language_template(summary, language)` - Apply language-specific formatting
+
+**Example:**
+```python
+# Switch to Chinese
+chinese_summary = change_language(english_summary, "en", "zh", article)
+
+# Switch to English
+english_summary = change_language(chinese_summary, "zh", "en", article)
+```
+
+### Unified Refinement Handler
+
+**Function:** `handle_refinement_request(summary, request, article, template_metadata)`
+- **Purpose:** Parse user request and route to appropriate handler
+- **Supports:**
+  - "make it shorter" / "make it longer"
+  - "focus on [topic]"
+  - "translate to Chinese/English"
+
+**Example:**
+```python
+refined = handle_refinement_request(
+    summary,
+    "please make it shorter and focus on React",
+    article,
+    template_metadata
+)
+```
+
+### Refinement Loop
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Present Summary                          │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    Ask for Feedback                         │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+                    User Response?
+                              ↓
+            ┌─────────────────┴─────────────────┐
+            │                                   │
+        [Perfect]                         [Adjustment Needed]
+            │                                   │
+            ↓                                   ↓
+    [Save/Finalize]                    [Apply Refinement]
+            │                                   │
+            └───────────────────┬───────────────┘
+                                ↓
+                        [Return to Validation]
+```
 
 ---
 
@@ -216,29 +424,123 @@ After presenting summary, ask for feedback. See `references/user-feedback.py` fo
 
 ### Error Types and Handling
 
-See `references/error-handling.py` for complete implementation of all error types including detection logic and user-facing messages.
+See `references/error-handling.py` for complete implementation with testable functions and custom exceptions.
 
 #### Error 1: Invalid URL
-Cannot access the provided URL
+
+**Detection:** `is_url(input_string)` and `check_url_accessible(url)`
+**Exception:** `InvalidURLError`
+**User Message:**
+```markdown
+## ❌ 无法访问URL / URL Not Accessible
+
+无法访问该链接。请尝试以下方法：
+The URL cannot be accessed. Please try:
+
+1. **检查链接 / Check URL** - 确认URL是否正确
+2. **直接粘贴 / Paste Content** - 直接粘贴文章内容
+3. **更换链接 / Different URL** - 尝试其他链接
+```
 
 #### Error 2: File Not Found
-Requested file does not exist
+
+**Detection:** `is_file_path(input_string)` and `check_file_exists(file_path)`
+**Exception:** `FileNotFoundError`
+**User Message:**
+```markdown
+## ❌ 文件不存在 / File Not Found
+
+找不到该文件。请检查：
+File not found. Please check:
+
+1. **文件路径 / File Path** - 确认路径正确
+2. **文件格式 / File Format** - 支持.md和.txt文件
+3. **直接粘贴 / Paste** - 直接粘贴内容
+```
 
 #### Error 3: Empty/Insufficient Content
-Content too short (minimum 100 words required)
+
+**Detection:** `validate_content_length(content, min_words=100)`
+**Exception:** `InsufficientContentError`
+**Minimum Required:** 100 words
+**User Message:**
+```markdown
+## ❌ 内容不足 / Insufficient Content
+
+文章内容太少（最少需要100字）。
+Content too short (minimum 100 words required).
+
+**当前 / Current:** {actual} 字/words
+**需要 / Required:** 100+ 字/words
+
+请提供完整文章内容。
+Please provide the complete article.
+```
 
 #### Error 4: Article Type Ambiguous
-Cannot determine article type (Blog/Tutorial/Research/Documentation)
+
+**Detection:** `detect_article_type_confidence(content)` with confidence < 0.6
+**Exception:** `AmbiguousTypeError`
+**User Message:**
+```markdown
+## ❓ 文章类型不明确 / Article Type Unclear
+
+无法确定文章类型，请选择：
+Cannot determine article type, please select:
+
+1. **博客文章 / Blog Post** - 个人观点、实践经验
+2. **教程 / Tutorial** - 分步指导、学习材料
+3. **研究论文 / Research Paper** - 学术研究、数据分析
+4. **文档 / Documentation** - API参考、技术规范
+```
 
 #### Error 5: Template Loading Failed
-Requested template not found, using default
+
+**Detection:** `check_template_exists(template_name, available_templates)`
+**Exception:** `TemplateNotFoundError`
+**Fallback:** Use default template (Standard)
+**User Message:**
+```markdown
+## ⚠️ 模板未找到 / Template Not Found
+
+请求的模板 "{template}" 不存在。
+Requested template "{template}" not found.
+
+**可用模板 / Available Templates:**
+- Standard (标准摘要)
+- Concise (简洁笔记)
+- Comprehensive (全面解析)
+
+使用默认模板：Standard
+Using default template: Standard
+```
+
+### Comprehensive Input Validation
+
+**Function:** `validate_input(input_string)`
+- **Returns:** Validation status with error details if validation fails
+- **Checks:** URL accessibility, file existence, content length, article type
+- **Usage:** Run once at the start of workflow
 
 ### Error Recovery Flow
 ```
-[Error Detected] → [Identify Type] → [Recoverable/Non-Recoverable]
-                                   ↓                    ↓
-                           [Provide Solution]    [Inform User]
-                           [Offer Alternative]   [Request Input]
+┌─────────────────────────────────────────────────────────────┐
+│                    [Error Detected]                         │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+                    [Identify Error Type]
+                              ↓
+            ┌─────────────────┴─────────────────┐
+            │                                   │
+      [Recoverable]                     [Non-Recoverable]
+            │                                   │
+            ↓                                   ↓
+    [Provide Solution]                [Inform User]
+    [Offer Alternative]                [Request New Input]
+            │                                   │
+            └───────────────────┬───────────────┘
+                                ↓
+                        [Await User Action]
 ```
 
 ---
