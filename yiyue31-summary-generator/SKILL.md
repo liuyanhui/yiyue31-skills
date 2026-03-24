@@ -1,53 +1,21 @@
 ---
 name: yiyue31-summary-generator
-description: Generates structured summaries of technical articles with multiple templates (Standard/Concise/Comprehensive). Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize blog", "生成摘要", "总结文章", or provides URLs/files that need summarization. Supports all types of tech content (blog posts, research papers, documentation, tutorials) in Chinese or English. Accepts URLs, text files (.md, .txt), or direct text input.
+description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成摘要", "总结文章", or provides URLs/files that need summarization. 
 ---
 
 # Tech Article Summarizer
 
 ## Summary Templates
 
-This skill supports multiple summary templates for different use cases. **Before generating a summary, you will be asked to select a template.**
+This skill supports multiple summary templates for different use cases. **Before generating a summary,  ask user to select a template.**
 
 ### Available Templates
 
-| Template | Description | Best For |
-|----------|-------------|----------|
-| **Standard** | 平衡型通用技术文章格式（默认中文） | 大多数技术文章、博客文章、公告 |
-| **Concise** | 简洁笔记 - 聚焦核心知识（默认中文） | 技术文章学习笔记、工程师快速复习 |
-| **Comprehensive** | 全面解析 - 按文章顺序分节整理（默认中文） | 深度学习、技术参考、设计方案参考 |
-
-### Template Management
-
-Templates are stored in `templates/` directory. Each template file is self-contained with its own structure, guidelines, and use cases.
-
-**To add a new template:**
-1. Create a new `.md` file in `templates/` (e.g., `my-template.md`)
-2. Follow the template structure format used by existing templates
-3. Include sections: Description, Structure (markdown example), Guidelines, Best For
-4. The template will be automatically available for selection
-
-**To remove templates:** Delete the corresponding `.md` file from `templates/` directory.
-
-## Quick Start
-
-Summarize any technical article with structured output:
-
-**From URL:**
-```
-Summarize this article: https://example.com/tech-article
-```
-
-**From file:**
-```
-Summarize the article at ./article.md
-```
-
-**Direct text:**
-```
-Summarize this article:
-[paste article content]
-```
+| Template | Description | Best For | Template Path |
+|----------|-------------|----------|---------------|
+| **Standard** | 平衡型通用技术文章格式（默认中文） | 大多数技术文章、博客文章、公告 | `templates/standard.md` |
+| **Concise** | 简洁笔记 - 聚焦核心知识（默认中文） | 技术文章学习笔记、工程师快速复习 | `templates/concise.md` |
+| **Comprehensive** | 全面解析 - 按文章顺序分节整理（默认中文） | 深度学习、技术参考、设计方案参考 | `templates/comprehensive.md` |
 
 ## Template and Language Selection Workflow
 
@@ -66,57 +34,43 @@ When starting a new summary:
 
 ---
 
-## Main Execution Workflow
+## Main Workflow
 
 The complete step-by-step process from input to final output:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    1. INPUT STAGE                            │
-│  - Receive URL, file path, or direct text                   │
-│  - Detect input type                                         │
-│  - Fetch/read content                                        │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    2. SELECTION STAGE                        │
-│  - Ask language preference (Chinese/English)                │
-│  - Ask template selection (Standard/Concise/Comprehensive)  │
-│  - Load selected template metadata                          │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    3. ANALYSIS STAGE                         │
-│  - Detect article type (Blog/Research/Docs/Tutorial)        │
-│  - Extract article metadata (title, author, length)         │
-│  - Identify main themes and sections                        │
-│  - Extract key technical terms                              │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    4. GENERATION STAGE                      │
-│  - Generate each section per template structure             │
-│  - Apply language-specific rules                            │
-│  - Preserve technical terms appropriately                   │
-│  - Handle code blocks and examples                          │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    5. VALIDATION STAGE                      │
-│  - Run quality validation checklist                         │
-│  - Verify all sections present                              │
-│  - Check length requirements                                │
-│  - Validate technical accuracy                              │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    6. FEEDBACK STAGE                        │
-│  - Present summary to user                                  │
-│  - Ask for feedback                                         │
-│  - Handle refinement requests if any                        │
-│  - Finalize or regenerate                                   │
-└─────────────────────────────────────────────────────────────┘
-```
+### step 1. INPUT STAGE                          
+- Receive URL, file path, or direct text                  
+- Detect input type                                       
+- Fetch/read content                                      
+
+### step 2. SELECTION STAGE                      
+- Ask language preference (Chinese/English)               
+- Ask template selection (Standard/Concise/Comprehensive) 
+- Load selected template metadata                         
+
+### step 3. ANALYSIS STAGE                       
+- Detect article type (Blog/Research/Docs/Tutorial)       
+- Extract article metadata (title, author, length)        
+- Identify main themes and sections                       
+- Extract key technical terms                           
+
+### step 4. GENERATION STAGE                     
+- Generate each section per template structure            
+- Apply language-specific rules                           
+- Preserve technical terms appropriately                  
+- Handle code blocks and examples               
+
+### step 5. VALIDATION STAGE                     
+- Run quality validation checklist                        
+- Verify all sections present                             
+- Check length requirements                               
+- Validate technical accuracy                    
+
+### step 6. FEEDBACK STAGE                       
+- Present summary to user                                 
+- Ask for feedback                                        
+- Handle refinement requests if any                       
+- Finalize or regenerate  
 
 **Decision Points:**
 - At Stage 2: If user doesn't specify language, default to Chinese
@@ -141,10 +95,8 @@ def analyze_article(article_content, language):
         "length": word_count(article_content),
         "structure": identify_sections(article_content)
     }
-
     # Detect article type
     article_type = detect_article_type(article_content)
-
     # Extract main themes
     themes = extract_themes(article_content, top_n=5)
 
@@ -158,6 +110,7 @@ def analyze_article(article_content, language):
         "tech_terms": tech_terms
     }
 ```
+
 
 ### Step 2: Article Type Detection
 
