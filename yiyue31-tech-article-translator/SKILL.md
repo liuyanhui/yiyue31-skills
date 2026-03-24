@@ -1,6 +1,6 @@
 ---
 name: yiyue31-tech-article-translator
-description: 翻译英文文章为中文。保留技术术语，支持直译和意译两种模式。当用户提供英文技术文章URL或内容时启用。当用户输入“翻译”，“translate” "translate article", "translate to Chinese", "改成中文"，"convert to Chinese"等指令时启用。或者当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
+description: 当用户输入“翻译”，“translate” "translate article", "translate to Chinese", "改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
 version: 1.0.0 
 author: Yiyue31
 ---
@@ -39,13 +39,14 @@ author: Yiyue31
 ### Step 1: 获取文章内容
 
 根据用户输入的类型，使用不同工具获取文章内容：
-- **URL输入**：优先查看本地是否已经安装合适下载文章和转换文章的skills。否则，使用 `wget` 或 `curl` 或 `agent-browser` 获取文章内容。下载的原始文章要保存到本地。
+- **URL输入**：优先使用本地已安装的skills，如：下载文章、转换文章、搜索信息、操作网页、查看网页等skills。其次，使用 `wget` 或 `curl` 或 `agent-browser` 获取文章内容。
 - **文件路径输入**：使用 `Read` 工具读取文件内容
 - **直接粘贴**：直接处理输入内容
+- 用户输入的原始文章/文件/粘贴内容，提取title（title提取优先级为：从标题中提取，文件名，第一句话的前10个字），保存到本地，目录为：`{title}/original-{title}.md`。
 - **缺少需要翻译的内容**，要求用户提供信息
 
 **文章内容预处理**
-1. 文章内容为非markdown格式时，转换为markdown格式，并保存为`original-{Original English Title}.md`。
+1. 文章内容为非markdown格式时，转换并保存为markdown格式。
 2. 转换时保留原文结构和格式，尽量保持段落、标题、列表等格式不变；对于无法准确转换的元素，保留原文并添加注释提示用户检查。
 3. 检查转换后文件。如果不确定转换结果，要求用户确认。
 
@@ -56,6 +57,7 @@ author: Yiyue31
 3. 使用关键词匹配术语表topic，确定文章topic
 4. 加载或新建对应术语表
 5. 当不确定topic是否已经存在时，咨询用户
+6. 分析结果保存到本地，目录为：`{title}/analysis-{title}.md`。
 
 **topic识别规则**：优先从标题、h2/h3中提取；识别技术关键词；多topic选择主要topic；未知topic询问用户。
 **语言识别**：如果输入内容主要是中文（如：中文超过50%），请用户确认是否继续；如果主要语言是非英文的其他语言，请用户确认是否继续。
@@ -81,13 +83,13 @@ author: Yiyue31
 默认选择：直译
 
 
-### Step 4: 术语表维护
-
-1. **提取新术语**：扫描文章，识别未在术语表中的专业术语
-2. **展示新术语**：展示新术语列表
-3. **用户确认**：全部添加、部分添加或跳过
-4. **更新术语表**：将确认的术语追加到 `glossary/{topic}.md`
-5. **不翻译的情况**：术语表中`Chinese Term`列为`[KEEP]`时，表示不翻译该术语。
+### Step 4: 术语表读取和维护
+1. **加载术语表**：从 `glossary/{topic}.md` 加载术语表，识别需要保留英文的术语
+2. **提取新术语**：扫描文章，识别未在术语表中的专业术语
+3. **展示新术语**：展示新术语列表
+4. **用户确认**：全部添加、部分添加或跳过
+5. **更新术语表**：将确认的术语追加到 `glossary/{topic}.md`
+6. **不翻译的情况**：术语表中`Chinese Term`列为`[KEEP]`时，表示不翻译该术语。
 
 
 **术语表规则**
@@ -132,6 +134,9 @@ author: Yiyue31
 **subagent支持**：
 - 如果支持subagent，启用subagent执行本步骤的翻译任务。
 
+**文件保存路径**：
+- 翻译完成后，保存翻译结果到本地，目录为：`{title}/translated-{title}-zh.md`。
+
 ### Step 6: 结果文件校验
 
 #### 翻译质量检查
@@ -168,8 +173,9 @@ author: Yiyue31
 When translating technical documents, always save BOTH the original English version and the Chinese translation. Name them clearly (e.g., 'original-article.md' and 'translated-article-zh.md').
 
 ```
-articles/{YYYY-MM}/original-{article-name}.md
-articles/{YYYY-MM}/translated-{article-name}-zh.md
+{title}/original-{title}.md
+{title}/analysis-{title}.md
+{title}/translated-{title}-zh.md
 ```
 
 **文件命名规则**：使用翻译后的标题，小写字母，单词间用连字符连接
