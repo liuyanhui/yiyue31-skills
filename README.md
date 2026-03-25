@@ -1,12 +1,12 @@
 # Yiyue31 Agent Skills
 
-个人 Agent Skills 集合 - 用于 Claude Code 的自定义技能包
+个人 Agent Skills 集合 - 用于 Claude Code 的自定义Skills包
 
 ## 项目简介
 
 本项目包含针对特定使用场景优化的 Agent Skills，可安装到 Claude Code 中扩展 AI 助手的能力。
 
-## 当前技能
+## 包含的Skills
 
 ### 📚 yiyue31-courseware-generator
 
@@ -20,7 +20,7 @@
 - 自动生成分级习题和历年中考真题
 - 输出高质量 Markdown 格式课件
 
-**技能包：** `yiyue31-courseware-generator.skill`
+**目录：** `yiyue31-courseware-generator/SKILL.md`
 
 **使用示例：**
 ```
@@ -42,7 +42,7 @@
 - 输出带 YAML Frontmatter 的规范 Markdown
 - 自动 Git 提交术语表更新
 
-**技能包：** `yiyue31-tech-article-translator.skill`
+**目录：** `yiyue31-tech-article-translator/SKILL.md`
 
 **使用示例：**
 ```
@@ -56,6 +56,7 @@
 智能技术文章总结生成器，支持多种模板和文章类型的深度分析。
 
 **功能特性：**
+
 - 三种专业总结模板（技术文章、论文、简洁笔记）
 - 智能文章分析（语言、类型、主题、结构、主体、背景、术语、金句）
 - 支持多种输入方式（URL、文件、直接粘贴）
@@ -65,13 +66,15 @@
 - 生成结构化 Markdown 输出文件
 
 **可用模板：**
+
 - **Tech-Article-Summary**：技术文章总结模板，适合技术博客、文档、公告等
 - **Paper Template**：论文总结模板，适合学术论文和研究报告
 - **Concise Template**：简洁笔记模板，聚焦核心知识，适合快速学习（默认）
 
-**技能包：** `yiyue31-summary-generator.skill`
+**目录** `yiyue31-summary-generator/SKILL.md`
 
 **工作流程：**
+
 1. 获取文章内容（支持 URL/文件/粘贴）
 2. 深度分析（8维度智能分析）
 3. 模板选择与总结生成
@@ -82,26 +85,24 @@
 ```
 总结这篇文章：https://example.com/tech-post
 ```
-
-**工具脚本：**
-- `scripts/word-counter.js` - 字数统计工具，支持中英文混合内容统计
-
 ---
 
 ## 安装方法
 
-1. 下载 `.skill` 文件
-2. 将文件复制到 Claude Code 的 skills 目录
-3. 重启 Claude Code
+1. 包含三个文件：`yiyue31-summary-generator/SKILL.md`,`yiyue31-tech-article-translator/SKILL.md`, `yiyue31-courseware-generator/SKILL.md`。
+2. User scope 级别安装。依次将三个文件复制到`~/.claude/`下。
+3. Project 级别安装。将文件复制到项目对应的目录下的`.claude/`。
+4. 复制前先创建对应的目录：`yiyue31-summary-generator/`,`yiyue31-tech-article-translator/`, `yiyue31-courseware-generator/`
+5. 重启 Claude Code
 
 ## 项目结构
 
-所有技能遵循 Anthropic Agent Skills 规范：
+所有Skills遵循 Anthropic Agent Skills 规范：
 
 ```
 skill-name/
-├── SKILL.md              # 必需：技能定义和工作流程
-├── README.md             # 可选：技能说明文档
+├── SKILL.md              # 必需：Skills定义和工作流程
+├── README.md             # 可选：Skills说明文档
 ├── CLAUDE.md             # 可选：文档生成规则
 ├── templates/            # 可选：模板文件
 │   ├── template-1.md
@@ -113,9 +114,9 @@ skill-name/
 └── assets/               # 可选：输出资源文件
 ```
 
-## 技能开发规范
+## Skills开发规范
 
-- 使用 YAML Frontmatter 定义技能元数据
+- 使用 YAML Frontmatter 定义Skills元数据
 - 提供清晰的工作流程和步骤说明
 - 包含使用示例和最佳实践
 - 保持文档简洁易读
