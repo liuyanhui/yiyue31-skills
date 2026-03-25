@@ -2,24 +2,6 @@
 name: Comprehensive
 display_name: 全面解析
 version: 1.1.0
-default_language: zh
-sections:
-  - title_overview
-  - key_concepts
-  - main_content_structure
-  - core_highlights
-  - issues_extensions
-guidelines_length:
-  title_overview: 1-5 sentences
-  key_concepts: 8-15 terms
-  main_content_structure: 按文章顺序分节（引言/背景/方法/实现/结果/结论）
-  core_highlights: 8-10 points
-  issues_extensions: 2-3 items each
-features:
-  - 按文章顺序分节
-  - 突出创新点和实用价值
-  - 层级缩进便于复习
-  - 保留技术准确性
 ---
 
 # Summary Template: Comprehensive（全面解析）
@@ -38,13 +20,15 @@ features:
 
 **模板**: Comprehensive（全面解析）
 
+**字数**：xxx字
+
 ---
 
 ## 1. 文章标题与概述
 
 **文章标题**：[Original Title]
 
-**概述**：[1-5句话概述文章核心主题和主要目标]
+**概述**：[1-5句话概述文章核心主题和主要目标，如果涉及人员，如果涉及人员、团队或组织等主体，简要说明该主体的相关背景]
 
 ## 2. 关键内容提炼
 
@@ -74,7 +58,8 @@ features:
 - [主要结论]
 - [未来方向]
 
-[可根据文章内容调整分节，如：技术背景、核心算法、实验设计、系统架构、性能评估、讨论等]
+**要求**
+- 根据原文结构依次进行总结
 
 ## 4. 核心要点与亮点
 
@@ -111,9 +96,4 @@ features:
 - **长度**: 5-10个核心要点
 - **突出重点**: 创新点、实用价值、技术比较
 
-## Best For
 
-- 技术文章深度学习笔记
-- 工程师技术复习
-- 论文/技术报告理解
-- 知识沉淀和分享
