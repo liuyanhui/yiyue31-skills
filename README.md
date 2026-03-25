@@ -87,13 +87,14 @@
 ```
 ---
 
-## 安装方法
+## 安装或更新的方法
 
 1. 包含三个文件：`yiyue31-summary-generator/SKILL.md`,`yiyue31-tech-article-translator/SKILL.md`, `yiyue31-courseware-generator/SKILL.md`。
 2. User scope 级别安装。依次将三个文件复制到`~/.claude/`下。
 3. Project 级别安装。将文件复制到项目对应的目录下的`.claude/`。
 4. 复制前先创建对应的目录：`yiyue31-summary-generator/`,`yiyue31-tech-article-translator/`, `yiyue31-courseware-generator/`
-5. 重启 Claude Code
+5. 只能复制或更新'## 项目结构'中的目录和目录下的文件。
+6. 重启 Claude Code
 
 ## 项目结构
 
@@ -102,14 +103,12 @@
 ```
 skill-name/
 ├── SKILL.md              # 必需：Skills定义和工作流程
-├── README.md             # 可选：Skills说明文档
-├── CLAUDE.md             # 可选：文档生成规则
 ├── templates/            # 可选：模板文件
 │   ├── template-1.md
 │   ├── template-2.md
 │   └── ...
 ├── scripts/              # 可选：可执行脚本
-│   └── script-name.js/py
+│   └── script-name.js/py/ts
 ├── references/           # 可选：参考文档和模板
 └── assets/               # 可选：输出资源文件
 ```
