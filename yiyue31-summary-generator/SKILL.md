@@ -5,32 +5,9 @@ description: Use when user asks to "summarize article", "summarize tech post", "
 
 # Tech Article Summarizer
 
-## Summary Templates
+## Description
 
-This skill supports multiple summary templates for different use cases. **Before generating a summary,  ask user to select a template.**
-
-### Available Templates
-
-| Template | Description | Best For | Template Path |
-|----------|-------------|----------|---------------|
-| **Standard** | 平衡型通用技术文章格式（默认中文） | 大多数技术文章、博客文章、公告 | `templates/standard.md` |
-| **Concise** | 简洁笔记 - 聚焦核心知识（默认中文） | 技术文章学习笔记、工程师快速复习 | `templates/concise.md` |
-| **Comprehensive** | 全面解析 - 按文章顺序分节整理（默认中文） | 深度学习、技术参考、设计方案参考 | `templates/comprehensive.md` |
-
-## Template and Language Selection Workflow
-
-When starting a new summary:
-
-1. **Ask language preference**: "总结语言？ / Summary language?"
-   - **中文** (Chinese - default)
-   - **English** (English)
-
-2. **Ask template selection**: "你想使用哪个总结模板？ / Which summary template?"
-   - **Standard**: 平衡型技术文章格式 (Overview, Key Points, Technical Details, Takeaways, Conclusion)
-   - **Concise**: 简洁笔记 - 聚焦核心知识，快速复习
-   - **Comprehensive**: 全面解析 - 按文章顺序分节，突出创新点和实用价值
-
-3. **Use the selected template's structure** for the summary in the chosen language
+文章总结生成器，适用于用户需要总结技术文章、博客、论文、文档等内容的场景。支持多种总结模板，满足不同需求。通过分析文章内容，提取核心要点和亮点，生成结构化、易读的总结。
 
 ---
 
@@ -54,7 +31,7 @@ The complete step-by-step process from input to final output:
 
 ### Step 2: 分析文章                 
 - 语言分析：检测文章语言
-- 文章类型分析：技术博客、论文、产品文档、使用教程，视频字幕等。
+- 文章类型分析：技术博客、论文、产品文档、使用教程，视频字幕、论文、普通文章等。
 - 主题分析：提取文章的主题和领域
 - 结构分析：识别文章的主要结构和章节
 - 主体分析：如果涉及人员、团队或组织等主体，分析其相关背景
@@ -64,8 +41,7 @@ The complete step-by-step process from input to final output:
 - 分析结果保存到本地，目录为：`{title}/analysis-{title}.md`。
 
 ### step 3. 模板选择与总结生成
-- 根据分析结果推荐适合的总结模板。总结模板见`templates/`目录下的文件。
-- 根据用户选择的模板生成总结
+- 根据分析结果推荐适合的总结模板。模板见"Available Templates"部分。
 - 金句和重要术语在总结中突出显示，格式为：在单独的一个段落中用 `> 中文翻译文字(英文原文)` 形式展示。
 - 总结保存在本地，目录为：`{title}/summary-{title}.md`。
 - 运行 `node scripts/word-counter.js {title}/summary-{title}.md` 检查字数是否符合模板要求，并展示结果。
@@ -82,9 +58,17 @@ The complete step-by-step process from input to final output:
 - 根据用户选择的语言进行润色，去除AI生成痕迹。如果本地已经安装去除AI生成痕迹的Skills（如：humanizer-zh）；如果没有可以通过`find-skills`搜索和下载相关的去除AI生成痕迹的skills，安装到当前目录后再使用。
 - 润色后的总结保存到本地，目录为：`{title}/final-summary-{title}.md`。
 
+---
+
+## Available Templates
+
+- **Tech Article Template**: 技术文章总结模板 - 适合技术文章、技术博客、技术公告等，提供全面的分析和总结，突出创新点和实用价值。模板内容见 `templates/tech-article.md`。
+- **Paper Template**: 论文总结模板 - 适合学术论文总结，帮助读者快速学习和理解论文的核心内容和创新点。模板内容见 `templates/paper.md`。
+- **Concise Template**: 简洁总结模板 - 聚焦核心知识，适合快速学习。模板内容见 `templates/concise.md`。**默认模板*，当其他模板无法匹配时使用。
+
 
 **注意**
 - 要严格按照step顺序执行，禁止跳过任何步骤
 - 每一步的输出都要保存到本地
 - 每一步的输出都要符合markdown格式要求，特别是标题层级、列表缩进、代码块格式、表格格式等
----
+
