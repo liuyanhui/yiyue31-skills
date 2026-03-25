@@ -1,9 +1,108 @@
 "use strict";
 /**
- * Word Counter Utility
+ * Word Counter Utility - 统计字数工具
  *
- * This TypeScript module provides utilities to count words in text files.
- * Supports various file formats including .md, .txt, and other text-based files.
+ * 这是一个多功能文本统计工具，支持中英文字符识别和详细的语言分类统计。
+ * This is a multi-functional text statistics tool with Chinese/English character recognition.
+ *
+ * ============ 使用方法 / Usage ============
+ *
+ * 【方式1：命令行使用 / Command Line Interface】
+ *
+ * // 统计文件字数 / Count words in a file
+ * node scripts/word-counter.js <文件路径>
+ *
+ * // 示例 / Examples:
+ * node scripts/word-counter.js SKILL.md
+ * node scripts/word-counter.js templates/standard.md
+ * node scripts/word-counter.js ../path/to/document.txt
+ *
+ *
+ * 【方式2：作为模块使用 / Use as Module】
+ *
+ * // 在Node.js脚本中导入 / Import in Node.js script
+ * const counter = require('./scripts/word-counter.js');
+ *
+ * // 使用方法 / Available Methods:
+ *
+ * 1. countWords(text) - 统计总字数
+ *    counter.countWords("Hello 世界")  // Returns: 2
+ *
+ * 2. countChineseChars(text) - 统计中文字符
+ *    counter.countChineseChars("你好Hello")  // Returns: 2
+ *
+ * 3. countEnglishChars(text) - 统计英文字符
+ *    counter.countEnglishChars("Hello你好")  // Returns: 5
+ *
+ * 4. countOtherChars(text) - 统计其他语言字符
+ *    counter.countOtherChars("こんにちは")  // Returns: 5
+ *
+ * 5. countChars(text, includeSpaces) - 统计字符数
+ *    counter.countChars("Hello", false)  // Returns: 5 (不含空格)
+ *    counter.countChars("Hello", true)   // Returns: 5 (含空格)
+ *
+ * 6. countLines(text) - 统计行数
+ *    counter.countLines("Line1\nLine2")  // Returns: 2
+ *
+ * 7. getTextStatistics(text) - 获取完整统计信息
+ *    const stats = counter.getTextStatistics("Hello 世界");
+ *    // Returns: {
+ *    //   totalWords: 2,
+ *    //   chineseChars: 2,
+ *    //   englishChars: 5,
+ *    //   otherChars: 0,
+ *    //   ...
+ *    // }
+ *
+ * 8. countWordsInFile(filePath) - 统计文件字数
+ *    counter.countWordsInFile('./SKILL.md')
+ *
+ * 9. getFileStatistics(filePath) - 获取文件完整统计
+ *    const stats = counter.getFileStatistics('./SKILL.md');
+ *
+ * 10. formatStatistics(stats, filePath) - 格式化输出统计信息
+ *     const formatted = counter.formatStatistics(stats, './SKILL.md');
+ *     console.log(formatted);
+ *
+ *
+ * 【输出格式 / Output Format】
+ * 📄 File: <文件路径>
+ *
+ * 📊 Text Statistics:
+ *
+ *    📝 Total Words:
+ *       289 words
+ *
+ *    🔤 Character Breakdown:
+ *       中文: 1,011 chars
+ *       English: 1,100 chars
+ *       其他语言: 116 chars
+ *       Numbers: 15
+ *       Punctuation: 375
+ *
+ *    📏 Total Characters:
+ *       Without spaces: 2,617
+ *       With spaces: 3,084
+ *
+ *    📐 Structure:
+ *       Lines: 67
+ *       Paragraphs: 22
+ *
+ *    ⏱️  Estimated reading time: 4 min
+ *
+ *
+ * 【支持的语言 / Supported Languages】
+ * - 中文 / Chinese (汉字、中文标点)
+ * - 英文 / English
+ * - 日文 / Japanese
+ * - 韩文 / Korean
+ * - 阿拉伯文 / Arabic
+ * - 其他Unicode字符 / Other Unicode characters
+ *
+ *
+ * 【依赖 / Requirements】
+ * - Node.js (v16 or higher)
+ * - 无需额外依赖 / No external dependencies needed
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
