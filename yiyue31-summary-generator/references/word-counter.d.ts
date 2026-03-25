@@ -44,25 +44,68 @@ export declare function countChars(text: string, includeSpaces?: boolean): numbe
  */
 export declare function countLines(text: string): number;
 /**
- * Get comprehensive text statistics
+ * Count Chinese characters
  *
- * @param text - The text to analyze
- * @param includeSpaces - Whether to include spaces in character count (default: false)
- * @returns Statistics object with word, character, and line counts
+ * @param text - The text to count Chinese characters in
+ * @returns Number of Chinese characters
  *
  * @example
  * ```typescript
- * const stats = getTextStatistics("Hello world\nThis is a test");
+ * const count = countChineseChars("你好Hello世界"); // Returns 4 (你好世界)
+ * ```
+ */
+export declare function countChineseChars(text: string): number;
+/**
+ * Count English characters (letters, numbers, and common punctuation)
+ *
+ * @param text - The text to count English characters in
+ * @returns Number of English characters
+ *
+ * @example
+ * ```typescript
+ * const count = countEnglishChars("Hello, World! 123"); // Returns 15
+ * ```
+ */
+export declare function countEnglishChars(text: string): number;
+/**
+ * Count other language characters (not Chinese or English)
+ *
+ * @param text - The text to count other characters in
+ * @returns Number of other language characters
+ *
+ * @example
+ * ```typescript
+ * const count = countOtherChars("こんにちは"); // Returns Japanese characters
+ * ```
+ */
+export declare function countOtherChars(text: string): number;
+/**
+ * Get comprehensive text statistics with language breakdown
+ *
+ * @param text - The text to analyze
+ * @param includeSpaces - Whether to include spaces in character count (default: false)
+ * @returns Statistics object with detailed language breakdown
+ *
+ * @example
+ * ```typescript
+ * const stats = getTextStatistics("Hello world\n你好世界");
  * console.log(stats);
- * // { words: 5, characters: 15, lines: 2, paragraphs: 1 }
+ * // { totalWords: 4, chineseChars: 4, englishChars: 10, otherChars: 0, ... }
  * ```
  */
 export interface TextStatistics {
-    words: number;
-    characters: number;
+    totalWords: number;
+    totalCharacters: number;
     charactersWithSpaces: number;
+    chineseChars: number;
+    englishChars: number;
+    otherChars: number;
+    numbers: number;
+    punctuation: number;
+    spaces: number;
     lines: number;
     paragraphs: number;
+    readingTimeMinutes: number;
 }
 export declare function getTextStatistics(text: string, includeSpaces?: boolean): TextStatistics;
 /**
@@ -144,6 +187,9 @@ declare const _default: {
     countWords: typeof countWords;
     countChars: typeof countChars;
     countLines: typeof countLines;
+    countChineseChars: typeof countChineseChars;
+    countEnglishChars: typeof countEnglishChars;
+    countOtherChars: typeof countOtherChars;
     getTextStatistics: typeof getTextStatistics;
     fileExists: typeof fileExists;
     readFile: typeof readFile;

@@ -79,44 +79,160 @@ export function countLines(text: string): number {
 }
 
 /**
- * Get comprehensive text statistics
+ * Count Chinese characters
  *
- * @param text - The text to analyze
- * @param includeSpaces - Whether to include spaces in character count (default: false)
- * @returns Statistics object with word, character, and line counts
+ * @param text - The text to count Chinese characters in
+ * @returns Number of Chinese characters
  *
  * @example
  * ```typescript
- * const stats = getTextStatistics("Hello world\nThis is a test");
+ * const count = countChineseChars("你好Hello世界"); // Returns 4 (你好世界)
+ * ```
+ */
+export function countChineseChars(text: string): number {
+    if (!text) {
+        return 0;
+    }
+
+    // Match Chinese characters (CJK Unified Ideographs)
+    // Basic range: U+4E00-U+9FFF (most common Chinese characters)
+    // Extension A: U+3400-U+4DBF
+    const chinesePattern = /[\u4e00-\u9fff\u3400-\u4dbf]/gu;
+    const matches = text.match(chinesePattern);
+    return matches ? matches.length : 0;
+}
+
+/**
+ * Count English characters (letters, numbers, and common punctuation)
+ *
+ * @param text - The text to count English characters in
+ * @returns Number of English characters
+ *
+ * @example
+ * ```typescript
+ * const count = countEnglishChars("Hello, World! 123"); // Returns 15
+ * ```
+ */
+export function countEnglishChars(text: string): number {
+    if (!text) {
+        return 0;
+    }
+
+    // Match English letters (a-z, A-Z)
+    const englishPattern = /[a-zA-Z]/g;
+    const matches = text.match(englishPattern);
+    return matches ? matches.length : 0;
+}
+
+/**
+ * Count other language characters (not Chinese or English)
+ *
+ * @param text - The text to count other characters in
+ * @returns Number of other language characters
+ *
+ * @example
+ * ```typescript
+ * const count = countOtherChars("こんにちは"); // Returns Japanese characters
+ * ```
+ */
+export function countOtherChars(text: string): number {
+    if (!text) {
+        return 0;
+    }
+
+    const chineseChars = countChineseChars(text);
+    const englishChars = countEnglishChars(text);
+    const numbers = (text.match(/\d/g) || []).length;
+    const spaces = (text.match(/\s/g) || []).length;
+    const punctuation = (text.match(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g) || []).length;
+
+    // Total non-whitespace characters minus known categories
+    const totalChars = text.replace(/\s/g, '').length;
+
+    // Other = total - chinese - english - numbers - punctuation
+    const other = totalChars - chineseChars - englishChars - numbers - punctuation;
+
+    return Math.max(0, other);
+}
+
+/**
+ * Get comprehensive text statistics with language breakdown
+ *
+ * @param text - The text to analyze
+ * @param includeSpaces - Whether to include spaces in character count (default: false)
+ * @returns Statistics object with detailed language breakdown
+ *
+ * @example
+ * ```typescript
+ * const stats = getTextStatistics("Hello world\n你好世界");
  * console.log(stats);
- * // { words: 5, characters: 15, lines: 2, paragraphs: 1 }
+ * // { totalWords: 4, chineseChars: 4, englishChars: 10, otherChars: 0, ... }
  * ```
  */
 export interface TextStatistics {
-    words: number;
-    characters: number;
+    totalWords: number;
+    totalCharacters: number;
     charactersWithSpaces: number;
+    chineseChars: number;
+    englishChars: number;
+    otherChars: number;
+    numbers: number;
+    punctuation: number;
+    spaces: number;
     lines: number;
     paragraphs: number;
+    readingTimeMinutes: number;
 }
 
 export function getTextStatistics(text: string, includeSpaces: boolean = false): TextStatistics {
-    const words = countWords(text);
-    const characters = countChars(text, false);
+    const totalWords = countWords(text);
+    const totalCharacters = countChars(text, false);
     const charactersWithSpaces = countChars(text, true);
     const lines = countLines(text);
+
+    // Count by language
+    const chineseChars = countChineseChars(text);
+    const englishChars = countEnglishChars(text);
+    const otherChars = countOtherChars(text);
+
+    // Count numbers and punctuation
+    const numbers = (text.match(/\d/g) || []).length;
+
+    // Count punctuation marks manually
+    const punctuationSet = new Set(['!', '"', '#', '$', '%', '&', "'", '(', ')', '*', '+', ',', '-', '.', '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '{', '|', '}', '~']);
+    let punctuation = 0;
+    for (const char of text) {
+        if (punctuationSet.has(char)) {
+            punctuation++;
+        }
+    }
+
+    const spaces = (text.match(/\s/g) || []).length;
 
     // Count paragraphs (separated by double newlines)
     const paragraphs = text
         .split(/\n\s*\n/)
         .filter(para => para.trim().length > 0).length;
 
+    // Calculate reading time
+    // Mixed content: average 200 Chinese chars or 100 English words per minute
+    const chineseReadingTime = chineseChars / 300; // Chinese: ~300 chars/min
+    const englishReadingTime = totalWords / 200;   // English: ~200 words/min
+    const readingTimeMinutes = Math.ceil(Math.max(chineseReadingTime, englishReadingTime));
+
     return {
-        words,
-        characters,
+        totalWords,
+        totalCharacters,
         charactersWithSpaces,
+        chineseChars,
+        englishChars,
+        otherChars,
+        numbers,
+        punctuation,
+        spaces,
         lines,
-        paragraphs
+        paragraphs,
+        readingTimeMinutes
     };
 }
 
@@ -225,15 +341,26 @@ export function formatStatistics(stats: TextStatistics, filePath?: string): stri
     }
 
     lines.push('📊 Text Statistics:');
-    lines.push(`   Words: ${stats.words.toLocaleString()}`);
-    lines.push(`   Characters (no spaces): ${stats.characters.toLocaleString()}`);
-    lines.push(`   Characters (with spaces): ${stats.charactersWithSpaces.toLocaleString()}`);
-    lines.push(`   Lines: ${stats.lines.toLocaleString()}`);
-    lines.push(`   Paragraphs: ${stats.paragraphs.toLocaleString()}`);
-
-    // Estimated reading time (average 200 words per minute)
-    const readingMinutes = Math.ceil(stats.words / 200);
-    lines.push(`   Estimated reading time: ${readingMinutes} min`);
+    lines.push('');
+    lines.push('   📝 Total Words:');
+    lines.push(`      ${stats.totalWords.toLocaleString()} words`);
+    lines.push('');
+    lines.push('   🔤 Character Breakdown:');
+    lines.push(`      中文: ${stats.chineseChars.toLocaleString()} chars`);
+    lines.push(`      English: ${stats.englishChars.toLocaleString()} chars`);
+    lines.push(`      其他语言: ${stats.otherChars.toLocaleString()} chars`);
+    lines.push(`      Numbers: ${stats.numbers.toLocaleString()}`);
+    lines.push(`      Punctuation: ${stats.punctuation.toLocaleString()}`);
+    lines.push('');
+    lines.push('   📏 Total Characters:');
+    lines.push(`      Without spaces: ${stats.totalCharacters.toLocaleString()}`);
+    lines.push(`      With spaces: ${stats.charactersWithSpaces.toLocaleString()}`);
+    lines.push('');
+    lines.push('   📐 Structure:');
+    lines.push(`      Lines: ${stats.lines.toLocaleString()}`);
+    lines.push(`      Paragraphs: ${stats.paragraphs.toLocaleString()}`);
+    lines.push('');
+    lines.push(`   ⏱️  Estimated reading time: ${stats.readingTimeMinutes} min`);
 
     return lines.join('\n');
 }
@@ -287,6 +414,9 @@ export default {
     countWords,
     countChars,
     countLines,
+    countChineseChars,
+    countEnglishChars,
+    countOtherChars,
     getTextStatistics,
     fileExists,
     readFile,

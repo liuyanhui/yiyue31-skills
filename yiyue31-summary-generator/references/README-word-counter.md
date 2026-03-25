@@ -4,10 +4,17 @@ A TypeScript utility for counting words, characters, lines, and paragraphs in te
 
 ## Features
 
-- **Word Count**: Accurately count words in text files
-- **Character Count**: Count characters with or without spaces
-- **Line Count**: Count non-empty lines
-- **Paragraph Count**: Count paragraphs (separated by double newlines)
+- **Total Word Count**: Accurately count total words in text files
+- **Language Character Breakdown**:
+  - Chinese characters (汉字)
+  - English characters
+  - Other language characters (Japanese, Korean, Arabic, etc.)
+- **Detailed Statistics**:
+  - Numbers count
+  - Punctuation count
+  - Space count
+- **Structure Analysis**: Lines and paragraphs
+- **Reading Time Estimation**: Based on content language
 - **Multiple File Formats**: Supports .md, .txt, and other text-based files
 - **CLI Interface**: Easy to use command-line interface
 - **Module Support**: Import as a TypeScript module
@@ -46,12 +53,26 @@ node word-counter.js ./document.txt
 📄 File: /path/to/article.md
 
 📊 Text Statistics:
-   Words: 1,234
-   Characters (no spaces): 5,678
-   Characters (with spaces): 6,789
-   Lines: 89
-   Paragraphs: 12
-   Estimated reading time: 7 min
+
+   📝 Total Words:
+      1,234 words
+
+   🔤 Character Breakdown:
+      中文: 456 chars
+      English: 678 chars
+      其他语言: 12 chars
+      Numbers: 34
+      Punctuation: 56
+
+   📏 Total Characters:
+      Without spaces: 1,236
+      With spaces: 1,456
+
+   📐 Structure:
+      Lines: 89
+      Paragraphs: 12
+
+   ⏱️  Estimated reading time: 3 min
 
 ✅ Successfully counted words in file
 ```
@@ -94,6 +115,30 @@ const count1 = countChars("Hello world"); // Returns 10 (without spaces)
 const count2 = countChars("Hello world", true); // Returns 11 (with spaces)
 ```
 
+#### `countChineseChars(text: string): number`
+
+Count Chinese characters in a string.
+
+```typescript
+const count = countChineseChars("你好Hello世界"); // Returns 4
+```
+
+#### `countEnglishChars(text: string): number`
+
+Count English characters (letters) in a string.
+
+```typescript
+const count = countEnglishChars("Hello World"); // Returns 10
+```
+
+#### `countOtherChars(text: string): number`
+
+Count other language characters (not Chinese or English) in a string.
+
+```typescript
+const count = countOtherChars("こんにちは"); // Returns Japanese characters
+```
+
 #### `countLines(text: string): number`
 
 Count lines in a string.
@@ -104,12 +149,25 @@ const count = countLines("Line 1\nLine 2\nLine 3"); // Returns 3
 
 #### `getTextStatistics(text: string): TextStatistics`
 
-Get comprehensive text statistics.
+Get comprehensive text statistics with language breakdown.
 
 ```typescript
-const stats = getTextStatistics("Hello world\nThis is a test");
+const stats = getTextStatistics("Hello world\n你好世界");
 console.log(stats);
-// { words: 5, characters: 15, charactersWithSpaces: 21, lines: 2, paragraphs: 1 }
+// {
+//   totalWords: 4,
+//   totalCharacters: 10,
+//   charactersWithSpaces: 15,
+//   chineseChars: 4,
+//   englishChars: 10,
+//   otherChars: 0,
+//   numbers: 0,
+//   punctuation: 1,
+//   spaces: 2,
+//   lines: 2,
+//   paragraphs: 1,
+//   readingTimeMinutes: 1
+// }
 ```
 
 #### `countWordsInFile(filePath: string): number`
@@ -122,15 +180,16 @@ const count = countWordsInFile('./article.md');
 
 #### `getFileStatistics(filePath: string): TextStatistics`
 
-Get comprehensive statistics for a file.
+Get comprehensive statistics for a file with language breakdown.
 
 ```typescript
 const stats = getFileStatistics('./article.md');
+console.log(`Chinese: ${stats.chineseChars}, English: ${stats.englishChars}`);
 ```
 
 #### `formatStatistics(stats: TextStatistics, filePath?: string): string`
 
-Format statistics for display.
+Format statistics for display with language breakdown.
 
 ```typescript
 const formatted = formatStatistics(stats, './article.md');
