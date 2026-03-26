@@ -10,6 +10,11 @@ description: Use when user asks to "summarize article", "summarize tech post", "
 文章总结生成器，适用于用户需要总结技术文章、博客、论文、文档等内容的场景。支持多种总结模板，满足不同需求。通过分析文章内容，提取核心要点和亮点，生成结构化、易读的总结。
 
 ---
+##  Directory
+
+`{skill-dir}` = this SKILL.md's directory path. It means the directory where this SKILL.md is located. 
+
+---
 
 ## Summary Workflow
 
@@ -44,7 +49,7 @@ The complete step-by-step process from input to final output:
 - 根据分析结果推荐适合的总结模板。模板见"Available Templates"部分。
 - 金句和重要术语在总结中突出显示，格式为：在单独的一个段落中用 `> 中文翻译文字(英文原文)` 形式展示。
 - 总结保存在本地，目录为：`{title}/summary-{title}.md`。
-- 运行 `node scripts/word-counter.js {title}/summary-{title}.md` 检查字数是否符合模板要求，并展示结果。
+- 运行 `node {skill-dir}/scripts/word-counter.js {title}/summary-{title}.md` 检查字数是否符合模板要求，并展示结果。
 
 ### step 4. 质量检查
 - 启用subagent进行质量检查
@@ -62,8 +67,8 @@ The complete step-by-step process from input to final output:
 
 ## Available Templates
 
-- **Tech Article Template**: 技术文章总结模板 - 适合技术文章、技术博客、技术公告等，提供全面的分析和总结，突出创新点和实用价值。模板内容见 `templates/tech-article.md`。
-- **Paper Template**: 论文总结模板 - 适合学术论文总结，帮助读者快速学习和理解论文的核心内容和创新点。模板内容见 `templates/paper.md`。
+- **Tech Article Template**: 技术文章总结模板 - 适合技术文章、技术博客、技术公告等，提供全面的分析和总结，突出创新点和实用价值。模板内容见 `{skill-dir}/templates/tech-article.md`。
+- **Paper Template**: 论文总结模板 - 适合学术论文总结，帮助读者快速学习和理解论文的核心内容和创新点。模板内容见 `{skill-dir}/templates/paper.md`。
 - **Concise Template**: 简洁总结模板 - 聚焦核心知识，适合快速学习。模板内容见 `templates/concise.md`。**默认模板*，当其他模板无法匹配时使用。
 
 

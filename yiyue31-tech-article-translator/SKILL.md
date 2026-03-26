@@ -12,13 +12,17 @@ author: Yiyue31
 你是专业的翻译大师，可以胜任任何翻译任务。你的任务是将英文文章翻译为中文，同时：
 
 1. **准确识别文章topic**：提取标题、关键概念，确定技术领域
-2. **加载topic术语表**：从 `glossary/{topic}.md` 加载该topic的技术术语表
+2. **加载topic术语表**：从 `{skill-dir}/glossary/{topic}.md` 加载该topic的技术术语表
 3. **询问翻译风格**：直译（默认）或意译
 4. **保留技术术语**：术语表中的词汇保持英文，不翻译
 5. **维护术语表**：翻译后主动识别新术语，经用户确认后更新术语表
 
 ---
+##  Directory
 
+`{skill-dir}` = this SKILL.md's directory path. It means the directory where this SKILL.md is located. 
+
+---
 ## 用户输入要求
 
 ### 必需输入
@@ -69,7 +73,7 @@ author: Yiyue31
 **原文标题**: {Original English Title}
 **语言**: {from} → {to}
 **识别的主题**: {Topic Name}
-**已加载术语表**: glossary/{topic}.md ({N} 个术语)
+**已加载术语表**: {skill-dir}/glossary/{topic}.md ({N} 个术语)
 ```
 
 ### Step 3: 询问翻译风格
@@ -84,17 +88,17 @@ author: Yiyue31
 
 
 ### Step 4: 术语表读取和维护
-1. **加载术语表**：从 `glossary/{topic}.md` 加载术语表，识别需要保留英文的术语
+1. **加载术语表**：从 `{skill-dir}/glossary/{topic}.md` 加载术语表，识别需要保留英文的术语
 2. **提取新术语**：扫描文章，识别未在术语表中的专业术语
 3. **展示新术语**：展示新术语列表
 4. **用户确认**：全部添加、部分添加或跳过
-5. **更新术语表**：将确认的术语追加到 `glossary/{topic}.md`
+5. **更新术语表**：将确认的术语追加到 `{skill-dir}/glossary/{topic}.md`
 6. **不翻译的情况**：术语表中`Chinese Term`列为`[KEEP]`时，表示不翻译该术语。
 
 
 **术语表规则**
 
-文件位置：`glossary/{topic}.md`
+- 术语表文件位置：`{skill-dir}/glossary/{topic}.md`
 
 术语表格式：
 - **English Term**列：保存英文术语
@@ -139,6 +143,8 @@ author: Yiyue31
 
 ### Step 6: 结果文件校验
 
+必须启用subagent执行质量检查任务。
+
 #### 翻译质量检查
 
 - **术语一致性**：术语表中的词汇保持英文
@@ -148,23 +154,8 @@ author: Yiyue31
 
 #### Markdown 格式检查
 
-完成翻译后，必须检查以下格式要求：
+markdown的格式检查，检查标准参考文件：`{skill-dir}/references/markdown-format-checklist.md`.
 
-- **标题层级**：# → ## → ### 顺序，不跳跃
-- **列表缩进**：同层级缩进一致（2空格），分隔符统一
-- **代码块**：``` 后加语言标识，保留原文缩进
-- **数学公式**：行内用 $，独立用 $$
-- **表格格式**：| 对齐正确，表头分隔符 ≥3个-
-- **Mermaid**：```mermaid 开头，语法正确
-- **换行规则**：段落间空一行，列表项间无空行
-- **空行控制**：连续不超过2行
-- **链接格式**：[文本](URL) 格式正确
-- **特殊字符**：| < > 需转义处已处理
-- **行尾空格**：无多余空格
-- **中英文空格**：之间保留一个空格
-
-**subagent支持**： 
-如果支持subagent，启用subagent执行本步骤的质量检查任务。
 ---
 
 ## 输出格式规范

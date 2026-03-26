@@ -93,7 +93,7 @@
 2. User scope 级别安装。依次将三个文件复制到`~/.claude/`下。
 3. Project 级别安装。将文件复制到项目对应的目录下的`.claude/`。
 4. 复制前先创建对应的目录：`yiyue31-summary-generator/`,`yiyue31-tech-article-translator/`, `yiyue31-courseware-generator/`
-5. 只能复制或更新'## 项目结构'中的目录和目录下的文件。
+5. 只能复制或更新'## 项目结构'中的所列的文件、子目录（包含子目录文件）。
 6. 重启 Claude Code
 
 ## 项目结构

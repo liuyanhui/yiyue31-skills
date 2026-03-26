@@ -10,6 +10,11 @@ author: Yiyue31
 你是优秀的教育大师，熟练掌握各种教学方法。现在以{用户输入课程主题}为背景，你要努力思考，生成一份面向初中生的**自学**课件。课件要既贴近生活，又科学严谨。
 
 ---
+##  Directory
+
+`{skill-dir}` = this SKILL.md's directory path. It means the directory where this SKILL.md is located. 
+
+---
 
 # 用户输入要求
 
@@ -84,18 +89,18 @@ chemistry/grade09/chapter05-acid-base/
 
 ## 各章节详细要求
 
-> **📘 详细内容**：每个章节的详细输出格式和内容要求请参阅：[`references/chapter-requirements.md`](references/chapter-requirements.md)
+> **📘 详细内容**：每个章节的详细输出格式和内容要求请参阅：[`{skill-dir}/references/chapter-requirements.md`]({skill-dir}/references/chapter-requirements.md)
 
 > **📘 章节说明和索引**：
-> - [1. 知识点提炼](references/chapter-requirements.md#1-知识点提炼) - 认知负荷理论应用
-> - [2. 生活场景映射](references/chapter-requirements.md#2-生活场景映射) - 现象导向学习应用
-> - [3. 知识点脑图](references/chapter-requirements.md#3-知识点脑图) - 概念地图应用
-> - [4. 趣味自测](references/chapter-requirements.md#4-趣味自测) - 同伴教学应用
-> - [5. 易考点](references/chapter-requirements.md#5-易考点) - 学习迁移应用
-> - [6. 易错点（思维陷阱）](references/chapter-requirements.md#6-易错点思维陷阱) - 认知冲突应用
-> - [7. 难点](references/chapter-requirements.md#7-难点) - 建模教学应用
-> - [8. 习题](references/chapter-requirements.md#8-习题) - 认知负荷应用
-> - [9. 历年中考真题](references/chapter-requirements.md#9-历年中考真题) - 学习迁移应用
+> - [1. 知识点提炼]({skill-dir}/references/chapter-requirements.md#1-知识点提炼) - 认知负荷理论应用
+> - [2. 生活场景映射]({skill-dir}/references/chapter-requirements.md#2-生活场景映射) - 现象导向学习应用
+> - [3. 知识点脑图]({skill-dir}/references/chapter-requirements.md#3-知识点脑图) - 概念地图应用
+> - [4. 趣味自测]({skill-dir}/references/chapter-requirements.md#4-趣味自测) - 同伴教学应用
+> - [5. 易考点]({skill-dir}/references/chapter-requirements.md#5-易考点) - 学习迁移应用
+> - [6. 易错点（思维陷阱）]({skill-dir}/references/chapter-requirements.md#6-易错点思维陷阱) - 认知冲突应用
+> - [7. 难点]({skill-dir}/references/chapter-requirements.md#7-难点) - 建模教学应用
+> - [8. 习题]({skill-dir}/references/chapter-requirements.md#8-习题) - 认知负荷应用
+> - [9. 历年中考真题]({skill-dir}/references/chapter-requirements.md#9-历年中考真题) - 学习迁移应用
 
 > **📘 使用说明**：
 > - 每个章节都提供了标准输出格式模板
