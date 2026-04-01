@@ -42,7 +42,7 @@ The complete step-by-step process from input to final output:
 - 段落分析：提取每个段落的核心观点、步骤、优缺点或重要论述等。如果有代码、算法或流程，使用简化描述或伪代码表示。必要时采用bullet points（主点 + 子点）的方式。
 - 主体分析：如果涉及人员、团队或组织等主体，分析其相关背景
 - 背景分析：如果涉及事件，分析事件背景，材料来源，发布时间等
-- 术语分析：提取关键术语和概念，以便在总结中保留或解释
+- 术语分析：提取关键术语和概念，以便在总结中保留或解释。最终以表格形式输出：" 原文位置 | 原文术语 | 中文术语 "
 - 金句提取：筛选出彩表达、亮眼、有记忆点的句子、有感染力、印象深刻的句子，作为总结中的亮点。最终以表格形式输出：" 原文位置 | 原文 | 亮点说明 "
 - 分析结果保存到本地，目录为：`{title}/analysis-{title}.md`。
 
@@ -53,7 +53,9 @@ The complete step-by-step process from input to final output:
 
 ### step 4. 模板选择与总结生成
 - 根据分析结果推荐适合的总结模板。模板见 [Available Templates](#available-templates) 部分。
-- 金句和重要术语在总结中突出显示，格式为：在单独的一个段落中用 `> 中文翻译文字(英文原文)` 形式展示。
+- 金句和重要术语在总结中突出显示，格式为：在单独的一个段落中用 `> 中文翻译(英文原文)` 形式展示。
+- 术语采用`中文翻译(英文原文)`的格式在总结中展示。
+- 完整长句或者一句话前面出现了逗号，末尾欸一定要加句号。
 - 总结保存在本地，目录为：`{title}/summary-{title}.md`。
 - 运行 `node {skill-dir}/scripts/word-counter.js {title}/summary-{title}.md` 检查字数是否符合模板要求，并展示结果。
 
@@ -90,4 +92,6 @@ The complete step-by-step process from input to final output:
 - 要严格按照step顺序执行，禁止跳过任何步骤
 - 每一步的输出都要保存到本地
 - 每一步的输出都要符合markdown格式要求，特别是标题层级、列表缩进、代码块格式、表格格式等
+
+- AI语境下'agent'必须翻译为'智能体'，不能翻译为'代理'
 
