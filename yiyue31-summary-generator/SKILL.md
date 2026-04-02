@@ -9,6 +9,11 @@ description: Use when user asks to "summarize article", "summarize tech post", "
 
 文章总结生成器，适用于用户需要总结技术文章、博客、论文、文档等内容的场景。支持多种总结模板，满足不同需求。通过分析文章内容，提取核心要点和亮点，生成结构化、易读的总结。
 
+## 要求
+- 除了人类的原话之外，总结时不要过于口语化，保持专业、清晰、简洁的语言风格。
+- 从读者的角度总结，而不是作者的角度。
+- AI语境下'agent'必须翻译为'智能体'，不能翻译为'代理'。
+
 ---
 ##  Directory
 
@@ -93,5 +98,4 @@ The complete step-by-step process from input to final output:
 - 每一步的输出都要保存到本地
 - 每一步的输出都要符合markdown格式要求，特别是标题层级、列表缩进、代码块格式、表格格式等
 
-- AI语境下'agent'必须翻译为'智能体'，不能翻译为'代理'
 
