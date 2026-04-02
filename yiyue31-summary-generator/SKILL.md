@@ -58,6 +58,7 @@ The complete step-by-step process from input to final output:
 
 ### step 4. 模板选择与总结生成
 - 根据分析结果推荐适合的总结模板。模板见 [Available Templates](#available-templates) 部分。
+- 重要内容保持原文翻译，如：流程、概念、技术细节等。
 - 金句和重要术语在总结中突出显示，格式为：在单独的一个段落中用 `> 中文翻译(英文原文)` 形式展示。
 - 术语采用`中文翻译(英文原文)`的格式在总结中展示。
 - 完整长句或者一句话前面出现了逗号，末尾欸一定要加句号。

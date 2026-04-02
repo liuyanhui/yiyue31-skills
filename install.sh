@@ -79,6 +79,10 @@ echo "目标: $DEST"
 echo "========================================"
 echo ""
 
+# ── 结果跟踪数组 ─────────────────────────────────────────
+declare -A RESULT_STATUS    # skill名 => "成功" / "跳过"
+declare -A RESULT_DETAIL    # skill名 => 详细信息
+
 # ── 复制函数 ─────────────────────────────────────────────
 copy_skill() {
   local skill_name="$1"
@@ -89,12 +93,16 @@ copy_skill() {
   # 检查源目录是否存在
   if [[ ! -d "$src" ]]; then
     echo "  [跳过] $skill_name (源目录不存在)"
+    RESULT_STATUS[$skill_name]="跳过"
+    RESULT_DETAIL[$skill_name]="源目录不存在"
     return
   fi
 
   # 检查 SKILL.md 是否存在
   if [[ ! -f "$src/SKILL.md" ]]; then
     echo "  [跳过] $skill_name (缺少 SKILL.md)"
+    RESULT_STATUS[$skill_name]="跳过"
+    RESULT_DETAIL[$skill_name]="缺少 SKILL.md"
     return
   fi
 
@@ -104,9 +112,11 @@ copy_skill() {
   # 复制 SKILL.md（必需）
   cp "$src/SKILL.md" "$dst/SKILL.md"
   echo "  [复制] SKILL.md"
+  local file_count=1
 
   # 复制允许的子目录
   IFS=',' read -ra DIRS <<< "$subdirs"
+  local copied_dirs=""
   for dir in "${DIRS[@]}"; do
     if [[ -d "$src/$dir" ]]; then
       # 检查目录是否有内容
@@ -115,7 +125,9 @@ copy_skill() {
         cp -r "$src/$dir/"* "$dst/$dir/"
         local count
         count=$(find "$src/$dir" -type f | wc -l)
+        file_count=$((file_count + count))
         echo "  [复制] $dir/ ($count 个文件)"
+        copied_dirs="$copied_dirs $dir"
       else
         # 空目录，创建但不复制
         mkdir -p "$dst/$dir"
@@ -125,6 +137,8 @@ copy_skill() {
   done
 
   echo "  [完成] $skill_name"
+  RESULT_STATUS[$skill_name]="成功"
+  RESULT_DETAIL[$skill_name]="${file_count} 个文件${copied_dirs:-}"
 }
 
 # ── 执行安装/更新 ────────────────────────────────────────
@@ -140,9 +154,39 @@ for entry in "${SKILLS[@]}"; do
   ((updated++)) || true
 done
 
+# ── 显示安装结果 ──────────────────────────────────────────
 echo "========================================"
-echo "  完成! 已处理 $updated 个 Skills"
+echo "  安装结果"
+echo "========================================"
+printf "  %-35s %-8s %s\n" "Skill" "状态" "详情"
+echo "  -----------------------------------------------"
+for entry in "${SKILLS[@]}"; do
+  skill="${entry%%:*}"
+  status="${RESULT_STATUS[$skill]:-未处理}"
+  detail="${RESULT_DETAIL[$skill]:-}"
+  printf "  %-35s %-8s %s\n" "$skill" "$status" "$detail"
+done
+echo "========================================"
+echo ""
+success=0
+skipped_res=0
+for entry in "${SKILLS[@]}"; do
+  s="${entry%%:*}"
+  case "${RESULT_STATUS[$s]:-}" in
+    成功) ((success++)) || true ;;
+    跳过) ((skipped_res++)) || true ;;
+  esac
+done
+echo "  总计: ${#SKILLS[@]} 个  |  成功: $success  |  跳过: $skipped_res"
 echo "  目标目录: $DEST"
 echo ""
 echo "  请重启 Claude Code 以使 Skills 生效"
 echo "========================================"
+
+# ── 按任意键退出 ─────────────────────────────────────────
+echo ""
+echo "按任意键退出..."
+if [[ -t 0 ]]; then
+  read -n 1 -s -r -p ""
+  echo ""
+fi
