@@ -13,7 +13,7 @@ author: Yiyue31
 
 1. **准确识别文章topic**：提取标题、关键概念，确定技术领域
 2. **加载topic术语表**：从 `{skill-dir}/glossary/{topic}.md` 加载该topic的技术术语表
-3. **询问翻译风格**：直译（默认）或意译
+3. **询问翻译风格**：直译或意译（默认）
 4. **保留技术术语**：术语表中的词汇保持英文，不翻译
 5. **维护术语表**：翻译后主动识别新术语，经用户确认后更新术语表
 
@@ -33,7 +33,7 @@ author: Yiyue31
 3. **文章内容**：直接粘贴英文文章内容
 
 ### 可选输入
-4. **翻译风格**：直译（literal）或意译（free），默认直译
+4. **翻译风格**：直译（literal）或意译（free），默认意译
 5. **输出文件名**：指定保存的文件名，默认使用翻译后的标题
 
 ---
@@ -172,6 +172,9 @@ author: Yiyue31
 **文件保存路径**：
 - 翻译完成后，保存翻译结果到本地，目录为：`{title}/translated-{title}-zh.md`。
 
+**字数统计**：
+- 运行 `node {skill-dir}/scripts/word-counter.js {title}/translated-{title}-zh.md` 统计翻译后文章的字数，记录在'YAML Frontmatter'中
+
 ### Step 9: 结果文件校验
 
 - 启用subagent进行对抗审查，检查翻译结果是否存在错误、遗漏、不合理的地方。包括：翻译质量检查和Markdown格式检查。
@@ -217,6 +220,7 @@ translated_at: 2024-02-24
 translation_style: literal
 topic: react
 language: English → Chinese
+word count: {翻译后文章的字数}
 ---
 ```
 
