@@ -2,3 +2,8 @@
 test-scenarios/
 nul
 .claude/
+
+# yiyue31-takeaways: only track SKILL.md and templates/
+yiyue31-takeaways/*
+!yiyue31-takeaways/SKILL.md
+!yiyue31-takeaways/templates/
