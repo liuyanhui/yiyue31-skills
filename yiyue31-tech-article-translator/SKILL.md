@@ -46,7 +46,7 @@ author: Yiyue31
 - **URL输入**：优先使用本地已安装的skills，如：下载文章、转换文章、抓取网页、操作网页、查看网页等skills。其次，使用 `wget` 或 `curl` 打开网页并下载文章内容。
 - **文件路径输入**：使用 `Read` 工具读取文件内容
 - **直接粘贴**：直接处理输入内容
-- 用户输入的原始文章/文件/粘贴内容，提取title（title提取优先级为：从标题中提取，文件名，第一句话的前10个字），保存到本地，目录为：`{title}/original-{title}.md`。
+- 用户输入的原始文章/文件/粘贴内容，提取title（title提取优先级为：从标题中提取，文件名，第一句话的前10个字），保存到本地，目录为：`{title}/translation/original-{title}.md`。
 - **缺少需要翻译的内容**，要求用户提供信息
 
 **文章内容预处理**
@@ -61,7 +61,7 @@ author: Yiyue31
 3. 使用关键词匹配术语表topic，确定文章topic
 4. 当不确定topic是否正确时，咨询用户
 5. 原文是超链接时，提取链接
-6. 分析结果保存到本地，目录为：`{title}/analysis-topic-{title}.md`。
+6. 分析结果保存到本地，目录为：`{title}/translation/analysis-topic-{title}.md`。
 
 **topic识别规则**：优先从标题、h2/h3中提取；识别技术关键词；多topic选择主要topic；未知topic询问用户。
 **语言识别**：如果输入内容主要是中文（如：中文超过50%），请用户确认是否继续；如果主要语言是非英文的其他语言，请用户确认是否继续。
@@ -79,7 +79,7 @@ author: Yiyue31
 ### step 3. 分析文章topic结果对抗审查
 - 启用subagent进行对抗审查(参考生成对抗网络的方式)，检查分析结果是否存在错误、遗漏、不合理的地方。
 - 尽量复用现有的术语表文件，避免创建重复的术语表文件。[术语表目录](#step-5-术语表读取和维护)
-- 对抗审查结果保存到本地，目录为：`{title}/analysis-topic-gan-{title}.md`。
+- 对抗审查结果保存到本地，目录为：`{title}/translation/analysis-topic-gan-{title}.md`。
 - 对抗审查不通过时，重新执行上一步
 
 ### Step 4: 询问翻译风格
@@ -144,11 +144,11 @@ author: Yiyue31
 
 ```
 
-特殊词句提取结果保存目录为：`{title}/special-phrases-{title}.md`。
+特殊词句提取结果保存目录为：`{title}/translation/special-phrases-{title}.md`。
 
 ### step 7. 特殊词句提取结果对抗审查
 - 启用subagent进行对抗审查(参考生成对抗网络的方式)，检查特殊词句提取结果是否存在错误、遗漏、不合理的地方。
-- 对抗审查结果保存到本地，目录为：`{title}/special-phrases-gan-{title}.md`。
+- 对抗审查结果保存到本地，目录为：`{title}/translation/special-phrases-gan-{title}.md`。
 - 对抗审查不通过时，重新执行上一步
 
 
@@ -175,15 +175,15 @@ author: Yiyue31
 - 如果支持subagent，启用subagent执行本步骤的翻译任务。
 
 **文件保存路径**：
-- 翻译完成后，保存翻译结果到本地，目录为：`{title}/translated-{title}-zh.md`。
+- 翻译完成后，保存翻译结果到本地，目录为：`{title}/translation/translated-{title}-zh.md`。
 
 **字数统计**：
-- 运行 `node {skill-dir}/scripts/word-counter.js {title}/translated-{title}-zh.md` 统计翻译后文章的字数，记录在'YAML Frontmatter'中
+- 运行 `node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md` 统计翻译后文章的字数，记录在'YAML Frontmatter'中
 
 ### Step 9: 结果文件校验
 
 - 启用subagent进行对抗审查，检查翻译结果是否存在错误、遗漏、不合理的地方。包括：翻译质量检查和Markdown格式检查。
-- 检查结果保存到本地，目录为：`{title}/validation-translated-gan-{title}.md`。
+- 检查结果保存到本地，目录为：`{title}/translation/validation-translated-gan-{title}.md`。
 - 检查不通过时，重新执行上一步
 
 #### 翻译质量检查
@@ -206,9 +206,9 @@ markdown的格式检查，检查标准参考文件：`{skill-dir}/references/mar
 When translating technical documents, always save BOTH the original English version and the Chinese translation. Name them clearly (e.g., 'original-article.md' and 'translated-article-zh.md').
 
 ```
-{title}/original-{title}.md
-{title}/analysis-{title}.md
-{title}/translated-{title}-zh.md
+{title}/translation/original-{title}.md
+{title}/translation/analysis-{title}.md
+{title}/translation/translated-{title}-zh.md
 ```
 
 **文件命名规则**：使用翻译后的标题，小写字母，单词间用连字符连接
