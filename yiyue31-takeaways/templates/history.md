@@ -29,6 +29,12 @@
 |---------|---------|---------|--------|---------|
 | Your AI Isn't Stupid | TECH-THEORY | FIRST + PRACTICE | TECH-THEORY + 06方法论 + FIRST+PRACTICE | TECH-THEORY + 06方法论 + FIRST+PRACTICE |
 
+### 2026-04-23
+
+| 文章标题 | 输入类型 | 输出风格 | AI推荐 | 用户选择 |
+|---------|---------|---------|--------|---------|
+| AI Agent Traps | TECH-THEORY | THIRD + PRACTICE | TECH-THEORY + 05技术原理 + THIRD+PRACTICE | TECH-THEORY + 05技术原理 + THIRD+PRACTICE |
+
 ---
 
 > 说明：此文件由系统自动维护，记录历史选择以优化AI推荐
