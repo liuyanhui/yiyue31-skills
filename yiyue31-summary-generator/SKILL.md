@@ -37,7 +37,7 @@ The complete step-by-step process from input to final output:
 **文章内容预处理**
 1. 文章内容为非markdown格式时，转换并保存为markdown格式。
 2. 转换时保留原文结构和格式，尽量保持段落、标题、列表等格式不变；对于无法准确转换的元素，保留原文并添加注释提示用户检查。
-3. 检查转换后文件。如果不确定转换结果，要求用户确认。                                 
+3. 检查转换后文件。如果不确定转换结果，使用 AskUserQuestion 工具请用户确认：确认无误或需要修正。                                 
 
 ### Step 2: 分析文章                 
 - 语言分析：检测文章语言
@@ -57,7 +57,7 @@ The complete step-by-step process from input to final output:
 - 对抗审查不通过时，返回分析阶段重新分析文章
 
 ### step 4. 模板选择与总结生成
-- 根据分析结果推荐适合的总结模板。模板见 [Available Templates](#available-templates) 部分。
+- 根据分析结果使用 AskUserQuestion 工具推荐适合的总结模板，请用户选择或输入自定义意见。模板见 [Available Templates](#available-templates) 部分。
 - 重要内容保持原文翻译，如：流程、概念、技术细节等。
 - 金句和重要术语在总结中突出显示，格式为：在单独的一个段落中用 `> 中文翻译(英文原文)` 形式展示。
 - 术语采用`中文翻译(英文原文)`的格式在总结中展示。
@@ -72,7 +72,7 @@ The complete step-by-step process from input to final output:
 - 检查总结是否符合所选模板的格式要求
 - 检查结果保存到本地，目录为：`{title}/summary/validation-{title}.md`。
 - 检查不通过时，返回总结生成阶段重新生成总结
-- 检查通过时，告知用户，并要求用户确认：继续下一步或根据用户已经修改总结。
+- 检查通过时，告知用户，并使用 AskUserQuestion 工具请用户确认：继续下一步或已修改总结。
 
 ### step 6. 总结润色
 - 根据用户选择的语言进行润色，去除AI生成痕迹。如果本地已经安装去除AI生成痕迹的Skills（如：humanizer-zh）；如果没有可以通过`find-skills`搜索和下载相关的去除AI生成痕迹的skills，安装到当前目录后再使用。
