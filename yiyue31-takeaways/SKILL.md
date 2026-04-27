@@ -1,11 +1,11 @@
 ---
 name: yiyue31-takeaways
-description: 当用户要求"重写文章"、"改写文章"、"把这篇文章改成我自己的话"、"从我的角度改写文章"、"按我的理解改写文章"、"按我的理解重写文章"、"写心得体会"、"写收获"时，使用此技能将别人的文章改写成个人的心得体会。此技能也适用于任何需要将他人的文章转化为自己的理解、收获、经验总结的场景。当用户提供URL、文件或粘贴内容并要求改写时，必须使用此技能。
+description: 当用户要求"提取观点"、"生成心得"、"记录我的理解"、"写收获"、"我的想法"、"我对这篇文章的看法"时使用。此技能专注于生成用户观点文档，通过交互式讨论收集用户的理解、观点和收获。如需完整覆盖原文内容，建议配合 summary-generator 使用。
 ---
 
-# Article Rewriting and Takeaways Generation Skill
+# User Viewpoints Extraction Skill
 
-此技能用于将文章总结成自己的心得体会，生成结构清晰、可发表的markdown文档。包含了用户和AI互动的环节，用来总结心得。
+此技能通过交互式讨论生成用户观点文档，记录用户对文章的理解、观点和收获。
 
 ## workflow
 
@@ -79,7 +79,7 @@ title从原文中提取，或使用简短的描述性名称。
 {title}/takeaways/analysis-raw-{title}.md
 ```
 
-**分析结果检查（启用subagent）**：
+**分析结果检查**：
 
 启用 subagent 读取并执行 `{skill-dir}/references/step2-analysis-reviewer.md` 中的评估指令。
 
@@ -272,7 +272,7 @@ AI 从 Step 2 分析结果中自动提炼讨论话题：
 {title}/takeaways/viewpoint-mapping-{title}.md
 ```
 
-**映射有效性检查（启用subagent）**：
+**映射有效性检查**：
 
 启用 subagent 读取并执行 `{skill-dir}/references/step5-mapping-reviewer.md` 中的评估指令。
 
@@ -296,160 +296,74 @@ AI 从 Step 2 分析结果中自动提炼讨论话题：
 
 用户确认后，方可进入 Step 6。
 
-### Step 6: 选择内容结构模板和表达风格
+### Step 6: 选择输出详细程度
 
-**从讨论中提取偏好：**
-根据 Step 4 讨论过程中记录的用户观点、偏好、侧重点，结合文章分析结果，生成改写参数推荐：
-- **改写目的**：根据用户在讨论中表达的使用场景推荐
-- **目标读者**：根据用户的知识水平和关注点判断
-- **重点侧重**：根据用户讨论中感兴趣的方面判断
-- **表达风格**：推荐合适的风格
+**选项**：
+- **简洁版**：观点概览 + 总结
+- **详细版**：观点概览 + 逐话题详情 + 对话记录 + 总结
 
-**输入类型判断：**
-根据 `{skill-dir}/templates/input-types.md` 判断输入类型：
-- **内容领域**：TECH（技术）、MGMT（管理）、ACAD（学术）、POPU（科普）、PROD（产品）、BIZN（商业）
-- **文章结构**：TUTOR（教程）、CASE（案例）、THEORY（理论）、EXP（经验）、REVIEW（综述）、GUIDE（指南）、INTERVIEW（访谈）
+**用户选择**：AskUserQuestion（简洁版 / 详细版）
 
-例如：`TECH-CASE`（技术案例分析）、`MGMT-EXP`（管理经验分享）
+**保存到**：`{title}/takeaways/output-detail-{title}.md`
 
-告知用户判断结果，使用 AskUserQuestion 工具请用户确认或输入自定义意见。
+### Step 7: 生成用户观点文档
 
-**读取模板文件：**
-- `{skill-dir}/templates/content-structures/` - 10种内容结构模板
-- `{skill-dir}/templates/output-styles.md` - 6种表达风格定义
-- `{skill-dir}/rules/forbidden-words.md` - 禁止词汇表
+**⚠️ 强制要求**：
+- 确保观点映射表中每个观点都体现
+- 保留原文位置信息
+- 遵守 `{skill-dir}/rules/rewrite-guidelines.md`
 
-**AI推荐内容结构模板：**
-根据文章内容，推荐最适合的内容结构模板。
+**生成流程**：
 
-示例：
-- 技术案例分析 → 推荐 `04-case-analysis.md`（案例解析型）
-- 项目复盘总结 → 推荐 `02-review.md`（复盘总结型）
-- 零基础入门教程 → 推荐 `01-tutorial.md`（教程入门型）
+1. **读取**：分析结果、观点映射、讨论记录、输出详细程度
+2. **生成观点概览**：核心关注、我的理解、我的异议/补充
+3. **生成观点详情**（详细版）：按话题组织，包含原文位置、原文观点、用户观点、对话记录
+4. **生成总结**：关键启示、实践建议、适用边界
+5. **生成原文结构概览**：简要列出章节
 
-**用户确认或指定内容结构模板：**
-用户可以接受AI推荐，或指定自己的选择。
+**输出格式**：
+```markdown
+# [文章标题] - 用户观点文档
 
-**选择表达风格：**
-AI根据文章内容推荐合适的表达风格，用户确认或指定。
+**原文**: [URL/路径] | **生成时间**: [时间戳] | **话题数**: [N] | **观点数**: [M]
 
-详细风格定义见 `{skill-dir}/templates/output-styles.md`。
+## 我的观点概览
+### 核心关注 | ### 我的理解 | ### 我的异议/补充
 
-**记录选择：**
-更新 `{skill-dir}/templates/history.md`，记录本次选择。
+## 观点详情
+### 话题1：[主题]
+**原文位置**: [章节/段落] | **原文观点**: [...] | **我的观点**: [...]
+**对话记录**（详细版）:
+> AI: [...] | 用户: [...]
 
-**选择合理性检查（启用subagent）**：
+### 话题2：[主题]
+...
 
-启用 subagent 读取并执行 `{skill-dir}/references/step6-selection-reviewer.md` 中的评估指令。
+## 我的总结
+### 关键启示 | ### 实践建议 | ### 适用边界
 
-**评估对象**：
-- 模板和风格选择
-- 讨论记录：`{title}/takeaways/qa-{title}.md`（用于验证用户偏好一致性）
-
-**审查结果保存到**：
-```
-{title}/takeaways/review-step6-selection-{title}.md
+## 附录：原文结构概览
 ```
 
-如审查不通过，根据 subagent 的建议进行调整，直到审查通过。
+**保存到**：`{title}/takeaways/user-viewpoints-{title}.md`
 
-### Step 7: 重写文章
+**自检验证**：启用 subagent 执行 `{skill-dir}/references/step7-article-reviewer.md`
 
-根据选择的内容结构模板，生成心得草稿。
+**评估对象**：生成的文档、观点映射表、讨论记录
 
-**⚠️ 强制性要求（必须遵守）**：
+**审查结果保存到**：`{title}/takeaways/review-step7-viewpoints-{title}.md`
 
-**覆盖率要求**：
-- 必须覆盖原文所有核心要点，不得遗漏重要内容
-- 使用 Step 2 分析结果中的"实体名词"表进行自检
-- 使用 Step 2 分析结果中的"文章结构"确保每个章节都被涵盖
-- 对于原文的关键论据、数据、结论，必须保留核心信息
-
-**用户观点体现要求（必须执行）**：
-- **必须**读取 `{title}/takeaways/viewpoint-mapping-{title}.md` 中的观点映射表
-- **必须**确保映射表中的每个用户观点都在文章的对应章节中体现
-- 优先级为"高"的观点必须以独立段落形式出现
-- 在文章中明确区分"原文内容"和"我的理解"，使用以下格式：
-  ```markdown
-  原文指出：[原文观点]
-  
-  我的理解：[用户在讨论中表达的观点]
-  ```
-- **禁止**忽略或遗漏用户在讨论中表达的任何核心观点
-
-**结构化展示要求**：
-- 按照选定模板的章节结构组织内容
-- 在每个章节开始前，检查该章节是否需要展示用户观点（参考观点映射表）
-- 对于有用户观点的章节，优先展示用户的观点，然后展开说明
-
-**改写原则要求**：
-- 遵守 `{skill-dir}/rules/rewrite-guidelines.md` 中的改写原则
-- 按照模板 `{skill-dir}/templates/content-structures/[模板名称].md` 结构生成内容
-- 对于不可改写内容（数据、人名、公司名等），完全保留
-- 对于可改写内容，用用户自己的语言重新组织，但保持准确性
-
-**生成文章流程**：
-1. **读取必需文件**：
-   - Step 2 分析结果：`{title}/takeaways/analysis-raw-{title}.md`
-   - Step 5 观点映射：`{title}/takeaways/viewpoint-mapping-{title}.md`
-   - 选定的内容结构模板
-
-2. **逐章节生成**：
-   对于每个章节：
-   - 检查观点映射表，确定该章节需要展示的用户观点
-   - 先总结原文核心内容（确保覆盖率）
-   - 再融入用户的理解和观点（按映射表的放置方式）
-
-3. **金句和重要内容突出显示**：
-
-   选取能提升阅读体验和文章质量的部分（如：金句、习语、重要语句），在正文中突出显示。
-
-   **显示格式**：
-   在单独的一个段落中用引用格式展示：
-   ```markdown
-   > 中文翻译(英文原文)
-   ```
-
-4. **保存生成的文章**：
-
-   **保存位置**：
-   ```
-   {title}/takeaways/final-{title}.md
-   ```
-
-5. **生成结果自检验证（启用subagent）**：
-
-   生成完成后，**必须**启用 subagent 读取并执行 `{skill-dir}/references/step7-article-reviewer.md` 中的评估指令。
-
-   **评估对象**：
-   - 生成的文章：`{title}/takeaways/final-{title}.md`
-   - 观点映射表：`{title}/takeaways/viewpoint-mapping-{title}.md`
-   - 原文分析：`{title}/takeaways/analysis-raw-{title}.md`
-
-   **审查结果保存到**：
-   ```
-   {title}/takeaways/review-step7-article-{title}.md
-   ```
-
-   **重要**：如果 subagent 发现任何严重问题，必须返回修改文章，直到验证通过。
-
-6. **用户确认**：
-
-   向用户展示：
-   1. 生成的文章草稿
-   2. subagent 审查报告（`{title}/takeaways/review-step7-article-{title}.md`）
-
-   等待用户确认或修改。只有用户确认后，才继续生成最终文章。
+**用户确认**：展示文档和审查报告，等待确认
 
 ### Step 8: 结果审查
 
 从读者的角度进行最终质量评估。
 
-**读者视角质量评估（启用subagent）**：
+**读者视角质量评估**：
 
 启用 subagent 读取并执行 `{skill-dir}/references/step8-quality-reviewer.md` 中的评估指令。
 
-**评估对象**：`{title}/takeaways/final-{title}.md`
+**评估对象**：`{title}/takeaways/user-viewpoints-{title}.md`
 
 **评估结果保存到**：
 ```
@@ -457,8 +371,8 @@ AI根据文章内容推荐合适的表达风格，用户确认或指定。
 ```
 
 **评估结果处理**：
-- 评估通过时：告知用户，文章已满足发布要求
+- 评估通过时：告知用户，用户观点文档已完成
 - 评估不通过时：
-  - 详细说明为什么文章不建议发布
-  - 返回 Step 7，根据评估结果修改文章
+  - 详细说明存在的问题
+  - 返回 Step 7，根据评估结果修改文档
   - 修改后重新进行 Step 8 评估，直到通过
