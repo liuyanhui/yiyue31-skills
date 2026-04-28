@@ -7,6 +7,29 @@ description: 当用户要求"提取观点"、"生成心得"、"记录我的理�
 
 此技能通过交互式讨论生成用户观点文档，记录用户对文章的理解、观点和收获。
 
+## 状态管理与恢复
+
+**State 文件**：`{title}/takeaways/state-{title}.json`
+
+```json
+{
+  "task_id": "uuid",
+  "title": "标题",
+  "current_step": 4,
+  "status": "in_progress",
+  "last_update": "2026-04-28T14:45:00Z",
+  "steps": {
+    "step1": {"status": "completed"},
+    "step4": {"status": "in_progress", "current_topic": 2, "total_topics": 5}
+  }
+}
+```
+
+**恢复逻辑**：
+- Skill 开始时检查 state 文件
+- 存在且未完成 → 询问用户：继续/重新开始/跳转步骤
+- 每个 Step 完成后更新 state
+
 ## workflow
 
 严格按照以下步骤执行：
@@ -29,6 +52,10 @@ description: 当用户要求"提取观点"、"生成心得"、"记录我的理�
 ```
 
 title从原文中提取，或使用简短的描述性名称。
+
+**状态更新**：创建 state，`current_step=1`
+
+完成后：`step1.status=completed`, `current_step=2`
 
 ### Step 2: 分析原文
 
@@ -92,6 +119,8 @@ title从原文中提取，或使用简短的描述性名称。
 
 如审查不通过，根据 subagent 的建议进行调整后继续。
 
+**状态更新**：`step2.status=completed`, `current_step=3`
+
 ### Step 3: 生成实体关系图（可选）
 
 根据Step 2提取的实体，生成Mermaid代码。数据缺失或者关系不确定时，请用户协助。
@@ -142,6 +171,8 @@ erDiagram
 ```
 
 **用户确认**：使用 AskUserQuestion 工具向用户展示实体关系图，请用户确认：实体准确关系完整，或需要修正。等待用户确认后再继续。
+
+**状态更新**：生成则 `step3.status=completed`，跳过则 `step3.status=skipped`，`current_step=4`
 
 ### Step 4: 交互式讨论与记录
 
@@ -223,6 +254,8 @@ AI 从 Step 2 分析结果中自动提炼讨论话题：
 - 偏好/侧重点2
 ```
 
+**状态更新**：开始时 `step4.status=in_progress`, 话题切换时 `current_topic++`，完成后 `step4.status=completed`, `current_step=5`
+
 ### Step 5: 用户观点映射（必须执行）
 
 **核心目的**：确保 Step 4 讨论中收集的每个用户观点都能在最终文章中得到体现，避免交互成果流失。
@@ -296,6 +329,8 @@ AI 从 Step 2 分析结果中自动提炼讨论话题：
 
 用户确认后，方可进入 Step 6。
 
+**状态更新**：`step5.status=completed`, `current_step=6`
+
 ### Step 6: 选择输出详细程度
 
 **选项**：
@@ -305,6 +340,8 @@ AI 从 Step 2 分析结果中自动提炼讨论话题：
 **用户选择**：AskUserQuestion（简洁版 / 详细版）
 
 **保存到**：`{title}/takeaways/output-detail-{title}.md`
+
+**状态更新**：`step6.status=completed`, `current_step=7`
 
 ### Step 7: 生成用户观点文档
 
@@ -355,6 +392,8 @@ AI 从 Step 2 分析结果中自动提炼讨论话题：
 
 **用户确认**：展示文档和审查报告，等待确认
 
+**状态更新**：`step7.status=completed`, `current_step=8`
+
 ### Step 8: 结果审查
 
 从读者的角度进行最终质量评估。
@@ -372,7 +411,6 @@ AI 从 Step 2 分析结果中自动提炼讨论话题：
 
 **评估结果处理**：
 - 评估通过时：告知用户，用户观点文档已完成
-- 评估不通过时：
-  - 详细说明存在的问题
-  - 返回 Step 7，根据评估结果修改文档
-  - 修改后重新进行 Step 8 评估，直到通过
+- 评估不通过时：返回 Step 7 修改，重新评估
+
+**状态更新**：`step8.status=completed`, `status=completed`（任务完成）
