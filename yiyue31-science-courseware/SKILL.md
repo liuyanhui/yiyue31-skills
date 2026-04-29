@@ -1,6 +1,6 @@
 ---
-name: yiyue31-science-courseware-generator
-description: 初中理科科目（物理、化学、生物）的自学课件生成器。当用户提出以下需求时触发使用："生成课件","制作理科学习资料","生成物理课件","生成化学课件","生成生物课件"。需用户输入具体学科、年级、章节编号或章节名称、教材版本等信息。
+name: yiyue31-science-courseware
+description: 初中理科科目（物理、化学、生物）的自学课件生成器。当用户提出以下需求时触发使用："生成课件","制作理科学习资料","生成物理课件"、"生成化学课件"、"生成生物课件"。需用户输入具体学科、年级、章节编号或章节名称、教材版本等信息。
 disable-model-invocation: true
 version: 1.0.0 
 author: Yiyue31

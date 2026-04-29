@@ -1,5 +1,5 @@
 ---
-name: chinese-journal-formatter
+name: yiyue31-paper-layout
 description: 将中文学术论文（docx）转换为正规格式化期刊投稿文档。当用户提供一篇论文 docx 和格式模板（或要求按通用中文期刊格式排版）时触发使用。触发场景：用户说"格式化论文"、"转期刊格式"、"排版论文"、"双栏排版"、"按模板格式化"、"生成投稿文档"等。即使用户没有明确说"格式化"，只要涉及将论文转为期刊发表格式，都应使用此 skill。
 disable-model-invocation: true
 version: 1.0.0 
