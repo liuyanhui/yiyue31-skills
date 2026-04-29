@@ -1,6 +1,6 @@
 ---
-name: yiyue31-summary-generator
-description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization. 
+name: yiyue31-summary
+description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization.
 ---
 
 # Tech Article Summarizer
