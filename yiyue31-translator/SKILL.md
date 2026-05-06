@@ -154,6 +154,8 @@ author: Yiyue31
 
 ### Step 8: 翻译文章
 
+启用subagent执行本步骤的翻译任务。
+
 **通用翻译规则**：
 - **准确性优先**：事实、数据与逻辑必须与原文完全吻合
 - **术语规范**：使用标准译法；不翻译术语，术语首次出现再原文后添加中文注释（或术语表中对应的`Chinese Explanation`列信息）并用括号包围。如` Prompt(提示词)`、`agent(智能体)`、`Agent(智能体)`等
@@ -171,14 +173,18 @@ author: Yiyue31
 - **情感保真**：保留措辞的情感内涵，而非仅译字典释义。带有主观情感的词汇（如 “令人警醒的”“萦绕心头的”），需让目标语言读者产生相同感受
 - **表达流畅**：采用目标语言地道的语序与句式；源语句式在目标语言中不自然时，可自由拆分、重组句子
 
-**subagent支持**：
-- 如果支持subagent，启用subagent执行本步骤的翻译任务。
-
 **文件保存路径**：
 - 翻译完成后，保存翻译结果到本地，目录为：`{title}/translation/translated-{title}-zh.md`。
 
 **字数统计**：
 - 运行 `node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md` 统计翻译后文章的字数，记录在'YAML Frontmatter'中
+
+### Step 8.1: 翻译腔检查
+- 启用subagent进行翻译腔，如：句式照搬英语结构，冗余和生硬的表达，短句堆叠模仿英语等。
+- 确保译文自然流畅，符合中文表达习惯。
+- 检查结果保存到本地，目录为：`{title}/translation/validation-translationese-{title}.md`。
+- 检查不通过时，重新执行上一步
+
 
 ### Step 9: 结果文件校验
 
