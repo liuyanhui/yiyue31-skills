@@ -1,78 +1,78 @@
 ---
 name: Tech-Article-Summary
-display_name: 技术文章总结模板
+display_name: Tech Article Summary Template
 version: 1.1.0
 ---
 
-# Tech Article Summary Template: 技术文章总结模板
+# Tech Article Summary Template
 
 ## Description
-技术学习笔记模板（增强版），适合学生或工程师深度学习和理解。按文章顺序分节整理，突出创新点和实用价值。默认中文，用户可指定使用英文。
+
+Tech learning notes template (enhanced version), suitable for students or engineers for in-depth learning and understanding. Organized by article sections in order, highlighting innovations and practical value. Default language is Chinese; users can specify English.
 
 ## Template Content
 
 ```markdown
-# 原标题：{{Original Title}}
+# Original Title: {{Original Title}}
 
-**来源**: {{URL or file path}}
+**Source**: {{URL or file path}}
 
-**作者**: {{if available}}
+**Author**: {{if available}}
 
-**模板**: {{当前模板名称或模板的文件名}}
+**Template**: {{current template name or template filename}}
 
-**字数**：{{xxx}}字
+**Word Count**: {{xxx}} words
 
 ---
 
-## 1. 文章标题与概述
+## 1. Article Title and Overview
 
-**文章标题**：{{Original Title}}
+**Article Title**: {{Original Title}}
 
-**概述**：{{3-5句话概述文章核心主题和主要目标。}}
-{{如果涉及人员，如果涉及人员、团队、组织或事件等主题，另起一个段落简要说明该主体的相关背景}}
+**Overview**: {{3-5 sentences summarizing the core theme and main objectives of the article.}}
+{{If people, teams, organizations, or events are involved, start a new paragraph briefly describing the relevant background of the entity.}}
 
-## 2. 要点速览
+## 2. Key Points at a Glance
 
-> **生成要求**：目的是快速了解文章内容，吸引读者继续阅读；不要过于口语化；按照文章的内容顺序/时间顺序/逻辑顺序总结；重要的内容要保持原文。
+> **Generation Requirements**: The purpose is to quickly understand the article content and attract readers to continue reading; avoid overly colloquial language; summarize in order of content/chronology/logic; keep important content in the original text.
 
-{{要点或亮点1}}
-{{要点或亮点2}}
-{{更多要点或亮点...}}
+{{Key point or highlight 1}}
+{{Key point or highlight 2}}
+{{More key points or highlights...}}
 
-## 3. 主要内容结构
+## 3. Main Content Structure
 
-{{原文章节1}}
-{{根据自然段总结，如：关键点、步骤、优缺点或重要论述等。如果有代码、算法或流程，保留原样不变。必要时采用bullet points（主点 + 子点）的方式。不要过于口语化；按照内容顺序/时间顺序/逻辑顺序总结。}}
+{{Original article section 1}}
+{{Summarize by natural paragraphs, e.g.: key points, steps, pros/cons, or key arguments. If there is code, algorithms, or processes, keep them as-is. Use bullet points (main point + sub-points) when necessary. Avoid overly colloquial language; summarize in order of content/chronology/logic.}}
 
-{{原文章节2}}
-{{总结内容..}}
+{{Original article section 2}}
+{{Summary content...}}
 
-{{原文章节..}}
-{{总结内容..}}
+{{Original article section...}}
+{{Summary content...}}
 
 
-## 4. 洞察和启发
+## 4. Insights and Inspirations
 
-{{洞察1：挑选文章中最有洞察的观点，用通俗自然的语言描述。如：创新点或突破,实用价值,技术优势,与其他技术的比较,性能或效果亮点,设计思路,实现要点,最佳实践,经验教训等}}
+{{Insight 1: Select the most insightful viewpoints from the article and describe them in plain, natural language. E.g.: innovations or breakthroughs, practical value, technical advantages, comparisons with other technologies, performance or effectiveness highlights, design approaches, implementation key points, best practices, lessons learned, etc.}}
 
-{{洞察2：...}}
+{{Insight 2: ...}}
 
-{{洞察...}}
+{{Insight...}}
 
-## 5. 潜在问题
+## 5. Potential Issues
 
 {{
-- 指出文章提到的限制、挑战或未解决问题
-- 未解决的问题
-- 建议相关延伸阅读或应用场景（严格基于文章内容，不要杜撰）
-- 如果没有就不生成
+- Point out limitations, challenges, or unresolved issues mentioned in the article
+- Unresolved problems
+- Suggest related further reading or application scenarios (strictly based on article content, do not fabricate)
+- If none exist, do not generate this section
 }}
 ```
 
 ## Rules
 
-- **结构**: 按文章顺序分节（引言、背景、方法、实现、结论等）
-- **语言**: 默认中文，保留英文专有名词（如 AI Agent, prompt 等）
-- **准确性**: 保留技术准确性，用易懂语言解释复杂概念
-- **信息来源**: 只基于提供的文章内容，除了文章公司名、人名、产品名、事件名等特殊名词外。
-- **字数要求**：不能超过原文字数。
+- **Structure**: Organize by article sections in order (introduction, background, methods, implementation, conclusions, etc.)
+- **Accuracy**: Preserve technical accuracy, explain complex concepts in understandable language
+- **Information Source**: Only based on the provided article content, except for special nouns such as company names, person names, product names, event names, etc.
+- **Word Count**: Must not exceed the original word count.
