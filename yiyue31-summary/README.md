@@ -1,6 +1,6 @@
 # yiyue31-summary-generator
 
-Intelligent article summary generator supporting multiple templates and Chinese/English output.
+Intelligent article summary generator supporting multiple templates.
 
 ## Core Features
 

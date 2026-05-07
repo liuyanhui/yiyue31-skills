@@ -8,7 +8,7 @@ version: 1.1.0
 
 ## Description
 
-Tech learning notes template (enhanced version), suitable for students or engineers for in-depth learning and understanding. Organized by article sections in order, highlighting innovations and practical value. Default language is Chinese; users can specify English.
+Tech learning notes template (enhanced version), suitable for students or engineers for in-depth learning and understanding. Organized by article sections in order, highlighting innovations and practical value.
 
 ## Template Content
 

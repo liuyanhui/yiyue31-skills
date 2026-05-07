@@ -8,7 +8,7 @@ version: 1.1.0
 
 ## Description
 
-Paper notes template, suitable for summarizing research papers, helping readers quickly learn and understand the paper. Organized by article sections in order, highlighting innovations and practical value. Default language is Chinese; users can specify English.
+Paper notes template, suitable for summarizing research papers, helping readers quickly learn and understand the paper. Organized by article sections in order, highlighting innovations and practical value.
 
 ## Template Content
 
