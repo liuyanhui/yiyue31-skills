@@ -72,11 +72,27 @@ Retrieve article content using different tools based on the user's input type:
 - If the check fails, return to the summary generation stage to regenerate the summary
 - If the check passes, inform the user and use the AskUserQuestion tool to ask the user to confirm: proceed to the next step or modify the summary.
 
-### Step 6: Summary Polishing
+### Step 6: Summary Evaluation Loop
+
+Use the evaluator prompt (`{skill-dir}/references/evaluate-prompt.md`) to run a scoring-based evaluation loop on the summary.
+
+**Loop rules:**
+- Maximum 5 rounds. The evaluator subagent must use the same LLM throughout all rounds — switching LLMs mid-loop is forbidden to ensure evaluation consistency.
+- Passing threshold: weighted total score ≥ 8.0 (out of 10).
+- Each round's evaluation report is saved to `{title}/summary/evaluation-round{N}-{title}.md`.
+
+**Loop procedure:**
+1. Enable a subagent with the evaluator prompt to score the summary across 4 dimensions (Information Density, Logical Coherence, Technical Depth, Expression Quality) and produce a detailed issue report. Save the report to `{title}/summary/evaluation-round{N}-{title}.md`.
+2. The main agent checks whether the weighted total score ≥ 8.0:
+   - **Passes**: Break out of the loop and proceed to Step 7.
+   - **Fails**: Record the current score. If it is the highest so far, save this summary as the best candidate. Then revise the summary based on the Issues table from the evaluation report and the original article, save the revised summary to `{title}/summary/summary-round{N}-{title}.md`, and start the next round.
+3. If all 5 rounds are exhausted without passing: use the best-scoring summary from the loop as the final result. Inform the user that the target was not met after 5 rounds, report the best score achieved, and proceed to Step 7.
+
+### Step 7: Summary Polishing
 - Polish the summary based on the user's chosen language to remove AI-generated traces. If a de-AI-trace skill is installed locally (e.g., humanizer-zh), use it; otherwise, search for and install a relevant de-AI-trace skill via `find-skills` into the current directory before using it.
 - Save the polished summary locally at: `{title}/summary/final-summary-{title}.md`.
 
-### Step 7: Polishing Result Check
+### Step 8: Polishing Result Check
 - Enable subagent for adversarial quality check (referencing generative adversarial network approach).
 - Check the readability of the polished summary to ensure it conforms to human reading habits.
 - Save check results locally at: `{title}/summary/refine-gan-{title}.md`.
