@@ -38,16 +38,16 @@ Retrieve article content using different tools based on the user's input type:
 3. Check the converted file. If unsure about the conversion result, use the AskUserQuestion tool to ask the user to confirm: correct as-is or needs correction.
 
 ### Step 2: Analyze Article
-- Language analysis: Detect the article's language
-- Article type analysis: Tech blog, research paper, product documentation, tutorial, video subtitles, paper, general article, etc.
-- Topic analysis: Extract the article's topic and domain
-- Structure analysis: Identify the article's main structure and sections
-- Paragraph analysis: Extract core viewpoints, steps, pros/cons, or key arguments from each paragraph. If there is code, algorithms, or processes, use simplified descriptions or pseudocode. Use bullet points (main point + sub-points) when necessary.
-- Entity analysis: If people, teams, or organizations are involved, analyze their relevant backgrounds
-- Background analysis: If events are involved, analyze event background, material sources, publication date, etc.
-- Terminology analysis: Extract key terms and concepts to retain or explain in the summary.
-- Quote extraction: Select outstanding expressions, eye-catching, memorable, impactful, and impressive sentences as highlights in the summary. Output in table format: "Location in original | Original text | Highlight description"
-- Save analysis results locally at: `{title}/summary/analysis-{title}.md`.
+- **Language**: Detect language
+- **Article type**: Tech blog, research paper, documentation, tutorial, video subtitles, general article, etc.
+- **Topic & domain**: Extract topic and domain
+- **Structure**: Identify main sections and hierarchy
+- **Paragraphs**: Extract core viewpoints, steps, pros/cons per paragraph. For code/algorithms/processes, use simplified descriptions or pseudocode. Use bullet points (main point + sub-points).
+- **Entities**: If people, teams, or organizations are involved, analyze their backgrounds
+- **Background**: If events are involved, analyze event context, sources, publication date
+- **Terminology**: Extract key terms and concepts to retain or explain
+- **Quotes**: Select standout sentences as summary highlights. Output table: "Location in original | Original text | Highlight description"
+- Save to: `{title}/summary/analysis-{title}.md`
 
 ### Step 3: Analysis Adversarial Review
 - Enable subagent for adversarial review (referencing generative adversarial network approach) to check whether the analysis results contain errors, omissions, or unreasonable points.
@@ -61,73 +61,33 @@ Retrieve article content using different tools based on the user's input type:
 ### Step 5: Summary Generate-Evaluate Loop
 
 **Summary formatting rules:**
-- Keep important content in the original text, such as: processes, concepts, technical details, etc.
-- Highlight quotes and key terms in the summary, formatted as: displayed in a separate paragraph using blockquote `>` format.
-- When content is quoted verbatim from the original article, use the format: `> **[Verbatim]**: {original sentence}`
+- Keep important content: processes, concepts, technical details, etc.
+- Highlight quotes and key terms in blockquote `>` format as separate paragraphs.
+- Verbatim quotes: `> **[Verbatim]**: {original sentence}`
 - Any non-heading sentence must end with punctuation.
 
-**Flowchart:**
-
-```text
-node timer.js start --tag {title}
-            ↓
-    ┌── Loop (max 5 rounds) ──────────────────┐
-    │                                          │
-    │   node timer.js check → expired?         │
-    │   ├── Yes → use best summary, break      │
-    │   └── No  → continue                     │
-    │                                          │
-    │   Round 1?                               │
-    │   ├── Yes → Generate from analysis       │
-    │   └── No  → Revise per eval report       │
-    │              ↓                           │
-    │   Save summary & run word-counter        │
-    │              ↓                           │
-    │   Evaluate via subagent                  │
-    │              ↓                           │
-    │        Score ≥ 8.0?                      │
-    │   ├── Yes → Exit loop → Step 6           │
-    │   └── No  → Loop back ↑                  │
-    │                                          │
-    └── Global timeout: 30min ─────────────────┘
-```
-
-**Loop rules:**
-- Maximum 5 rounds. The evaluator subagent MUST use the same LLM throughout all rounds — switching LLMs mid-loop is FORBIDDEN to ensure evaluation consistency.
-- Passing threshold: total score ≥ 8.0 (out of 10). Scoring methodology is defined in the evaluator prompt.
-- Each round's evaluation report is saved to `{title}/summary/evaluation-round{N}-{title}.md`.
-- Global timeout: 30 minutes. Tracked via `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800`. If expired, stop the loop and use the best-scoring summary. Inform the user of the timeout.
+**Loop parameters:** max 5 rounds, global timeout 30 min, passing threshold score ≥ 8.0 (out of 10). Evaluator MUST use the same LLM throughout all rounds — switching mid-loop is FORBIDDEN.
 
 **Loop procedure:**
-1. **Start timer**: Run `node {skill-dir}/scripts/timer.js start --tag {title}` before entering the loop.
-2. **Check global timeout**: At the start of each round, run `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800`. If the output shows `"expired": true`, use the best-scoring summary so far and proceed to Step 6.
-3. **Generate or revise**:
-   - Round 1: Generate the initial summary from analysis results.
-   - Subsequent rounds: Revise the summary based on the Issues table from the previous evaluation report and the original article.
-4. **Save and check**: Save the summary to `{title}/summary/summary-{title}.md`. Run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-{title}.md` to verify word count meets template requirements, and display the results.
-5. **Evaluate**: Enable a subagent with the evaluator prompt (`{skill-dir}/references/evaluate-prompt.md`). The subagent returns a structured evaluation report containing: total score (0-10), methodology (dimensions, weights, formula), and an issues table. Save the report to `{title}/summary/evaluation-round{N}-{title}.md`.
-6. **Check score**:
-   - **Passes (≥ 8.0)**: Break out of the loop. Proceed to Step 6.
-   - **Fails (< 8.0)**: Record the current score. If it is the highest so far, save this summary as the best candidate. Return to step 2 of this loop for the next round.
-7. **Round limit or timeout reached**: Use the best-scoring summary from the loop. Inform the user of the best score achieved. Proceed to Step 6.
+1. **Start timer**: `node {skill-dir}/scripts/timer.js start --tag {title}`
+2. **Each round**:
+   - Check timeout: `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800`. If `"expired": true`, use best summary so far → Step 6.
+   - Round 1: Generate summary from analysis. Later rounds: revise based on previous evaluation Issues table + original article.
+   - Save to `{title}/summary/summary-{title}.md`. Run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-{title}.md` to verify word count, display results.
+   - Evaluate via subagent using `{skill-dir}/references/evaluate-prompt.md`. Save report to `{title}/summary/evaluation-round{N}-{title}.md`.
+   - Score ≥ 8.0 → exit loop → Step 6. Score < 8.0 → track best candidate, next round.
+3. **Rounds exhausted or timeout**: use best-scoring summary, inform user of score → Step 6.
 
 ### Step 6: Summary Polishing
 
-- Polish the summary to remove AI-generated traces. Apply the following de-AI guidelines:
-  - Avoid formulaic expressions and overly smooth transitions (e.g., "It's worth noting", "Importantly", "In conclusion").
-  - Vary sentence structure and length to avoid repetitive patterns.
-  - Use natural, specific language rather than vague or generic phrasing.
-  - Remove excessive hedging and qualifiers.
-  - Avoid the rule of three and parallel structures that feel manufactured.
-  - If a de-AI-trace skill is installed locally (e.g., humanizer-cn), use it to assist the polishing.
-- Save the polished summary locally at: `{title}/summary/final-summary-{title}.md`.
+- Remove AI-generated traces: avoid formulaic transitions ("It's worth noting", "In conclusion"), manufactured parallel structures, excessive hedging, and repetitive sentence patterns. Use natural, specific language.
+- If a de-AI skill is installed locally (e.g., humanizer-cn), use it to assist.
+- Save to: `{title}/summary/final-summary-{title}.md`
 
 ### Step 7: Polishing Result Check
-- Enable subagent for adversarial quality check (referencing generative adversarial network approach).
-- Check the readability of the polished summary to ensure it conforms to human reading habits.
-- Save check results locally at: `{title}/summary/refine-gan-{title}.md`.
-- If the check fails, return to Step 6 to re-polish the summary. Maximum 3 retries. If all retries are exhausted, proceed with the current version and inform the user.
-- If the check passes, inform the user that the final summary has been generated and provide the summary file path.
+- Adversarial subagent checks readability and human reading habits. Save to: `{title}/summary/refine-gan-{title}.md`.
+- Fails → return to Step 6 (max 3 retries). Retries exhausted → proceed with current version, inform user.
+- Passes → inform user and provide summary file path.
 
 ---
 
