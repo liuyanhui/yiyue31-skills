@@ -94,7 +94,7 @@ node timer.js start --tag {title}
 
 **Loop rules:**
 - Maximum 5 rounds. The evaluator subagent MUST use the same LLM throughout all rounds — switching LLMs mid-loop is FORBIDDEN to ensure evaluation consistency.
-- Passing threshold: weighted total score ≥ 8.0 (out of 10).
+- Passing threshold: total score ≥ 8.0 (out of 10). Scoring methodology is defined in the evaluator prompt.
 - Each round's evaluation report is saved to `{title}/summary/evaluation-round{N}-{title}.md`.
 - Global timeout: 30 minutes. Tracked via `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800`. If expired, stop the loop and use the best-scoring summary. Inform the user of the timeout.
 
@@ -105,7 +105,7 @@ node timer.js start --tag {title}
    - Round 1: Generate the initial summary from analysis results.
    - Subsequent rounds: Revise the summary based on the Issues table from the previous evaluation report and the original article.
 4. **Save and check**: Save the summary to `{title}/summary/summary-{title}.md`. Run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-{title}.md` to verify word count meets template requirements, and display the results.
-5. **Evaluate**: Enable a subagent with the evaluator prompt (`{skill-dir}/references/evaluate-prompt.md`) to score the summary across 4 dimensions (Information Density, Logical Coherence, Technical Depth, Expression Quality) and produce a detailed issue report. Save the report to `{title}/summary/evaluation-round{N}-{title}.md`.
+5. **Evaluate**: Enable a subagent with the evaluator prompt (`{skill-dir}/references/evaluate-prompt.md`). The subagent returns a structured evaluation report containing: total score (0-10), methodology (dimensions, weights, formula), and an issues table. Save the report to `{title}/summary/evaluation-round{N}-{title}.md`.
 6. **Check score**:
    - **Passes (≥ 8.0)**: Break out of the loop. Proceed to Step 6.
    - **Fails (< 8.0)**: Record the current score. If it is the highest so far, save this summary as the best candidate. Return to step 2 of this loop for the next round.

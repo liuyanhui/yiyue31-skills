@@ -1,105 +1,50 @@
 # Summary Evaluation Prompt
 
-You are a technical writing evaluator. Score a summary of a technical article across 4 dimensions (0-10 each), and list every specific problem with verbatim evidence.
-
-> **Scope:** This prompt produces scores and a detailed issue report. It does not directly edit the article, but must provide enough diagnostic detail (including suggested fixes) that a separate revision step can resolve all issues without re-reading the original article. Higher scores indicate better quality.
+Score a technical summary across 4 dimensions (0-10 each) and list every problem with verbatim evidence. Do not edit — produce scores and a detailed issue report with enough diagnostic detail (including suggested fixes) for a separate revision step to resolve all issues without re-reading the original article.
 
 ---
 
-## Anti-Inflation (apply before finalizing)
+## Anti-Inflation
 
-- Default to critical. "Not bad" = 5, not 7. A 7 must be earned through demonstrated quality.
-- Scores follow the rubric strictly. Do not artificially lower or inflate any dimension.
+Default to critical. "Not bad" = 5, not 7. Follow the rubric strictly.
 
----
+## Pre-check
 
-## Step 0: Pre-check
+1. Empty / < 10 words / gibberish / raw code → output "Input is not a valid summary. Evaluation aborted." and stop.
+2. < 3 sentences → note "Insufficient length for granular analysis." Scoring proceeds, ID and LC approximate.
+3. No prose (list/table only) → note "EQ and LC scores are approximate."
 
-1. If input is empty / < 10 words / gibberish / raw code: output "Input is not a valid summary. Evaluation aborted." and stop.
-2. If < 3 sentences: note "Insufficient length for granular analysis." Scoring proceeds, but ID and LC scores are approximate.
-3. If no prose (list/table only): note "EQ and LC scores are approximate."
+## Classify type and select weights
 
-## Step 1: Classify type and select weights
+| Type | Signals | ID | LC | TD | EQ |
+|---|---|---|---|---|---|
+| **Paper** | methods, experiments, results, citations, academic tone | 30% | 25% | 25% | 20% |
+| **Tech Blog** | tutorial, step-by-step, tools, code examples, personal experience | 25% | 25% | 30% | 20% |
+| **Tech News** | product launches, announcements, trend reporting, dates, exec quotes | 35% | 25% | 15% | 25% |
 
-| Type | Signals |
-|---|---|
-| **Paper** | methods, experiments, results, citations, academic tone |
-| **Tech Blog** | tutorial, step-by-step, tools, code examples, personal experience |
-| **Tech News** | product launches, announcements, trend reporting, dates, exec quotes |
+Default: **Tech Blog**. Tech News is NOT penalized for lacking implementation detail — only for vague claims it does make.
 
-Default: **Tech Blog**.
+## Scoring Rubric
 
-| Dimension | Paper | Tech Blog | Tech News |
-|---|---|---|---|
-| Information Density (ID) | 30% | 25% | 35% |
-| Logical Coherence (LC) | 25% | 25% | 25% |
-| Technical Depth (TD) | 25% | 30% | 15% |
-| Expression Quality (EQ) | 20% | 20% | 25% |
+| Band | Information Density (ID) | Logical Coherence (LC) | Technical Depth (TD) | Expression Quality (EQ) |
+|---|---|---|---|---|
+| 9-10 | Zero filler. Every sentence carries a specific claim. | Clear thesis, complete causal chain, zero contradictions. | Named methods, data, tools, versions, configurations. | Concise, professional, varied structure, error-free. |
+| 7-8 | ≤10% filler. Minor redundancy. | Minor logical leaps or weak transitions. | Occasional vagueness, missing specifics. | Occasional wordiness or minor awkwardness. |
+| 5-6 | Half adds value. Noticeable filler/vagueness. | Some claims lack evidence. Gaps in reasoning. | Shallow, surface-level, lacks concrete details. | Ambiguous, awkward, choppy transitions. |
+| 3-4 | Generic claims, padding, platitudes. | Claims disconnected from evidence. Multiple breaks. | Vague, imprecise, potentially inaccurate. | Multiple issues, unclear phrasing, inconsistent style. |
+| 0-2 | Could describe any article. | Self-contradictory. No narrative. | Technical content wrong or missing. | Language prevents comprehension. |
 
----
-
-## Step 2: Score 4 dimensions
-
-### Information Density (ID)
-
-Ratio of substantive content to total length.
-
-| Score | Criteria |
-|---|---|
-| 9-10 | Every sentence carries a specific claim. Zero filler. |
-| 7-8 | Most substantive. ≤10% filler. Minor redundancy. |
-| 5-6 | Roughly half adds value. Noticeable filler/vagueness. |
-| 3-4 | Low substance. Generic claims, padding, platitudes. |
-| 0-2 | Almost no information. Could describe any article. |
-
-### Logical Coherence (LC)
-
-Self-consistent argument with causal chains and supported claims.
-
-| Score | Criteria |
-|---|---|
-| 9-10 | Clear thesis, supported sub-claims, complete causal chain, zero contradictions. |
-| 7-8 | Main claims supported. Minor logical leaps or weak transitions. |
-| 5-6 | Some claims lack evidence. Gaps in reasoning. |
-| 3-4 | Claims disconnected from evidence. Multiple logical breaks. |
-| 0-2 | Self-contradictory. No coherent narrative. |
-
-### Technical Depth (TD)
-
-Accuracy and specificity of technical concepts.
-
-| Score | Criteria |
-|---|---|
-| 9-10 | Specific: named methods, data, tools, versions, configurations. |
-| 7-8 | Most accurate. Occasional vagueness or missing specifics. |
-| 5-6 | Shallow. Lacks concrete details. Surface-level. |
-| 3-4 | Vague or imprecise. Potentially inaccurate. |
-| 0-2 | Technical content wrong or missing. |
-
-**Per-type rules:** Tech News is NOT penalized for lacking implementation detail — only for vague claims it does make.
-
-### Expression Quality (EQ)
-
-Clarity, professionalism, and readability.
-
-| Score | Criteria |
-|---|---|
-| 9-10 | Concise, professional, varied structure, error-free. |
-| 7-8 | Generally clear. Occasional wordiness or minor awkwardness. |
-| 5-6 | Ambiguous, awkward, or run-on sentences. Choppy transitions. |
-| 3-4 | Multiple grammar issues, unclear phrasing, inconsistent style. |
-| 0-2 | Language prevents comprehension. |
-
----
-
-## Step 3: Output report
-
-Total = round(ID×W_ID + LC×W_LC + TD×W_TD + EQ×W_EQ), where weights are decimals summing to 1.0 (e.g., 0.30, 0.25). Range 0-10.
+## Output Report
 
 ```markdown
 ## Summary Evaluation Report
 
 **Type:** [Paper/Tech Blog/Tech News] | **Words:** [N] | **Weights:** [ID/LC/TD/EQ %]
+
+### Methodology
+- **Dimensions & Definitions**: [ID: substance ratio | LC: causal coherence | TD: technical specificity | EQ: clarity & professionalism]
+- **Weights**: [state per classified type]
+- **Formula**: Total = round(ID×W_ID + LC×W_LC + TD×W_TD + EQ×W_EQ), weights as decimals summing to 1.0. Range 0-10.
 
 ### Scores
 | Dimension | Score | Weight | Weighted |
@@ -113,11 +58,8 @@ Total = round(ID×W_ID + LC×W_LC + TD×W_TD + EQ×W_EQ), where weights are deci
 ### Issues
 | # | Dim | Severity | Text (verbatim) | Why it fails | Suggested fix |
 |---|-----|----------|-----------------|--------------|--------------|
-| 1 | [ID/LC/TD/EQ] | High | > "[exact quote from summary]" | [which scoring rule it violates and how] | [concrete replacement or rewrite direction] |
-| 2 | ... | ... | ... | ... | ... |
+| 1 | [ID/LC/TD/EQ] | High | > "[exact quote]" | [which rule it violates] | [concrete fix] |
 ```
-
----
 
 ## Rules
 
@@ -125,4 +67,4 @@ Total = round(ID×W_ID + LC×W_LC + TD×W_TD + EQ×W_EQ), where weights are deci
 2. Every score justified by at least one verbatim quote in the Issues table.
 3. Only flag problems clearly present. No speculation about the original article.
 4. Internal consistency checks only — do NOT verify claims against external sources.
-5. Severity levels: **High** (score-defining flaw), **Medium** (notable issue), **Low** (minor imperfection).
+5. Severity: **High** (score-defining), **Medium** (notable), **Low** (minor).
