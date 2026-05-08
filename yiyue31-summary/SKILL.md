@@ -38,7 +38,7 @@ Retrieve article content using different tools based on the user's input type:
 3. Check the converted file. If unsure about the conversion result, use the AskUserQuestion tool to ask the user to confirm: correct as-is or needs correction.
 
 ### Step 2: Analyze Article
-- **Language**: Detect language
+- **Language**: Input language
 - **Article type**: Tech blog, research paper, documentation, tutorial, video subtitles, general article, etc.
 - **Topic & domain**: Extract topic and domain
 - **Structure**: Identify main sections and hierarchy
