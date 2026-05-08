@@ -29,7 +29,7 @@ Retrieve article content using different tools based on the user's input type:
 - **URL input**: Prefer locally installed skills such as: download article, convert article, search information, operate web page, view web page, etc. Alternatively, use `wget` or `curl` or `agent-browser` to open the web page and download the article content.
 - **File path input**: Use the `Read` tool to read the file content
 - **Direct paste**: Process the input content directly
-- Extract the title from the user's original article/file/pasted content (title extraction priority: extract from heading, filename, first 10 characters of the first sentence), and save it locally at: `{title}/summary/original-{title}.md`.
+- Extract the title from the user's original article/file/pasted content (title extraction priority: extract from heading, filename, first few words of the first sentence, or use `untitled-{timestamp}`). Sanitize the title by removing or replacing filesystem-unsafe characters (`/ \ : * ? " < > |`). If `{title}/summary/` already exists, delete it before saving. Save it locally at: `{title}/summary/original-{title}.md`.
 - **Missing content to summarize**: Ask the user to provide the information
 
 **Article Content Preprocessing**
@@ -52,51 +52,81 @@ Retrieve article content using different tools based on the user's input type:
 ### Step 3: Analysis Adversarial Review
 - Enable subagent for adversarial review (referencing generative adversarial network approach) to check whether the analysis results contain errors, omissions, or unreasonable points.
 - Save adversarial review results locally at: `{title}/summary/analysis-gan-{title}.md`.
-- If adversarial review fails, return to the analysis stage to re-analyze the article
+- If adversarial review fails, return to the analysis stage to re-analyze the article. Maximum 3 retries. If all retries are exhausted, proceed to the next step with a warning to the user.
 
-### Step 4: Template Selection and Summary Generation
+### Step 4: Template Selection
+
 - Based on the analysis results, use the AskUserQuestion tool to recommend a suitable summary template. Ask the user to choose or provide custom input. See [Available Templates](#available-templates) section.
+
+### Step 5: Summary Generate-Evaluate Loop
+
+**Summary formatting rules:**
 - Keep important content in the original text, such as: processes, concepts, technical details, etc.
 - Highlight quotes and key terms in the summary, formatted as: displayed in a separate paragraph using blockquote `>` format.
 - When content is quoted verbatim from the original article, use the format: `> **[Verbatim]**: {original sentence}`
-- Complete long sentences or sentences preceded by a comma must end with a period.
-- Save the summary locally at: `{title}/summary/summary-{title}.md`.
-- Run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-{title}.md` to check if the word count meets the template requirements, and display the results.
+- Any non-heading sentence must end with punctuation.
 
-### Step 5: Quality Check
-- Enable subagent for adversarial quality check (referencing generative adversarial network approach)
-- Check summary coverage, accuracy, length, structure, language, and absence of fabricated information
-- Check readability and logical coherence to ensure the summary is clear, coherent, and easy to understand
-- Check whether the summary meets the format requirements of the selected template
-- Save check results locally at: `{title}/summary/validation-{title}.md`.
-- If the check fails, return to the summary generation stage to regenerate the summary
-- If the check passes, inform the user and use the AskUserQuestion tool to ask the user to confirm: proceed to the next step or modify the summary.
+**Flowchart:**
 
-### Step 6: Summary Evaluation Loop
-
-Use the evaluator prompt (`{skill-dir}/references/evaluate-prompt.md`) to run a scoring-based evaluation loop on the summary.
+```text
+node timer.js start --tag {title}
+            ↓
+    ┌── Loop (max 5 rounds) ──────────────────┐
+    │                                          │
+    │   node timer.js check → expired?         │
+    │   ├── Yes → use best summary, break      │
+    │   └── No  → continue                     │
+    │                                          │
+    │   Round 1?                               │
+    │   ├── Yes → Generate from analysis       │
+    │   └── No  → Revise per eval report       │
+    │              ↓                           │
+    │   Save summary & run word-counter        │
+    │              ↓                           │
+    │   Evaluate via subagent                  │
+    │              ↓                           │
+    │        Score ≥ 8.0?                      │
+    │   ├── Yes → Exit loop → Step 6           │
+    │   └── No  → Loop back ↑                  │
+    │                                          │
+    └── Global timeout: 30min ─────────────────┘
+```
 
 **Loop rules:**
-- Maximum 5 rounds. The evaluator subagent must use the same LLM throughout all rounds — switching LLMs mid-loop is forbidden to ensure evaluation consistency.
+- Maximum 5 rounds. The evaluator subagent MUST use the same LLM throughout all rounds — switching LLMs mid-loop is FORBIDDEN to ensure evaluation consistency.
 - Passing threshold: weighted total score ≥ 8.0 (out of 10).
 - Each round's evaluation report is saved to `{title}/summary/evaluation-round{N}-{title}.md`.
+- Global timeout: 30 minutes. Tracked via `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800`. If expired, stop the loop and use the best-scoring summary. Inform the user of the timeout.
 
 **Loop procedure:**
-1. Enable a subagent with the evaluator prompt to score the summary across 4 dimensions (Information Density, Logical Coherence, Technical Depth, Expression Quality) and produce a detailed issue report. Save the report to `{title}/summary/evaluation-round{N}-{title}.md`.
-2. The main agent checks whether the weighted total score ≥ 8.0:
-   - **Passes**: Break out of the loop and proceed to Step 7.
-   - **Fails**: Record the current score. If it is the highest so far, save this summary as the best candidate. Then revise the summary based on the Issues table from the evaluation report and the original article, save the revised summary to `{title}/summary/summary-round{N}-{title}.md`, and start the next round.
-3. If all 5 rounds are exhausted without passing: use the best-scoring summary from the loop as the final result. Inform the user that the target was not met after 5 rounds, report the best score achieved, and proceed to Step 7.
+1. **Start timer**: Run `node {skill-dir}/scripts/timer.js start --tag {title}` before entering the loop.
+2. **Check global timeout**: At the start of each round, run `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800`. If the output shows `"expired": true`, use the best-scoring summary so far and proceed to Step 6.
+3. **Generate or revise**:
+   - Round 1: Generate the initial summary from analysis results.
+   - Subsequent rounds: Revise the summary based on the Issues table from the previous evaluation report and the original article.
+4. **Save and check**: Save the summary to `{title}/summary/summary-{title}.md`. Run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-{title}.md` to verify word count meets template requirements, and display the results.
+5. **Evaluate**: Enable a subagent with the evaluator prompt (`{skill-dir}/references/evaluate-prompt.md`) to score the summary across 4 dimensions (Information Density, Logical Coherence, Technical Depth, Expression Quality) and produce a detailed issue report. Save the report to `{title}/summary/evaluation-round{N}-{title}.md`.
+6. **Check score**:
+   - **Passes (≥ 8.0)**: Break out of the loop. Proceed to Step 6.
+   - **Fails (< 8.0)**: Record the current score. If it is the highest so far, save this summary as the best candidate. Return to step 2 of this loop for the next round.
+7. **Round limit or timeout reached**: Use the best-scoring summary from the loop. Inform the user of the best score achieved. Proceed to Step 6.
 
-### Step 7: Summary Polishing
-- Polish the summary based on the user's chosen language to remove AI-generated traces. If a de-AI-trace skill is installed locally (e.g., humanizer-zh), use it; otherwise, search for and install a relevant de-AI-trace skill via `find-skills` into the current directory before using it.
+### Step 6: Summary Polishing
+
+- Polish the summary to remove AI-generated traces. Apply the following de-AI guidelines:
+  - Avoid formulaic expressions and overly smooth transitions (e.g., "It's worth noting", "Importantly", "In conclusion").
+  - Vary sentence structure and length to avoid repetitive patterns.
+  - Use natural, specific language rather than vague or generic phrasing.
+  - Remove excessive hedging and qualifiers.
+  - Avoid the rule of three and parallel structures that feel manufactured.
+  - If a de-AI-trace skill is installed locally (e.g., humanizer-cn), use it to assist the polishing.
 - Save the polished summary locally at: `{title}/summary/final-summary-{title}.md`.
 
-### Step 8: Polishing Result Check
+### Step 7: Polishing Result Check
 - Enable subagent for adversarial quality check (referencing generative adversarial network approach).
 - Check the readability of the polished summary to ensure it conforms to human reading habits.
 - Save check results locally at: `{title}/summary/refine-gan-{title}.md`.
-- If the check fails, return to the summary polishing stage to re-polish the summary
+- If the check fails, return to Step 6 to re-polish the summary. Maximum 3 retries. If all retries are exhausted, proceed with the current version and inform the user.
 - If the check passes, inform the user that the final summary has been generated and provide the summary file path.
 
 ---
@@ -105,7 +135,7 @@ Use the evaluator prompt (`{skill-dir}/references/evaluate-prompt.md`) to run a 
 
 - **Tech Article Template**: Tech article summary template - Suitable for technical articles, tech blogs, tech announcements, etc. Provides comprehensive analysis and summary, highlighting innovations and practical value. See `{skill-dir}/templates/tech-article.md`.
 - **Paper Template**: Paper summary template - Suitable for academic paper summaries, helping readers quickly learn and understand the core content and innovations of the paper. See `{skill-dir}/templates/paper.md`.
-- **Concise Template**: Concise summary template - Focused on core knowledge, suitable for quick learning. See `templates/concise.md`. **Default template**, used when other templates cannot be matched.
+- **Concise Template**: Concise summary template - Focused on core knowledge, suitable for quick learning. See `{skill-dir}/templates/concise.md`. **Default template**, used when other templates cannot be matched.
 
 
 **Notes**
