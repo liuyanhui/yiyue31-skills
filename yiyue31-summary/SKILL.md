@@ -29,7 +29,7 @@ Retrieve article content using different tools based on the user's input type:
 - **URL input**: Prefer locally installed skills such as: download article, convert article, search information, operate web page, view web page, etc. Alternatively, use `wget` or `curl` or `agent-browser` to open the web page and download the article content.
 - **File path input**: Use the `Read` tool to read the file content
 - **Direct paste**: Process the input content directly
-- Extract the title from the user's original article/file/pasted content (title extraction priority: extract from heading, filename, first few words of the first sentence, or use `untitled-{timestamp}`). Sanitize the title by removing or replacing filesystem-unsafe characters (`/ \ : * ? " < > |`). If `{title}/summary/` already exists, delete it before saving. Save it locally at: `{title}/summary/original-{title}.md`.
+- Extract the title from the user's original article/file/pasted content (title extraction priority: extract from heading, filename, first few words of the first sentence, or use `untitled-{timestamp}`). Sanitize the title by removing or replacing filesystem-unsafe characters (`/ \ : * ? " < > |`). If `{title}/summary/` already exists, delete it before saving. Save to: `{title}/summary/original-{title}.md`.
 - **Missing content to summarize**: Ask the user to provide the information
 
 **Article Content Preprocessing**
@@ -51,7 +51,7 @@ Retrieve article content using different tools based on the user's input type:
 
 ### Step 3: Analysis Adversarial Review
 - Enable subagent for adversarial review (referencing generative adversarial network approach) to check whether the analysis results contain errors, omissions, or unreasonable points.
-- Save adversarial review results locally at: `{title}/summary/analysis-gan-{title}.md`.
+- Save to: `{title}/summary/analysis-gan-{title}.md`.
 - If adversarial review fails, return to the analysis stage to re-analyze the article. Maximum 3 retries. If all retries are exhausted, proceed to the next step with a warning to the user.
 
 ### Step 4: Template Selection
