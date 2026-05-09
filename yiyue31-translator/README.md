@@ -38,10 +38,11 @@
 ## 输出文件
 
 ```
-{title}/
-  ├── original-{title}.md      # 原文
-  ├── analysis-{title}.md      # 主题分析
-  └── translated-{title}-zh.md # 译文
+{title}/translation/
+  ├── original-{title}.md              # 原文
+  ├── analysis-topic-{title}.md        # 主题分析
+  ├── special-phrases-{title}.md       # 特殊词句
+  └── translated-{title}-zh.md         # 译文
 ```
 
 ---
