@@ -11,21 +11,21 @@ Default to critical. "Not bad" = 5, not 7. Follow the rubric strictly.
 ## Pre-check
 
 1. Empty / < 10 words / gibberish / raw code → output "Input is not a valid polished summary. Evaluation aborted." and stop.
-2. < 3 sentences → note "Insufficient length for granular analysis." NA and RE scores approximate.
+2. Input appears to be raw analysis (contains section headers like "Entities", "Terminology", "Paragraphs") or original article rather than a polished summary → output "Input is not a polished summary. Evaluation aborted." and stop.
+3. < 3 sentences → note "Insufficient length for granular analysis." NA and RE scores approximate.
 
 ## Scoring Rubric
 
 | Band | Naturalness (NA) | Readability (RE) | Fidelity (FI) | Professionalism (PR) |
 |------|------------------|-------------------|----------------|---------------------|
-| 9-10 | Zero AI artifacts. No formulaic transitions, manufactured parallels, or hedging patterns. Reads like a skilled human writer. | Smooth flow with varied sentence structure. Transitions feel organic. | All technical claims, data, and quotes preserved exactly. No distortion from polishing. | Concise, clear, specific. No filler or platitudes. Consistent professional tone throughout. |
-| 7-8 | Occasional minor AI patterns (1-2 instances). | Generally smooth. Minor choppy transitions. | ≤2 minor precision losses. Core meaning intact. | Occasional wordiness or a single vague claim. |
-| 5-6 | Noticeable AI patterns: repeated "It's worth noting", "In conclusion", or similar formulaic phrases. | Some awkward transitions. Repetitive sentence openings. | Several precision losses or slight distortions. | Noticeable filler. Some vague or generic claims. |
-| 3-4 | Heavy AI artifacts throughout. Manufactured parallel structures, excessive hedging. | Choppy, hard to follow. Monotonous structure. | Key details lost or distorted. Quotes paraphrased incorrectly. | Excessive padding. Multiple vague or generic statements. |
-| 0-2 | Clearly machine-generated. No attempt at natural expression. | Unreadable or incoherent. | Fundamentally changed meaning. | No professional quality. |
+| 9-10 | Zero AI artifacts (see AI Pattern Checklist). Reads like a skilled human writer. | Smooth flow with varied sentence structure. Transitions feel organic. | All technical claims, data, quotes, and terminology preserved exactly. No distortion from polishing. | Concise, clear, specific. No filler or platitudes. Consistent professional tone throughout. |
+| 5-8 | Noticeable AI patterns present: formulaic transitions, manufactured parallels, repetitive structures, or excessive hedging (1-3 instances). | Some awkward transitions or repetitive sentence openings. Flow generally adequate but not smooth. | Some precision losses, slight distortions, or technical terms replaced with less precise alternatives. Core meaning intact. | Occasional wordiness, filler, or vague claims. Professional tone inconsistent. |
+| 0-4 | Heavy AI artifacts throughout, or clearly machine-generated with no attempt at natural expression. | Choppy, hard to follow, monotonous structure, or incoherent. | Key details lost, quotes paraphrased incorrectly, technical meaning fundamentally changed, or specialized terms replaced with oversimplified language. | Excessive padding, multiple vague/generic statements, or no professional quality. |
 
 ## AI Pattern Checklist
 
 Flag these specific patterns as NA issues:
+
 - Formulaic transitions: "It's worth noting", "In conclusion", "It's important to", "Furthermore"
 - Manufactured parallel structures: forced three-part lists, symmetric but shallow comparisons
 - Excessive hedging: "may", "might", "could potentially", "it seems"
@@ -38,8 +38,8 @@ Flag these specific patterns as NA issues:
 | Dimension | Weight |
 |-----------|--------|
 | Naturalness | 30% |
-| Readability | 25% |
-| Fidelity | 25% |
+| Readability | 20% |
+| Fidelity | 30% |
 | Professionalism | 20% |
 
 ## Output Report
@@ -47,19 +47,18 @@ Flag these specific patterns as NA issues:
 ```markdown
 ## Polish Evaluation Report
 
-**Summary:** [title] | **Words:** [N] | **Weights:** NA 30% / RE 25% / FI 25% / PR 20%
+**Summary:** [title] | **Words:** [N] | **Weights:** NA 30% / RE 20% / FI 30% / PR 20%
 
 ### Methodology
-- **Dimensions & Definitions**: [NA: freedom from AI-generated patterns | RE: flow and sentence variety | FI: preservation of original meaning and technical precision | PR: conciseness and professional tone]
-- **Weights**: NA 30%, RE 25%, FI 25%, PR 20%
-- **Formula**: Total = round(NA×0.3 + RE×0.25 + FI×0.25 + PR×0.2). Range 0-10.
+- **Dimensions**: NA: freedom from AI-generated patterns (see AI Pattern Checklist) | RE: flow and sentence variety | FI: preservation of original meaning, technical precision, and terminology | PR: conciseness and professional tone
+- **Formula**: Total = round(NA×0.3 + RE×0.2 + FI×0.3 + PR×0.2). Range 0-10.
 
 ### Scores
 | Dimension | Score | Weight | Weighted |
 |-----------|-------|--------|----------|
 | Naturalness | [X] | 30% | [X×0.3] |
-| Readability | [X] | 25% | [X×0.25] |
-| Fidelity | [X] | 25% | [X×0.25] |
+| Readability | [X] | 20% | [X×0.2] |
+| Fidelity | [X] | 30% | [X×0.3] |
 | Professionalism | [X] | 20% | [X×0.2] |
 | **Total** | | | **[X/10]** |
 
@@ -75,4 +74,3 @@ Flag these specific patterns as NA issues:
 2. Every score justified by at least one verbatim quote in the Issues table.
 3. Only flag problems clearly present. No speculation about intent.
 4. Severity: **High** (score-defining), **Medium** (notable), **Low** (minor).
-5. For NA dimension: cross-reference the AI Pattern Checklist. Each detected pattern must appear in Issues with the pattern name.

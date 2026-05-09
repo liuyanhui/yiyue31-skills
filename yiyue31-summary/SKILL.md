@@ -111,7 +111,6 @@ Retrieve article content using different tools based on the user's input type:
 
 **Polishing rules:**
 - Remove AI-generated traces: avoid formulaic transitions ("It's worth noting", "In conclusion"), manufactured parallel structures, excessive hedging, and repetitive sentence patterns. Use natural, specific language.
-- If a de-AI skill is installed locally (e.g., humanizer-cn), use it to assist.
 
 **Loop parameters:** max 3 rounds, passing threshold score ≥ 8.0.
 
