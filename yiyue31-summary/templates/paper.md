@@ -1,24 +1,23 @@
 ---
 name: Paper-Summary
 display_name: Paper Summary Template
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Paper Summary Template
 
 ## Description
 
-Paper notes template, suitable for summarizing research papers, helping readers quickly learn and understand the paper. Organized by article sections in order, highlighting innovations and practical value.
+Paper notes template, suitable for summarizing research papers, helping readers quickly learn and understand the paper. Organized by paper sections in order, highlighting innovations and practical value.
 
 ## Template Content
 
 ```markdown
-
 # Original Title: {{Original Title}}
 
 **Source**: {{URL or file path}}
 
-**Author**: {{if available}}
+**Author**: {{Author name, conference or journal name}}
 
 **Template**: {{current template name or template filename}}
 
@@ -26,38 +25,56 @@ Paper notes template, suitable for summarizing research papers, helping readers 
 
 ---
 
-# {{Article/Paper Title}} Reading Summary
-
 ## Basic Information
-- **Original Link**: {{URL}}
-- **Author/Source**: {{Author name, conference or journal name}}
+
 - **Reading Date**: {{Date}}
 - **Keywords**: {{3~5 keywords}}
 
 ## Core Problem
-{{What problem does the article attempt to solve? What is the background?}}
+
+{{What problem does the paper attempt to solve? What is the background?}}
 
 ## Main Viewpoints/Conclusions
+
 {{Summarize the author's core conclusions in 2~3 sentences.}}
 
 ## Technical Highlights
+
 1. **Key Technology**: {{Methods, architecture, algorithms, etc.}}
 2. **Innovations**: {{Differences from existing work}}
 3. **Experiments/Validation**: {{How is effectiveness proven? Data or cases}}
 
-## My Reflections
-- **Insights**: {{Implications for current work}}
-- **Questions**: {{Unclear or controversial points in the text}}
-- **Extensions**: {{Directions for further exploration}}
+## Standout Quotes
+
+> **[Verbatim]**: {{standout sentence 1}} — {{why notable}}
+
+> **[Verbatim]**: {{standout sentence 2}} — {{why notable}}
+
+{{Select 1-3 key claims or memorable conclusions from the paper.}}
+
+## Reflections
+
+- **Insights**: {{Implications for current work or field}}
+- **Questions**: {{Unclear or controversial points in the paper}}
+- **Extensions**: {{Directions for further exploration suggested by the paper itself}}
+
+{{Questions and Extensions are optional — only generate if applicable.}}
 
 ## Action Items (Optional)
-{{If there are next steps, list them here.}}
+
+{{Next steps based on the paper's conclusions. If none, do not generate this section.}}
+
+## Key Terminology
+
+| Term | Explanation |
+|------|-------------|
+| {{term 1}} | {{brief explanation}} |
+| {{term 2}} | {{brief explanation}} |
+
+{{Only include if the paper introduces non-trivial terminology. If none exist, do not generate this section.}}
 ```
 
 ## Rules
 
-- **Format**: Use bullet points and hierarchical indentation for easy reading and review
-- **Structure**: Organize by article sections in order (introduction, background, methods, implementation, conclusions, etc.)
-- **Accuracy**: Preserve technical accuracy, explain complex concepts in understandable language
-- **Information Source**: Only based on the provided article content, do not add external knowledge
-- **Word Count**: Must not exceed the original word count.
+- **Structure**: Organize by paper sections in order (introduction, related work, methods, experiments, conclusions, etc.)
+- **Conditional sections**: "Questions" and "Extensions" under Reflections only if applicable. "Action Items" and "Key Terminology" only when relevant content exists.

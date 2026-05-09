@@ -1,7 +1,7 @@
 ---
 name: Tech-Article-Summary
 display_name: Tech Article Summary Template
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Tech Article Summary Template
@@ -25,54 +25,57 @@ Tech learning notes template (enhanced version), suitable for students or engine
 
 ---
 
-## 1. Article Title and Overview
+## 1. Overview
 
-**Article Title**: {{Original Title}}
-
-**Overview**: {{3-5 sentences summarizing the core theme and main objectives of the article.}}
-{{If people, teams, organizations, or events are involved, start a new paragraph briefly describing the relevant background of the entity.}}
+{{3-5 sentences summarizing the core theme, main objectives, and key conclusions of the article.}}
+{{If people, teams, organizations, or events are involved, add a paragraph briefly describing their relevant background.}}
 
 ## 2. Key Points at a Glance
 
-> **Generation Requirements**: The purpose is to quickly understand the article content and attract readers to continue reading; avoid overly colloquial language; summarize in order of content/chronology/logic; keep important content in the original text.
-
-{{Key point or highlight 1}}
-{{Key point or highlight 2}}
-{{More key points or highlights...}}
+- {{Key point or highlight 1}}
+- {{Key point or highlight 2}}
+- {{...typically 5-8 points, ordered by article flow}}
 
 ## 3. Main Content Structure
 
 {{Original article section 1}}
-{{Summarize by natural paragraphs, e.g.: key points, steps, pros/cons, or key arguments. If there is code, algorithms, or processes, keep them as-is. Use bullet points (main point + sub-points) when necessary. Avoid overly colloquial language; summarize in order of content/chronology/logic.}}
+{{Summarize: key points, steps, pros/cons, or key arguments. Use bullet points (main point + sub-points) when necessary.}}
 
 {{Original article section 2}}
 {{Summary content...}}
 
-{{Original article section...}}
-{{Summary content...}}
+{{...remaining sections...}}
 
+## 4. Standout Quotes
 
-## 4. Insights and Inspirations
+> **[Verbatim]**: {{standout sentence 1}} — {{why this quote is notable}}
 
-{{Insight 1: Select the most insightful viewpoints from the article and describe them in plain, natural language. E.g.: innovations or breakthroughs, practical value, technical advantages, comparisons with other technologies, performance or effectiveness highlights, design approaches, implementation key points, best practices, lessons learned, etc.}}
+> **[Verbatim]**: {{standout sentence 2}} — {{why this quote is notable}}
 
-{{Insight 2: ...}}
+{{Select 2-4 memorable sentences that capture key insights or turning points.}}
 
-{{Insight...}}
+## 5. Insights and Inspirations
 
-## 5. Potential Issues
+- {{Insight 1: innovations or breakthroughs, practical value, technical advantages, or lessons learned}}
+- {{Insight 2: ...}}
+{{Typically 3-5 insights.}}
 
-{{
-- Point out limitations, challenges, or unresolved issues mentioned in the article
-- Unresolved problems
-- Suggest related further reading or application scenarios (strictly based on article content, do not fabricate)
-- If none exist, do not generate this section
-}}
+## 6. Potential Issues
+
+{{Point out limitations, challenges, or unresolved issues mentioned in the article. Suggest related further reading or application scenarios (strictly based on article content). If none exist, do not generate this section.}}
+
+## 7. Key Terminology
+
+| Term | Explanation |
+|------|-------------|
+| {{term 1}} | {{brief explanation}} |
+| {{term 2}} | {{brief explanation}} |
+
+{{Only include if the article introduces non-trivial terminology. If none exist, do not generate this section.}}
 ```
 
 ## Rules
 
 - **Structure**: Organize by article sections in order (introduction, background, methods, implementation, conclusions, etc.)
-- **Accuracy**: Preserve technical accuracy, explain complex concepts in understandable language
-- **Information Source**: Only based on the provided article content, except for special nouns such as company names, person names, product names, event names, etc.
-- **Word Count**: Must not exceed the original word count.
+- **Conditional sections**: Sections 6 and 7 are only generated when the article contains relevant content.
+- **Accuracy**: Preserve technical accuracy; explain complex concepts in understandable language.

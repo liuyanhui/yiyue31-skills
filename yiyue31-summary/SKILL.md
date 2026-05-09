@@ -40,6 +40,8 @@ Single-shot evaluation: call subagent, get scored report, pass or fail. No loop.
 
 **Returns:** PASS/FAIL + evaluation report path.
 
+**Loop constraint:** When Evaluate Once is called within a generate-evaluate loop, the evaluator MUST use the same LLM throughout all rounds — switching mid-loop is FORBIDDEN.
+
 ---
 
 ## Summary Workflow
@@ -94,8 +96,12 @@ Retrieve article content using different tools based on the user's input type:
 - Highlight quotes and key terms in blockquote `>` format as separate paragraphs.
 - Verbatim quotes: `> **[Verbatim]**: {original sentence}`
 - Any non-heading sentence must end with punctuation.
+- Keep key code/algorithm snippets as-is; simplify supporting code into descriptions or pseudocode.
+- Organize content following the original article's flow (content/chronology/logic).
+- Only based on the provided article content. Do not fabricate or add external knowledge (except proper nouns such as company/person/product names).
+- Word count must not exceed the original article word count.
 
-**Loop parameters:** max 5 rounds, global timeout 30 min, passing threshold score ≥ 8.0 (out of 10). Evaluator MUST use the same LLM throughout all rounds — switching mid-loop is FORBIDDEN.
+**Loop parameters:** max 5 rounds, global timeout 30 min, passing threshold score ≥ 8.0 (out of 10).
 
 **Loop procedure:**
 1. **Start timer**: `node {skill-dir}/scripts/timer.js start --tag {title}`

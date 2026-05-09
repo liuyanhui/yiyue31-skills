@@ -1,22 +1,22 @@
 ---
 name: Concise
 display_name: Concise Notes
-version: 1.1.0
+version: 1.2.0
 default_language: zh
 target_length: 800-1500
 target_reading_time: 3-5 minutes
 sections:
   - title_overview
-  - key_concepts
   - content_outline
   - core_insights
-  - questions_extensions
+  - standout_quotes
+  - key_glossary
 guidelines_length:
   title_overview: 1-2 sentences
-  key_concepts: 5-10 terms
   content_outline: hierarchical by section
   core_insights: 5-8 points
-  questions_extensions: 2-3 items each
+  standout_quotes: 1-2 quotes
+  key_glossary: 5-10 terms
 features:
   - Focus on core knowledge
   - Avoid redundancy
@@ -48,15 +48,22 @@ Tech learning notes template, suitable for engineers or students to quickly revi
 - **Background & Problem**: {{What problem does the article solve}}
 - **Core Technology/Method**: {{Steps, algorithms, architecture (use bullet points)}}
 - **Advantages & Innovations**: {{Content here}}
-- **Disadvantages & Limitations**: {{Content here}}
+- **Disadvantages & Limitations**: {{Only if the article mentions limitations}}
 - **Conclusions & Applications**: {{Content here}}
-- **Key Glossary**: {{Content here}}
+- **Standout Quote**: > **[Verbatim]**: {{1-2 memorable sentences that capture key insights}}
+
+## Key Glossary
+
+| Term | Explanation |
+|------|-------------|
+| {{term 1}} | {{brief explanation}} |
+| {{term 2}} | {{brief explanation}} |
+
+{{Only include if the article introduces non-trivial terminology. If none exist, do not generate this section.}}
 ```
 
 ## Rules
 
-- **Format**: Use Markdown format, keep language concise and easy to understand.
-- **Accuracy**: Preserve technical accuracy, explain complex concepts in understandable language
-- **Information Source**: Only based on the provided article content, do not add external knowledge
 - **Highlight Key Points**: Innovations, practical value, technical comparisons
-- **Word Count**: Must not exceed the original word count
+- **Target length**: 800-1500 words (aspirational). Hard upper bound: must not exceed original article word count (see SKILL.md).
+- **Conditional items**: "Disadvantages & Limitations" only if the article mentions them. "Key Glossary" only if non-trivial terminology exists.
