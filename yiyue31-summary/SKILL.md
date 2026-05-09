@@ -19,6 +19,29 @@ Article summary generator for summarizing technical articles, blog posts, resear
 
 ---
 
+## Reusable Sub-workflows
+
+### Evaluate Once
+
+Single-shot evaluation: call subagent, get scored report, pass or fail. No loop.
+
+**Parameters (caller provides):**
+- `{eval-prompt}`: Evaluate prompt file path (e.g. `{skill-dir}/references/evaluate-analysis-prompt.md`)
+- `{input-file}`: File to evaluate
+- `{output-file}`: Where to save the evaluation report
+- `{threshold}`: Passing score, default 8.0
+
+**Procedure:**
+1. Call subagent with `{eval-prompt}` as prompt, providing `{input-file}` content as input.
+2. Save the evaluation report to `{output-file}`.
+3. Extract total score from report.
+   - Score ≥ `{threshold}` → **PASS**
+   - Score < `{threshold}` → **FAIL**
+
+**Returns:** PASS/FAIL + evaluation report path.
+
+---
+
 ## Summary Workflow
 
 The complete step-by-step process from input to final output:
@@ -37,7 +60,9 @@ Retrieve article content using different tools based on the user's input type:
 2. Preserve the original structure and format during conversion. Try to keep paragraphs, headings, lists, etc. unchanged. For elements that cannot be accurately converted, keep the original text and add comments to prompt the user to check.
 3. Check the converted file. If unsure about the conversion result, use the AskUserQuestion tool to ask the user to confirm: correct as-is or needs correction.
 
-### Step 2: Analyze Article
+### Step 2: Analyze Article (Generate-Evaluate Loop)
+
+**Analysis requirements:**
 - **Language**: Input language
 - **Article type**: Tech blog, research paper, documentation, tutorial, video subtitles, general article, etc.
 - **Topic & domain**: Extract topic and domain
@@ -47,18 +72,22 @@ Retrieve article content using different tools based on the user's input type:
 - **Background**: If events are involved, analyze event context, sources, publication date
 - **Terminology**: Extract key terms and concepts to retain or explain
 - **Quotes**: Select standout sentences as summary highlights. Output table: "Location in original | Original text | Highlight description"
-- Save to: `{title}/summary/analysis-{title}.md`
 
-### Step 3: Analysis Adversarial Review
-- Enable subagent for adversarial review (referencing generative adversarial network approach) to check whether the analysis results contain errors, omissions, or unreasonable points.
-- Save to: `{title}/summary/analysis-gan-{title}.md`.
-- If adversarial review fails, return to the analysis stage to re-analyze the article. Maximum 3 retries. If all retries are exhausted, proceed to the next step with a warning to the user.
+**Loop parameters:** max 3 rounds, passing threshold score ≥ 8.0.
 
-### Step 4: Template Selection
+**Loop procedure:**
+1. **Each round**:
+   - Round 1: full analysis per requirements above. Later rounds: re-analyze based on previous evaluation Issues table + original article.
+   - Save to `{title}/summary/analysis-round{N}-{title}.md`.
+   - Evaluate (same pattern as **Evaluate Once**): call subagent using `{skill-dir}/references/evaluate-analysis-prompt.md`, save report to `{title}/summary/evaluation-analysis-round{N}-{title}.md`.
+   - Score ≥ 8.0 → copy current round file to `{title}/summary/analysis-{title}.md` → Step 3. Score < 8.0 → track best candidate, next round.
+2. **Rounds exhausted**: copy best-scoring round file to `{title}/summary/analysis-{title}.md`, inform user of score → Step 3.
+
+### Step 3: Template Selection
 
 - Based on the analysis results, use the AskUserQuestion tool to recommend a suitable summary template. Ask the user to choose or provide custom input. See [Available Templates](#available-templates) section.
 
-### Step 5: Summary Generate-Evaluate Loop
+### Step 4: Summary Generate-Evaluate Loop
 
 **Summary formatting rules:**
 - Keep important content: processes, concepts, technical details, etc.
@@ -71,23 +100,28 @@ Retrieve article content using different tools based on the user's input type:
 **Loop procedure:**
 1. **Start timer**: `node {skill-dir}/scripts/timer.js start --tag {title}`
 2. **Each round**:
-   - Check timeout: `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800`. If `"expired": true`, use best summary so far → Step 6.
+   - Check timeout: `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800`. If `"expired": true`, copy best summary so far to `{title}/summary/summary-{title}.md` → Step 5.
    - Round 1: Generate summary from analysis. Later rounds: revise based on previous evaluation Issues table + original article.
-   - Save to `{title}/summary/summary-{title}.md`. Run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-{title}.md` to verify word count, display results.
-   - Evaluate via subagent using `{skill-dir}/references/evaluate-prompt.md`. Save report to `{title}/summary/evaluation-round{N}-{title}.md`.
-   - Score ≥ 8.0 → exit loop → Step 6. Score < 8.0 → track best candidate, next round.
-3. **Rounds exhausted or timeout**: use best-scoring summary, inform user of score → Step 6.
+   - Save to `{title}/summary/summary-round{N}-{title}.md`. Run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-round{N}-{title}.md` to verify word count, display results.
+   - Evaluate (same pattern as **Evaluate Once**): call subagent using `{skill-dir}/references/evaluate-prompt.md`, save report to `{title}/summary/evaluation-round{N}-{title}.md`.
+   - Score ≥ 8.0 → copy current round file to `{title}/summary/summary-{title}.md` → Step 5. Score < 8.0 → track best candidate, next round.
+3. **Rounds exhausted**: copy best-scoring round file to `{title}/summary/summary-{title}.md`, inform user of score → Step 5.
 
-### Step 6: Summary Polishing
+### Step 5: Summary Polishing (Generate-Evaluate Loop)
 
+**Polishing rules:**
 - Remove AI-generated traces: avoid formulaic transitions ("It's worth noting", "In conclusion"), manufactured parallel structures, excessive hedging, and repetitive sentence patterns. Use natural, specific language.
 - If a de-AI skill is installed locally (e.g., humanizer-cn), use it to assist.
-- Save to: `{title}/summary/final-summary-{title}.md`
 
-### Step 7: Polishing Result Check
-- Adversarial subagent checks readability and human reading habits. Save to: `{title}/summary/refine-gan-{title}.md`.
-- Fails → return to Step 6 (max 3 retries). Retries exhausted → proceed with current version, inform user.
-- Passes → inform user and provide summary file path.
+**Loop parameters:** max 3 rounds, passing threshold score ≥ 8.0.
+
+**Loop procedure:**
+1. **Each round**:
+   - Round 1: polish summary from Step 4. Later rounds: re-polish based on previous evaluation Issues table.
+   - Save to `{title}/summary/polish-round{N}-{title}.md`.
+   - Evaluate (same pattern as **Evaluate Once**): call subagent using `{skill-dir}/references/evaluate-polish-prompt.md`, save report to `{title}/summary/evaluation-polish-round{N}-{title}.md`.
+   - Score ≥ 8.0 → copy current round file to `{title}/summary/final-{title}.md` → inform user and provide file path. Score < 8.0 → track best candidate, next round.
+2. **Rounds exhausted**: copy best-scoring round file to `{title}/summary/final-{title}.md`, inform user of score and provide file path.
 
 ---
 
