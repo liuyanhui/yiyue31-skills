@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const TIMER_SCRIPT = path.join(__dirname, 'timer.js');
-const TIMER_DATA_DIR = path.join(process.cwd(), '.timer-data');
+const TIMER_DATA_DIR = path.join(require('os').tmpdir(), 'yiyue-translator-timers');
 
 function run(...args) {
   const output = execSync(`node "${TIMER_SCRIPT}" ${args.join(' ')}`, { encoding: 'utf-8' });

@@ -10,7 +10,7 @@ You will receive:
 
 1. **Original article** — the source English text
 2. **Translation** — the Chinese translation to evaluate
-3. **Glossary** — terminology table for TM dimension check
+3. **Corrections** — translation correction table for TM dimension check
 4. **Style** — Literal or Free, for ST dimension evaluation
 5. **Special phrases** — extracted phrases table from Step 3 (for FM check)
 
@@ -18,8 +18,8 @@ You will receive:
 
 Default to critical. "Not bad" = 5, not 7. Follow the rubric strictly.
 
-- If you find 3+ issues in a dimension, that dimension cannot exceed 7.
-- A score of 8 means nearly publishable quality with only minor issues.
+- If you find 3+ issues in a dimension, that dimension cannot exceed 6.
+- A score of 8 means publishable quality with at most 1-2 very minor issues that don't affect readability.
 - A score of 9-10 means the dimension is essentially flawless.
 
 ## Pre-check
@@ -31,9 +31,10 @@ Default to critical. "Not bad" = 5, not 7. Follow the rubric strictly.
 
 | Band | Accuracy (AC) | Fluency (FL) | Terminology (TM) | Format (FM) | Style (ST) |
 |------|---------------|--------------|-------------------|-------------|------------|
-| 9-10 | Perfect fidelity. Every fact, data point, logical relationship matches. Zero additions or omissions. | Natural Chinese. Zero translationese. Reads like original Chinese writing. | All glossary terms correctly handled. First occurrence uses `English(中文)` annotation. Consistent throughout. | All Markdown preserved. Golden quotes/idioms/slang bolded. Links: URL kept, text translated. Special phrases match Step 3 table. Image text language correct. | Matches selected style. Translator notes follow `Chinese（English original, explanation）` format when present. |
-| 5-8 | Minor inaccuracies (1-3 non-critical). Core meaning intact. | Some translationese (1-3 patterns from Checklist). Generally readable. | Most glossary terms correct. 1-2 annotation format errors or inconsistencies. | Minor format issues (1-2). Most structure preserved. | Mostly matches style. Occasional deviations. |
-| 0-4 | Significant misrepresentations, fabricated content, or major omissions. | Heavy translationese (4+ patterns). Unnatural Chinese. | Multiple glossary violations. Annotation format ignored. | Major format problems. Broken links, missing bolding, special phrases not followed. | Does not match selected style. |
+| 9-10 | Perfect fidelity. Every fact, data point, logical relationship matches. Zero additions or omissions. | Natural Chinese. Zero translationese. Reads like original Chinese writing. | All corrections correctly handled. First occurrence uses `English(中文)` annotation. Consistent throughout. | All Markdown preserved. Golden quotes/idioms/slang bolded. Links: URL kept, text translated. Special phrases match Step 3 table. | Matches selected style. Translator notes follow `Chinese（English original, explanation）` format when present. |
+| 7-8 | Very minor inaccuracies (1 non-critical). Core meaning perfectly intact. | At most 1 translationese pattern. Mostly natural. | Nearly all corrections correct. At most 1 annotation format inconsistency. | At most 1 very minor format issue. Structure fully preserved. | Closely matches style. Rare minor deviation. |
+| 5-6 | Minor inaccuracies (2-3 non-critical). Core meaning intact. | Some translationese (2-3 patterns from Checklist). Generally readable. | Most corrections correct. 1-2 annotation format errors or inconsistencies. | Minor format issues (1-2). Most structure preserved. | Mostly matches style. Occasional deviations. |
+| 0-4 | Significant misrepresentations, fabricated content, or major omissions. | Heavy translationese (4+ patterns). Unnatural Chinese. | Multiple correction violations. Annotation format ignored. | Major format problems. Broken links, missing bolding, special phrases not followed. | Does not match selected style. |
 
 ## Weights
 
@@ -89,4 +90,4 @@ For dimensions scoring 9-10 with zero issues: output "No issues found." instead 
 1. Single integer per dimension. No ranges.
 2. Every score < 10 must have at least one verbatim quote in Issues.
 3. For FL: cross-reference Translationese Checklist. Name the pattern.
-4. For TM: check against the provided glossary. Every violation flagged.
+4. For TM: check against the provided corrections table. Every violation flagged.
