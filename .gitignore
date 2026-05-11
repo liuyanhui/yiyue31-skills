@@ -7,3 +7,6 @@ nul
 yiyue31-takeaways/*
 !yiyue31-takeaways/SKILL.md
 !yiyue31-takeaways/templates/
+
+# yiyue31-translator: terms.md is user-specific
+yiyue31-translator/references/terms.md
