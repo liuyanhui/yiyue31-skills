@@ -5,412 +5,139 @@ description: 当用户要求"提取观点"、"生成心得"、"记录我的理�
 
 # User Viewpoints Extraction Skill
 
-此技能通过交互式讨论生成用户观点文档，记录用户对文章的理解、观点和收获。
+通过交互式讨论生成用户观点文档，记录用户对文章的理解、观点和收获。
 
-## 状态管理与恢复
+## Reusable Sub-workflows
 
-**State 文件**：`{title}/takeaways/state-{title}.json`
+### Evaluate Once
 
-```json
-{
-  "task_id": "uuid",
-  "title": "标题",
-  "current_step": 4,
-  "status": "in_progress",
-  "last_update": "2026-04-28T14:45:00Z",
-  "steps": {
-    "step1": {"status": "completed"},
-    "step4": {"status": "in_progress", "current_topic": 2, "total_topics": 5}
-  }
-}
-```
+Single-shot evaluation: call subagent, get report, pass or fail.
 
-**恢复逻辑**：
-- Skill 开始时检查 state 文件
-- 存在且未完成 → 询问用户：继续/重新开始/跳转步骤
-- 每个 Step 完成后更新 state
+**Parameters (caller provides):**
+- `{eval-criteria}`: Checklist items for the subagent to evaluate
+- `{input-files}`: File(s) to evaluate
+- `{output-file}`: Where to save the evaluation report
+- `{extra-output}`: Additional output fields beyond the default format (optional)
 
-## workflow
+**Procedure:**
+1. Call subagent with `{eval-criteria}` as evaluation standard, providing `{input-files}` content as input.
+2. Subagent outputs: 总体评估(通过/不通过) + 问题列表 + 改进建议 + `{extra-output}`(if specified).
+3. Save the evaluation report to `{output-file}`.
+4. Not passed → adjust based on suggestions and re-evaluate. Max 3 rounds.
+5. 3 rounds still not passed → show current version and report to user, let user decide.
 
-严格按照以下步骤执行：
+**Returns:** PASS/FAIL + evaluation report path.
 
-### Step 1: 格式化输入文档
+---
 
-首先将用户输入的内容转换为统一的Markdown文档。
+## title 安全化
 
-**输入来源处理：**
+仅保留字母、数字、CJK 字符、`-`、`_`，其余替换为 `-`，合并连续 `-`，去除首尾 `-`，限 64 字符。示例：`《AI 重塑软件开发：2026 年趋势》` → `AI-重塑软件开发-2026-趋势`。路径无效时用简短英文替代。
 
-1. **URL输入**：优先使用本地已安装的skills（如下载文章、转换文章、抓取网页、操作网页、查看网页等），其次使用 `wget` 或 `curl` 打开网页并下载文章内容。
-2. **文件路径**：如果用户提供的是文件路径（.md, .txt, .pdf, .docx等），读取文件内容
-3. **粘贴内容**：如果用户直接粘贴了文本内容，直接使用
+## 恢复逻辑
 
-**保存原始文档：**
+检查 `{title}/takeaways/` 下已有文件判断进度：
 
-创建目录结构并保存原始内容：
-```
-{title}/takeaways/raw-{title}.md
-```
+| 文件 | 完成步骤 |
+|------|---------|
+| `raw-{title}.md` | Step 1 |
+| `analysis-raw-{title}.md` | Step 2 |
+| `entities-{title}.md` 或 `entities-skipped-{title}.md` | Step 3 |
+| `qa-{title}.md`（含讨论记录） | Step 4 |
+| `output-detail-{title}.md` | Step 5 |
+| `viewpoint-mapping-{title}.md` | Step 6 |
+| `user-viewpoints-{title}.md` | Step 7 |
 
-title从原文中提取，或使用简短的描述性名称。
+存在未完成工作 → 询问用户：继续 / 重新开始 / 跳转步骤。
 
-**状态更新**：创建 state，`current_step=1`
+---
 
-完成后：`step1.status=completed`, `current_step=2`
+## Workflow
+
+### Step 1: 格式化输入
+
+将用户输入转为 Markdown。输入来源：URL（优先用本地 skills 下载） / 文件路径 / 粘贴内容。title 安全化后保存。
+
+保存：`{title}/takeaways/raw-{title}.md`
 
 ### Step 2: 分析原文
 
-阅读并分析原文，提取以下信息：
+提取核心主题、文章类型与复杂度。按章节分析：关键观点、出彩表达（完整句子）、实体/术语、不可改写内容（数据/人名/公司名等）、讨论价值等级。
 
-- 文章的核心主题和主旨
-- 文章结构（章节划分）
-- 按章节和自然段分析关键观点和论据
-- 文章类型（技术文章、管理心得、经验分享、学术论文等）
-- 原文的篇幅和复杂度
-- **提取实体名词**：识别关键名词、概念、人物、组件、技术术语等，分析它们之间的关系
-- **术语分析**：提取关键术语，标注专业术语、技术名词
-- **金句和习语提取**：筛选出彩表达、亮眼、有记忆点的句子，作为总结中的亮点。金句和习语必须是**完整句子**。
-- **不可改写内容识别**：识别数据（数字、百分比）、人名、公司名、产品名等在引用时需要保持准确的内容
+讨论价值：**高**=争议观点/深层概念/实践方法论；**中**=辅助论据/案例分析；**低**=引言/过渡/总结。
 
-**保存分析结果：**
+保存：`{title}/takeaways/analysis-raw-{title}.md`
 
-```markdown
-# 分析结果
+**审查**（same pattern as **Evaluate Once**）：
+- `{eval-criteria}`：核心主题准确无遗漏；章节划分完整，关键观点/出彩表达/实体/不可改写内容均已提取；讨论价值分级合理，高价值未被标低
+- `{input-files}`：分析结果文件
+- `{output-file}`：`{title}/takeaways/review-step2-analysis-{title}.md`
 
-## 核心主题
-[文章的核心主题和主旨]
+### Step 3: 实体关系图（可选）
 
-## 文章结构
-[章节和自然段]
-[每个章节或自然段的关键观点和论据]
+AI 判断复杂度：技术架构/系统设计 → 建议生成；个人心得/经验分享 → 可跳过。询问用户选择。
 
-## 实体名词
-[关键名词、概念、人物、组件、技术术语等]
+支持：思维导图 / ER 图 / 流程图（Mermaid）。保存到 `{title}/takeaways/entities-{title}.md`（跳过则创建 `entities-skipped-{title}.md`）。
 
-## 术语分析
-| 原文位置 | 原文术语 | 中文术语 | 改写建议 |
-|---------|---------|---------|---------|
-| 章节/段落 | term | 术语解释 | 保留/改写 |
+生成后请用户确认实体准确、关系完整。
 
-## 金句提取
-| 原文位置 | 原文 | 亮点说明 |
-|---------|------|---------|
-| 章节/段落 | 金句内容 | 为什么出彩 |
+### Step 4: 交互式讨论
 
-## 不可改写内容
-| 原文位置 | 内容类型 | 原文内容 | 处理方式 |
-|---------|---------|---------|---------|
-| 章节/段落 | 数据/人名/公司名 | 具体内容 | 完全保留 |
-```
+仅对"高""中"价值章节提炼话题：高价值 3-5 话题（各 3 引导问题），中价值 1-2 话题（各 2-3 问题），总上限 20。问题须具启发性和深度。
 
-```
-{title}/takeaways/analysis-raw-{title}.md
-```
+**话题保存到 `{title}/takeaways/qa-{title}.md`。**
 
-**分析结果检查**：
+**流程**：
+1. 展示话题列表（AskUserQuestion 多选），用户选择
+2. 逐话题深入讨论（自由文本对话，不用预设选项）：
+   - AI 先用自己理解引入话题，再邀请用户评价或补充
+   - 每话题至少 3 轮往复
+   - AI 可挑战用户观点，对每个观点提正反追问
+   - 每话题结束后 AI 总结用户观点、偏好、侧重点、对应原文段落
+   - **切换话题必须用户确认**（AskUserQuestion：继续下一个 / 深入当前 / 跳过剩余进下一步）
+3. **退出讨论必须用户确认**，AI 不得自行跳过
 
-启用 subagent 读取并执行 `{skill-dir}/references/step2-analysis-reviewer.md` 中的评估指令。
+讨论记录追加到 `{title}/takeaways/qa-{title}.md`，格式：话题 → AI 引导 → 用户原话 → AI 总结 → 对应段落 → 追问 → 用户原话 → AI 总结 → ...
 
-**评估对象**：`{title}/takeaways/analysis-raw-{title}.md`
+### Step 5: 输出详细程度
 
-**审查结果保存到**：
-```
-{title}/takeaways/review-step2-analysis-{title}.md
-```
+AskUserQuestion：简洁版（观点概览+总结）/ 详细版（+逐话题详情+对话记录）。
 
-如审查不通过，根据 subagent 的建议进行调整后继续。
+保存选择到 `{title}/takeaways/output-detail-{title}.md`
 
-**状态更新**：`step2.status=completed`, `current_step=3`
+### Step 6: 观点映射
 
-### Step 3: 生成实体关系图（可选）
+从 qa 记录提取所有用户观点，生成映射表（保存到 `{title}/takeaways/viewpoint-mapping-{title}.md`）：
 
-根据Step 2提取的实体，生成Mermaid代码。数据缺失或者关系不确定时，请用户协助。
+| 观点ID | 用户观点摘要 | 对应原文段落 | 来源话题 | 目标章节 | 放置方式 | 优先级 |
+|-------|------------|------------|---------|---------|---------|-------|
 
-**AI判断是否需要生成：**
-- 文章复杂度高（如技术架构、系统设计、多组件交互）→ 建议生成
-- 文章简单直接（如个人心得、经验分享）→ 可跳过
+放置方式：独立段落 / 融入正文 / 对比展示。
 
-**询问用户：**
-使用 AskUserQuestion 工具告知用户判断结果，请用户选择是否生成实体关系图：生成或跳过。
+**审查**（same pattern as **Evaluate Once**）：
+- `{eval-criteria}`：所有用户观点均已提取，摘要准确；映射章节合理，放置方式恰当，优先级正确；未映射观点已记录；遗漏率 > 0% 则不通过
+- `{input-files}`：讨论记录 + 映射表
+- `{output-file}`：`{title}/takeaways/review-step6-mapping-{title}.md`
+- `{extra-output}`：观点覆盖验证(总数/已映射/遗漏数/遗漏率)
 
-**支持的可视化类型：**
+用户确认映射表后进入 Step 7。
 
-- **思维导图（mindmap）**：展示概念的层级关系
-- **实体关系图（ER）**：展示实体之间的关联
-- **流程图**：展示流程或步骤
+### Step 7: 生成观点文档
 
-**输出格式：**
+**强制要求**：映射表每条观点均须体现；保留原文位置；数据/名称保持原值；明确区分"原文内容"与"我的观点"。
 
-```markdown
-# [title] - 实体关系图
+**生成内容**（根据 Step 5 选择）：
+- 观点概览：核心关注 / 我的理解 / 我的异议
+- 观点详情（详细版）：按话题组织，含原文位置、原文观点、用户观点、对话记录
+- 总结：关键启示 / 实践建议 / 适用边界
+- 附录：原文结构概览
 
-## 核心实体
-[列出文章中的关键名词、概念、人物、组件等]
+保存到 `{title}/takeaways/user-viewpoints-{title}.md`
 
-## 思维导图
-\`\`\`mermaid
-mindmap
-  root((主题))
-    子主题1
-      概念A
-      概念B
-    子主题2
-      概念C
-\`\`\`
+**审查**（same pattern as **Evaluate Once**）：
+- `{eval-criteria}`：观点覆盖率 100%（零容忍遗漏）；原文与用户观点明确区分，无混淆；原文核心观点/数据/章节均已覆盖；可读性通顺、逻辑连贯；相比直接总结有个性化价值，否则不通过
+- `{input-files}`：生成文档 + 映射表 + 讨论记录
+- `{output-file}`：`{title}/takeaways/review-step7-quality-{title}.md`
+- `{extra-output}`：观点体现情况(总数/已体现/遗漏/体现率) + 可读性评分(1-10) + 发布准备度 + 按严重程度(严重/中等/轻微)排列的问题
 
-## 实体关系图
-\`\`\`mermaid
-erDiagram
-    实体A ||--o{ 实体B : 关系
-\`\`\`
-```
-
-**保存位置：**
-
-```
-{title}/takeaways/entities-{title}.md
-```
-
-**用户确认**：使用 AskUserQuestion 工具向用户展示实体关系图，请用户确认：实体准确关系完整，或需要修正。等待用户确认后再继续。
-
-**状态更新**：生成则 `step3.status=completed`，跳过则 `step3.status=skipped`，`current_step=4`
-
-### Step 4: 交互式讨论与记录
-
-本步骤采用**交互式讨论**模式，AI和用户通过对话深入探讨文章内容。核心原则：**讨论是真实的对话，不是流程节点。**
-
-**话题生成：**
-
-AI 从 Step 2 分析结果中自动提炼讨论话题：
-- 来源包括：文章的核心争议点、金句背后的观点、实体之间的关系、关键概念的深层含义
-- 每个章节都生成 **3-6 个话题**，每个话题附带3个具体的引导问题，引导问题不要流域表面，要具备启发性和深度，能够引导用户深入思考和表达
-- 话题保存到 `{title}/takeaways/qa-{title}.md`中。
-- 启用subagent对话题进行对抗审查，确保话题的质量和深度，审查结果保存到 `{title}/takeaways/qa-gan-evalution-{title}.md`。如果审查不通过，AI要修改或重新话题知道满足审查要求。
-
-**讨论流程：**
-
-1. **AI 展示话题列表，用户选择**（使用 AskUserQuestion 多选）
-2. **逐个话题深入讨论**（使用自由文本对话，不使用预设选项）：
-   - 每个话题开头，AI 先用自己的理解引入话题，然后邀请用户评价或补充
-   - 每个话题至少 **3 轮往复对话**
-   - AI 等待用户自然回复，不跳过，不用预设选项限制用户
-   - **话题切换必须用户确认**：当一个话题讨论结束、准备切换到下一个话题时，AI 必须使用 AskUserQuestion 询问用户是否切换（选项包括："继续下一个话题"、"继续深入当前话题"、"跳过剩余话题，直接进入下一步"），**严禁AI自行决定切换话题**
-3. **退出讨论前必须用户确认**
-   - AI **不得自行跳过**讨论环节
-   - 用户确认后才进入 Step 5
-
-**讨论过程中 AI 的职责：**
-
-- 必须真实记录沟通过程，真实用户和AI的对话
-- 每次只讨论一个话题，聊透再换下一个
-- 没有被选中的话题，不主动发起讨论
-- 绝对不要取悦用户，可以挑战用户的观点，像在技术论坛里讨论一样沟通
-- 针对用户的每个观点要分别提出正反追问，保持讨论的真实性和深度
-- 每个话题结束后，AI总结用户的观点、偏好、侧重点、对应的章节或自然段
-- 沟通结果必须追加在 `{title}/takeaways/qa-{title}.md`。
-
-**保存讨论记录：**
-
-```
-{title}/takeaways/qa-{title}.md
-```
-
-格式示例：
-```markdown
-# 交互式讨论记录
-
-## AI 提炼的话题列表
-1. [话题A]
-   - [{用户是否选择}] [问题1]
-   - [{用户是否选择}] [问题2]
-2. [话题B]
-   - [{用户是否选择}] [问题1]
-   - [{用户是否选择}]  [问题2]
-
-
-## 讨论记录
-
-### 话题1：[主题]
-**AI**: [分享理解 + 引导问题]
-**用户**: [用户的原话]
-**AI总结**: [AI提炼用户观点、偏好、侧重点]
-**对应原文段落**: [对应原文的章节或段落]
-**AI**: [追问或深化]
-**用户**: [用户的原话]
-**AI总结**: [AI提炼用户观点、偏好、侧重点]
-**对应原文段落**: [对应原文的章节或段落]
-
-### 话题2：[主题]
-**AI**: [分享理解 + 引导问题]
-**用户**: [用户的原话]
-**AI总结**: [AI提炼用户观点、偏好、侧重点]
-**对应原文段落**: [对应原文的章节或段落]
-**AI**: [追问或深化]
-**用户**: [用户的原话]
-**AI总结**: [AI提炼用户观点、偏好、侧重点]
-**对应原文段落**: [对应原文的章节或段落]
-
-## 讨论中的用户偏好记录
-- 偏好/侧重点1
-- 偏好/侧重点2
-```
-
-**状态更新**：开始时 `step4.status=in_progress`, 话题切换时 `current_topic++`，完成后 `step4.status=completed`, `current_step=5`
-
-### Step 5: 用户观点映射（必须执行）
-
-**核心目的**：确保 Step 4 讨论中收集的每个用户观点都能在最终文章中得到体现，避免交互成果流失。
-
-**观点提取与整理**：
-
-从 `{title}/takeaways/qa-{title}.md` 中提取所有用户表达的观点，整理成以下表格：
-
-| 观点ID | 用户观点摘要 | 对应原文段落 | 来源话题 | 状态 |
-|-------|------------|------------|---------|------|
-| V1 | [用户表达的核心观点] | 章节/段落 | 话题1 | 待映射 |
-| V2 | [用户表达的核心观点] | 章节/段落 | 话题2 | 待映射 |
-| ... | ... | ... | ... | ... |
-
-**观点到文章章节的映射**：
-
-根据输出格式结构（观点概览/观点详情/我的总结），为每个用户观点确定将放在文章的哪个部分：
-
-| 观点ID | 用户观点 | 目标章节 | 放置方式 | 优先级 |
-|-------|---------|---------|---------|-------|
-| V1 | [观点摘要] | 章节名称 | 独立段落/融入正文 | 高 |
-| V2 | [观点摘要] | 章节名称 | 独立段落/融入正文 | 中 |
-| ... | ... | ... | ... | ... |
-
-**放置方式说明**：
-- **独立段落**：用户的观点作为一个完整的段落出现，前面可以用"我认为"、"我的理解是"等引导
-- **融入正文**：将用户的观点融入到对原文内容的复述中，形成"原文+我的理解"的混合表达
-- **对比展示**：使用"原文观点" vs "我的理解"的对比结构
-
-**保存映射结果**：
-
-```markdown
-# 用户观点映射表
-
-## 观点提取汇总
-[从讨论记录中提取的所有用户观点]
-
-## 观点到章节映射
-[每个观点将放在文章的哪个位置]
-
-## 未映射观点处理
-[如果有某些观点无法放入当前结构，记录在"其他观点"部分]
-```
-
-保存到：
-```
-{title}/takeaways/viewpoint-mapping-{title}.md
-```
-
-**映射有效性检查**：
-
-启用 subagent 读取并执行 `{skill-dir}/references/step5-mapping-reviewer.md` 中的评估指令。
-
-**评估对象**：
-- 观点映射表：`{title}/takeaways/viewpoint-mapping-{title}.md`
-- 讨论记录：`{title}/takeaways/qa-{title}.md`
-
-**审查结果保存到**：
-```
-{title}/takeaways/review-step5-mapping-{title}.md
-```
-
-如审查不通过，根据 subagent 的建议进行调整后继续。
-
-**用户确认**：
-
-使用 AskUserQuestion 工具向用户展示观点映射表，请用户确认：
-1. 我的观点都被记录了吗？
-2. 这些观点将被放在文章的什么位置？
-3. 是否需要调整？
-
-用户确认后，方可进入 Step 6。
-
-**状态更新**：`step5.status=completed`, `current_step=6`
-
-### Step 6: 选择输出详细程度
-
-**选项**：
-- **简洁版**：观点概览 + 总结
-- **详细版**：观点概览 + 逐话题详情 + 对话记录 + 总结
-
-**用户选择**：AskUserQuestion（简洁版 / 详细版）
-
-**保存到**：`{title}/takeaways/output-detail-{title}.md`
-
-**状态更新**：`step6.status=completed`, `current_step=7`
-
-### Step 7: 生成用户观点文档
-
-**⚠️ 强制要求**：
-- 确保观点映射表中每个观点都体现
-- 保留原文位置信息
-- 引用原文时：数据保持原值，名称保持原样，自然区分"原文内容"和"我的观点"
-
-**生成流程**：
-
-1. **读取**：分析结果、观点映射、讨论记录、输出详细程度
-2. **生成观点概览**：核心关注、我的理解、我的异议/补充
-3. **生成观点详情**（详细版）：按话题组织，包含原文位置、原文观点、用户观点、对话记录
-4. **生成总结**：关键启示、实践建议、适用边界
-5. **生成原文结构概览**：简要列出章节
-
-**输出格式**：
-```markdown
-# [文章标题] - 用户观点文档
-
-**原文**: [URL/路径] | **生成时间**: [时间戳] | **话题数**: [N] | **观点数**: [M]
-
-## 我的观点概览
-### 核心关注 | ### 我的理解 | ### 我的异议/补充
-
-## 观点详情
-### 话题1：[主题]
-**原文位置**: [章节/段落] | **原文观点**: [...] | **我的观点**: [...]
-**对话记录**（详细版）:
-> AI: [...] | 用户: [...]
-
-### 话题2：[主题]
-...
-
-## 我的总结
-### 关键启示 | ### 实践建议 | ### 适用边界
-
-## 附录：原文结构概览
-```
-
-**保存到**：`{title}/takeaways/user-viewpoints-{title}.md`
-
-**自检验证**：启用 subagent 执行 `{skill-dir}/references/step7-article-reviewer.md`
-
-**评估对象**：生成的文档、观点映射表、讨论记录
-
-**审查结果保存到**：`{title}/takeaways/review-step7-viewpoints-{title}.md`
-
-**用户确认**：展示文档和审查报告，等待确认
-
-**状态更新**：`step7.status=completed`, `current_step=8`
-
-### Step 8: 结果审查
-
-从读者的角度进行最终质量评估。
-
-**读者视角质量评估**：
-
-启用 subagent 读取并执行 `{skill-dir}/references/step8-quality-reviewer.md` 中的评估指令。
-
-**评估对象**：`{title}/takeaways/user-viewpoints-{title}.md`
-
-**评估结果保存到**：
-```
-{title}/takeaways/review-step8-quality-{title}.md
-```
-
-**评估结果处理**：
-- 评估通过时：告知用户，用户观点文档已完成
-- 评估不通过时：返回 Step 7 修改，重新评估
-
-**状态更新**：`step8.status=completed`, `status=completed`（任务完成）
+用户确认后，任务完成。
