@@ -18,20 +18,9 @@ Default to critical. "Not bad" = 5, not 7. Follow the rubric strictly.
 
 | Band | Naturalness (NA) | Readability (RE) | Fidelity (FI) | Professionalism (PR) |
 |------|------------------|-------------------|----------------|---------------------|
-| 9-10 | Zero AI artifacts (see AI Pattern Checklist). Reads like a skilled human writer. | Smooth flow with varied sentence structure. Transitions feel organic. | All technical claims, data, quotes, and terminology preserved exactly. No distortion from polishing. | Concise, clear, specific. No filler or platitudes. Consistent professional tone throughout. |
-| 5-8 | Noticeable AI patterns present: formulaic transitions, manufactured parallels, repetitive structures, or excessive hedging (1-3 instances). | Some awkward transitions or repetitive sentence openings. Flow generally adequate but not smooth. | Some precision losses, slight distortions, or technical terms replaced with less precise alternatives. Core meaning intact. | Occasional wordiness, filler, or vague claims. Professional tone inconsistent. |
-| 0-4 | Heavy AI artifacts throughout, or clearly machine-generated with no attempt at natural expression. | Choppy, hard to follow, monotonous structure, or incoherent. | Key details lost, quotes paraphrased incorrectly, technical meaning fundamentally changed, or specialized terms replaced with oversimplified language. | Excessive padding, multiple vague/generic statements, or no professional quality. |
-
-## AI Pattern Checklist
-
-Flag these specific patterns as NA issues:
-
-- Formulaic transitions: "It's worth noting", "In conclusion", "It's important to", "Furthermore"
-- Manufactured parallel structures: forced three-part lists, symmetric but shallow comparisons
-- Excessive hedging: "may", "might", "could potentially", "it seems"
-- Repetitive sentence patterns: same opening structure 3+ times
-- Vague attribution: "experts say", "research shows", "studies indicate" (without specific source)
-- Negation-based parallelism: "not just X, but Y", "not only X, but also Y"
+| 9-10 | Reads like a skilled human writer. Natural flow, no awkward phrasing. | Smooth flow with varied sentence structure. Transitions feel organic. | All technical claims, data, quotes, and terminology preserved exactly. No distortion from polishing. | Concise, clear, specific. No filler or platitudes. Consistent professional tone throughout. |
+| 5-8 | Generally natural but with occasional awkward or stilted phrasing. | Some awkward transitions or repetitive sentence openings. Flow generally adequate but not smooth. | Some precision losses, slight distortions, or technical terms replaced with less precise alternatives. Core meaning intact. | Occasional wordiness, filler, or vague claims. Professional tone inconsistent. |
+| 0-4 | Clearly unnatural. Stiff, robotic, or incoherent throughout. | Choppy, hard to follow, monotonous structure, or incoherent. | Key details lost, quotes paraphrased incorrectly, technical meaning fundamentally changed, or specialized terms replaced with oversimplified language. | Excessive padding, multiple vague/generic statements, or no professional quality. |
 
 ## Weights
 
@@ -50,7 +39,7 @@ Flag these specific patterns as NA issues:
 **Summary:** [title] | **Words:** [N] | **Weights:** NA 30% / RE 20% / FI 30% / PR 20%
 
 ### Methodology
-- **Dimensions**: NA: freedom from AI-generated patterns (see AI Pattern Checklist) | RE: flow and sentence variety | FI: preservation of original meaning, technical precision, and terminology | PR: conciseness and professional tone
+- **Dimensions**: NA: natural flow and phrasing | RE: flow and sentence variety | FI: preservation of original meaning, technical precision, and terminology | PR: conciseness and professional tone
 - **Formula**: Total = round(NA×0.3 + RE×0.2 + FI×0.3 + PR×0.2). Range 0-10.
 
 ### Scores
@@ -65,7 +54,7 @@ Flag these specific patterns as NA issues:
 ### Issues
 | # | Dim | Severity | Text (verbatim) | Why it fails | Suggested fix |
 |---|-----|----------|-----------------|--------------|---------------|
-| 1 | [NA/RE/FI/PR] | High | > "[exact quote]" | [which rule or AI pattern it violates] | [concrete fix] |
+| 1 | [NA/RE/FI/PR] | High | > "[exact quote]" | [which rule it violates] | [concrete fix] |
 ```
 
 ## Rules

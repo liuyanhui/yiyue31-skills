@@ -1,6 +1,7 @@
 ---
 name: yiyue31-summary
 description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization.
+version: 2.0.0
 ---
 
 # Tech Article Summarizer
@@ -115,9 +116,6 @@ Retrieve article content using different tools based on the user's input type:
 
 ### Step 5: Summary Polishing (Generate-Evaluate Loop)
 
-**Polishing rules:**
-- Remove AI-generated traces: avoid formulaic transitions ("It's worth noting", "In conclusion"), manufactured parallel structures, excessive hedging, and repetitive sentence patterns. Use natural, specific language.
-
 **Loop parameters:** max 3 rounds, passing threshold score ≥ 8.0.
 
 **Loop procedure:**
@@ -125,8 +123,21 @@ Retrieve article content using different tools based on the user's input type:
    - Round 1: polish summary from Step 4. Later rounds: re-polish based on previous evaluation Issues table.
    - Save to `{title}/summary/polish-round{N}-{title}.md`.
    - Evaluate (same pattern as **Evaluate Once**): call subagent using `{skill-dir}/references/evaluate-polish-prompt.md`, save report to `{title}/summary/evaluation-polish-round{N}-{title}.md`.
-   - Score ≥ 8.0 → copy current round file to `{title}/summary/final-{title}.md` → inform user and provide file path. Score < 8.0 → track best candidate, next round.
-2. **Rounds exhausted**: copy best-scoring round file to `{title}/summary/final-{title}.md`, inform user of score and provide file path.
+   - Score ≥ 8.0 → copy current round file to `{title}/summary/polished-{title}.md` → Step 6. Score < 8.0 → track best candidate, next round.
+2. **Rounds exhausted**: copy best-scoring round file to `{title}/summary/polished-{title}.md`, inform user of score → Step 6.
+
+### Step 6: AI Tone Check
+
+Single-pass problem-finding (no scoring loop). Detect and fix AI-generated tone artifacts.
+
+**Procedure:**
+1. Call subagent with `{skill-dir}/references/evaluate-ai-tone-prompt.md`, providing the polished summary as input.
+2. Save report to `{title}/summary/evaluation-ai-tone-{title}.md`.
+3. **Process results**:
+   - Parse "Must Fix" issues. Apply suggested fixes to the summary. Only revise once.
+   - "Suggested" issues are for reference only, no revision triggered.
+   - If no "Must Fix" issues → skip revision.
+4. Save final output to `{title}/summary/final-{title}.md`. Inform user and provide file path.
 
 ---
 
