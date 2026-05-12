@@ -125,7 +125,17 @@ word_count: {word-counter 输出的总字数}
 
 **处理检查结果**：与 Step 5 相同。只修订"必须修复"问题。
 
-### Step 7: 术语维护
+### Step 7: AI 味检查
+
+启用 subagent 检查译文中的 AI 味问题。使用 `{skill-dir}/references/evaluate-ai-tone-prompt.md` 作为检查指令。
+
+**输入给 subagent**：原文、译文。
+
+**检查报告保存到**：`{title}/translation/review-ai-tone-{title}.md`
+
+**处理检查结果**：与 Step 5 相同。只修订"必须修复"问题。
+
+### Step 8: 术语维护
 
 启用 subagent 维护 terms.md。**输入**：原文、最终译文、当前 terms.md 内容。
 
