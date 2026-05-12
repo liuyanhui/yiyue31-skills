@@ -1,199 +1,165 @@
 ---
 name: yiyue31-translator
-description: Use when the user inputs commands such as 'translate', 'translate article', 'translate to Chinese', '翻译','翻译成中文', '改成中文', or 'convert to Chinese'. Use when the user provides a URL, file path, or pastes content directly while expressing an intent to translate.
-version: 2.0.0
+description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
+version: 2.2.0
 author: Yiyue31
 ---
 
 # Tech Article Translator Skill
 
-## Description
+## 功能描述
 
-Professional translator that converts English articles to Chinese with translation corrections and a generate-evaluate loop for translation quality assurance.
+专业翻译工具，将英文文章翻译为中文。包含文章分析、术语表生成、翻译审阅、翻译腔检查和术语维护。
 
 ---
+
 ## Directory
 
-`{skill-dir}` = this SKILL.md's directory path. It means the directory where this SKILL.md is located.
+`{skill-dir}` = this SKILL.md's directory path.
 
 ---
-## User Input
 
-### Required Input
+## 翻译工作流程
 
-User should provide one of the following:
+### Step 1: 获取文章内容
 
-1. **Article URL**: URL of the English article
-2. **File path**: Local file path
-3. **Article content**: Directly pasted English article content
+根据输入类型获取文章：URL→web-access skill（或 wget/curl），文件路径→Read 工具，粘贴→直接处理。缺少内容则要求用户提供。
 
-### Optional Input
+**处理：**
 
-4. **Translation style**: `Free` (default) or `Literal`. Only used when user explicitly specifies.
-5. **Output filename**: Specify the save filename, default uses translated title
+1. 提取标题（优先级：文章标题 → 文件名 → 首句前几个词 → `untitled-{timestamp}`）。去除文件系统不安全字符（`/ \ : * ? " < > |`）。超过 60 字符则截断。文件命名：小写字母，连字符连接。
+2. 如果 `{title}/translation/` 目录已存在，删除。非 markdown 格式时转换并保留结构。
+3. 保存到 `{title}/translation/original-{title}.md`。
 
----
-## Reusable Sub-workflows
+### Step 2: 文章分析 + 生成术语表
 
-### Generate-Evaluate Loop
+1. 提取标题、h2/h3 标题、技术关键词和核心概念。
+2. 加载 `{skill-dir}/references/terms.md`，识别出现在本文中的术语。
+3. **语言检查**：如果文章主要是中文或非英文，提醒用户此 skill 设计用于英译中。
+4. 提取原文中的超链接。
+5. **生成 per-article 术语表**：只列出 LLM 可能处理不一致的词——纠正类、上下文相关译法、需统一处理的专有名词。不列 LLM 本来就能翻对的常见词。格式：`| English Term | Translation | Context |`（Translation 列用 `[KEEP]` 表示保留英文）。
+6. 保存分析到 `{title}/translation/analysis-{title}.md`，术语表到 `{title}/translation/glossary-{title}.md`。
 
-Iterative refinement: generate → evaluate → revise. Used by Step 4.
+分析文件包含：Basic Info（标题、语言、关键概念、terms.md 匹配数、glossary 条目数）、Heading Structure、Key Technical Vocabulary、Hyperlinks。
 
-**Parameters (caller provides):**
-- `{max-rounds}`: Maximum iterations
-- `{threshold}`: Passing score out of 10
-- `{eval-prompt}`: Path to evaluation prompt file
-- `{round-file}`: Save pattern for round N output (include `{N}` placeholder for round number)
-- `{final-file}`: Final output path on pass
-- `{eval-file}`: Save pattern for evaluation report (include `{N}` placeholder)
-- `{eval-context}`: Additional context to pass to evaluator (original article, corrections, style, etc.)
-- `{timer-tag}`: Optional timer tag for global timeout. When set, also provide `{timeout-seconds}`.
+### Step 3: 特殊词句提取
 
-**Procedure:**
-1. If `{timer-tag}` provided: `node {skill-dir}/scripts/timer.js start --tag {timer-tag}`.
-2. **Each round N** (1 to `{max-rounds}`):
-   - If `{timer-tag}` provided: `node {skill-dir}/scripts/timer.js check --tag {timer-tag} --timeout {timeout-seconds}`. If `"expired": true` → use best candidate as final → exit.
-   - Round 1: full generation per caller spec. Round 2+: revise based on previous evaluation Issues table + original input.
-   - Save to `{round-file}` (replace `{N}` with round number).
-   - **Evaluate**: call subagent with `{eval-prompt}`, providing round output and `{eval-context}` as input. Save report to `{eval-file}` (replace `{N}`).
-   - **Extract score**: parse the `**[X/10]**` total line from evaluation report. Score ≥ `{threshold}` → copy to `{final-file}` → **PASS, exit loop**. Score < `{threshold}` → track as best candidate if highest so far, next round.
-3. **Rounds exhausted**: copy best candidate to `{final-file}`, report score.
+**排除项**：跳过 terms.md 和 glossary 中已有的词汇。
 
----
-## Translation Workflow
+**提取类别：**
 
-### Step 1: Retrieve Article Content
+1. **金句**：启发性、总结性、观点鲜明的句子。保留表现力，译文后附原文注释。
+2. **连字符技术词组**：如 "agent-based"、"build-not-buy"。保留原文，附原文注释。
+3. **俚语和习语**：如 "hit the ground running"。根据上下文译为自然中文，附原文注释。
 
-Retrieve article content based on input type:
+**输出**：三个表格，列统一为 `| 原文位置 | 原文 | 中文翻译 | 亮点说明 |`。保存到 `{title}/translation/special-phrases-{title}.md`。
 
-- **URL input**: Use web-access skill to fetch the article. Alternatively, use `wget` or `curl`.
-- **File path input**: Use the `Read` tool.
-- **Direct paste**: Process directly.
-- **Missing content**: Ask the user.
+### Step 4: 翻译
 
-**Processing:**
-1. Extract title (priority: heading → filename → first sentence words → `untitled-{timestamp}`). Sanitize filesystem-unsafe characters (`/ \ : * ? " < > |`). Truncate to 60 characters if longer.
-2. File naming rule: lowercase, words connected with hyphens.
-3. If `{title}/translation/` exists, delete it.
-4. If not markdown, convert preserving structure. Unconvertible elements: keep original with comments.
-5. Save to `{title}/translation/original-{title}.md`.
+启用 subagent 执行翻译任务。
 
-### Step 2: Load Corrections
+**通用翻译规则：**
 
-1. Load `{skill-dir}/references/terms.md`. If file doesn't exist, proceed without corrections.
-2. **Language check**: If the article is primarily Chinese or non-English, warn user that this skill is designed for English-to-Chinese translation. Offer to proceed or abort.
-3. Extract hyperlinks from original article.
+- **准确性优先**：事实、数据与逻辑必须与原文完全吻合。从读者的角度翻译。
+- **术语规范**：使用标准译法；术语首次出现时在原文后添加中文注释（或术语表中对应的 Translation 列信息），用括号包围。如 `agent(智能体)`、`Prompt(提示词)`。
+- **修辞处理**：隐喻、习语等修辞性表达，按实际意图翻译而非逐字直译。若源语言意在目标语言中内涵不同，替换为表意、情感效果一致的自然表达。
+- **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）。
+- **尊重原文**：保留原文含义与意图，不增删、不主观篡改。
+- **译者注释**：针对目标读者因术语、文化差异、领域知识难以理解的内容，在其后立即加简洁注释（括号内），用通俗语言释义而非仅标英文原文。格式：`中文译文（English original，必要时添加说明）`。注释深度适配读者：普通读者注释更详细，专业读者可简化。仅必要时注释，避免过度标注浅显词汇。
+- **特殊词句翻译规则**：对于金句、连字符词组、俚语和习语，按照特殊词句提取结果文件中的中文翻译列进行翻译。
+- **金句、俚语和习语**：加粗展示，如：`**{金句}**`。
+- **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` 翻译为 `[译文](https://example.com)`。
+- **中英文间距**：中文与英文/数字之间加 1 个空格（如 `这是 English 文本`）。英文术语后紧跟 `(中文)` 时，术语与 `(` 之间保持空格（如 `Generator (生成器)`，不是 `Generator(生成器)`）。
 
-### Step 3: Special Phrases Extraction
+**意译时的额外翻译规则（默认）：**
 
-**Exclusions**: Skip terms already in corrections.
+- **重意不重形**：翻译作者的核心表意，而非单纯逐字直译。若直译生硬、无法传递预期效果，可自由重构句式，用地道目标语言表达相同含义。
+- **情感保真**：保留措辞的情感内涵，而非仅译字典释义。带有主观情感的词汇（如"令人警醒的"、"萦绕心头的"），需让目标语言读者产生相同感受。
+- **表达流畅**：采用目标语言地道的语序与句式；源语句式在目标语言中不自然时，可自由拆分、重组句子。
 
-**Targets and translation rules:**
-- **Golden quotes**: Insightful, summarizing, or strongly opinionated sentences. Preserve expressiveness, append original as annotation.
-- **Hyphenated phrases**: Technical phrases with "-" (e.g., "agent-based", "one-feature-at-a-time"). Keep original, append original as annotation.
-- **Idioms and slang**: (e.g., "hit the ground running", "low-hanging fruit"). Translate naturally, append original as annotation.
+**直译风格**（仅用户指定时）：跳过上述"意译时的额外翻译规则"。逐字翻译，保留原文句式结构。
 
-**Output format:**
+**输入给 subagent**：原文、terms.md 匹配项、glossary、特殊词句表、翻译风格。
 
-| Location | Original | Translation（附原文） |
-|----------|----------|----------------------------------------|
-| 1.2 | "This approach allows us to hit the ground running." | "这种方法让我们能够立刻投入工作（hit the ground running）" |
+**文件保存**：`{title}/translation/translated-{title}-zh.md`
 
-Save to: `{title}/translation/special-phrases-{title}.md`.
+**字数统计**：运行 `node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，记录结果。
 
-### Step 4: Translate (Generate-Evaluate Loop)
-
-**Translation rules (Free style — default):**
-- **Accuracy first**: Facts, data, logic must perfectly match the original. No additions, deletions, or subjective alterations. Translate from the reader's perspective.
-- **Free expression**: Translate core intent, restructure freely when literal translation is stiff. Preserve emotional connotations. Use natural Chinese word order.
-- **Terminology**: Use corrections-specified translations. On first occurrence: keep English with Chinese annotation (e.g., `Prompt(提示词)`).
-- **Rhetoric**: Translate metaphors and idioms by intent, not word-by-word. Replace with equivalent Chinese expressions when cultural connotations differ.
-- **Format**: Preserve all Markdown formatting.
-- **Chinese-English spacing**: 1 space between Chinese and English/numbers (e.g., `这是 English 文本`). When English term is followed by `(中文)`, keep a space between term and `(` (e.g., `Generator (生成器)`, not `Generator(生成器)`).
-- **Image text**: Do not translate image URLs or functional alt text. If an image contains visible English text, add a translator note below: `![...](url) *图注：图片中文字译为 [中文翻译]*`
-- **Translator notes**: Add concise notes only when necessary: `Chinese（English original, explanation）`.
-- **Special phrases**: Follow Chinese Translation column from Step 3.
-- **Golden quotes, idioms, slang**: Bold: `**{golden quote}**`.
-- **Links**: Preserve URLs, translate link text.
-
-**Literal style** (only when user specifies): Skip "Free expression" rule above. Word-by-word translation preserving original sentence structure.
-
-**Run Generate-Evaluate Loop:**
-- `{max-rounds}`: 5, `{threshold}`: 8.0
-- `{eval-prompt}`: `{skill-dir}/references/evaluate-translation-prompt.md`
-- `{round-file}`: `{title}/translation/translated-round{N}-{title}-zh.md`
-- `{final-file}`: `{title}/translation/translated-{title}-zh.md`
-- `{eval-file}`: `{title}/translation/evaluation-round{N}-{title}.md`
-- `{timer-tag}`: `{title}`, `{timeout-seconds}`: 1800
-- `{eval-context}`: original article, corrections (terms from terms.md that appear in the article), translation style (Literal/Free), special phrases table from Step 3
-
-After each round save, run word count: `node {skill-dir}/scripts/word-counter.js {title}/translation/translated-round{N}-{title}-zh.md`, display results.
-
-**After loop completes:**
-- Add YAML frontmatter to final translation file:
+**YAML Frontmatter**：
 
 ```yaml
 ---
-title: {translated title}
-source_title: {original English title}
-source_url: {url or empty}
-source_author: {author or empty}
-translated_at: {date}
-translation_style: free or literal
+title: {翻译后的标题}
+source_title: {原始英文标题}
+source_url: {url 或空}
+source_author: {author 或空}
+translated_at: {日期}
+translation_style: free 或 literal
 language: English → Chinese
-word_count: {totalWords from word-counter output}
+word_count: {word-counter 输出的总字数}
 ---
 ```
 
-- Run final word count: `node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`
-- Display summary:
+### Step 5: 翻译审阅
+
+启用 subagent 审阅翻译结果。使用 `{skill-dir}/references/evaluate-translation-prompt.md` 作为审阅指令。
+
+**输入给 subagent**：原文、译文、terms.md 匹配项、glossary、特殊词句表、翻译风格。
+
+**审阅报告保存到**：`{title}/translation/review-translation-{title}.md`
+
+**处理审阅结果**：
+
+- 解析报告中的"必须修复"问题列表。
+- 如果存在"必须修复"问题：提取问题和建议修复，应用到译文中。只修订一次。
+- 如果没有"必须修复"问题：跳过修订，进入下一步。
+- "建议优化"问题仅供参考，不触发修订。
+
+### Step 6: 翻译腔检查
+
+启用 subagent 检查译文中的翻译腔问题。使用 `{skill-dir}/references/evaluate-translationese-prompt.md` 作为检查指令。
+
+**输入给 subagent**：原文、译文。
+
+**检查报告保存到**：`{title}/translation/review-translationese-{title}.md`
+
+**处理检查结果**：与 Step 5 相同。只修订"必须修复"问题。
+
+### Step 7: 术语维护
+
+启用 subagent 维护 terms.md。**输入**：原文、最终译文、当前 terms.md 内容。
+
+**Subagent 任务：**
+
+1. 对比原文和译文，找出 LLM **实际翻译错误**的英文术语（如 "agent" 被翻译为"代理"而非"智能体"）。添加到 terms.md。
+2. 审查现有条目。如果 LLM 无需纠正项就能正确翻译，标记为建议移除。
+3. 更新 terms.md：追加新条目，移除已标记的条目。
+4. **添加标准**：仅添加有可验证误译证据的术语。**移除标准**：仅移除全文均正确翻译的术语。
+
+**向用户展示**：
+
 ```markdown
 ## Translation Complete
+**Source**: {原始标题} | **Style**: {Free 或 Literal} | **Corrections**: {N} loaded, {N} added | **File**: {title}/translation/translated-{title}-zh.md
 
-**Source**: {original title}
-**Style**: Free
-**Corrections loaded**: {N} terms from terms.md
-**New corrections added**: {list of auto-appended terms, or "none"}
-**File**: {title}/translation/translated-{title}-zh.md
-```
-
-### Step 5: Terms Maintenance
-
-After translation, run a subagent to maintain terms.md based on actual evidence from the translation output.
-
-**Input to subagent**: original article, final translation, current terms.md content.
-
-**Subagent task:**
-1. Compare original article with translation. Identify English terms where the LLM **actually translated incorrectly** (e.g., "agent" became "代理" instead of "智能体"). Add these as new entries to terms.md.
-2. Review existing terms.md entries. If the LLM correctly translated a term **without needing the correction** (i.e., removing the entry would not change the translation outcome), flag it for removal.
-3. Update terms.md: append new entries, remove flagged entries.
-
-**Criteria for addition**: Only add terms where the translation output contains verifiable evidence of mistranslation.
-**Criteria for removal**: Only remove terms where the LLM consistently gets the translation right across the entire article, suggesting the entry is unnecessary.
-
-**Display to user:**
-```markdown
 ## Terms Update
-
-+ Added: {list of new terms, or "none"}
-- Removed: {list of removed terms, or "none"}
-→ terms.md now has {N} entries
++ Added: {列表或 "none"} | - Removed: {列表或 "none"} | → terms.md now has {N} entries
 ```
 
 ---
+
 ## Corrections
 
-File location: `{skill-dir}/references/terms.md`
+文件位置：`{skill-dir}/references/terms.md`
 
-Only include terms where the LLM would produce a wrong or inconsistent translation without this entry.
+仅包含 LLM 在没有此条目的情况下会翻译错误或不一致的术语。
 
 ```markdown
-| English Term | Correct Translation |
-|--------------|---------------------|
-| agent | 智能体 |
-| prompt | 提示词 |
-| MCP | [KEEP] |
+| English Term | Correct Translation | Why |
+|--------------|---------------------|-----|
+| agent | 智能体 | LLM defaults to "代理" |
+| MCP | [KEEP] | Abbreviation |
 ```
 
-- **[KEEP]**: Do not translate, keep English
-- **Chinese translation**: Use this instead of LLM's default
+- **[KEEP]**：不翻译，保留英文
+- **中文翻译**：使用此翻译代替 LLM 的默认翻译

@@ -1,93 +1,60 @@
-# Translation Evaluation Prompt
+# 翻译质量审阅
 
-Score a translated article across 5 dimensions (0-10 each) and list every problem with verbatim evidence. Produce scores and a detailed issue report with enough diagnostic detail (including suggested fixes) for a separate revision step to resolve all issues without re-reading the original article.
+以挑剔、专业、客观的眼光审阅翻译结果，只报告问题，不做表扬。
 
 ---
 
-## Input
+## 输入
 
-You will receive:
+你将收到：
 
-1. **Original article** — the source English text
-2. **Translation** — the Chinese translation to evaluate
-3. **Corrections** — translation correction table for TM dimension check
-4. **Style** — Literal or Free, for ST dimension evaluation
-5. **Special phrases** — extracted phrases table from Step 3 (for FM check)
+1. **原文** — 英文原文
+2. **译文** — 中文翻译
+3. **术语纠正表** — terms.md 中匹配本文的条目
+4. **文章术语表** — glossary.md（per-article）
+5. **特殊词句表** — 金句、连字符词组、俚语习语
+6. **翻译风格** — 意译 (Free) 或直译 (Literal)
 
-## Anti-Inflation
+## 审阅维度
 
-Default to critical. "Not bad" = 5, not 7. Follow the rubric strictly.
+### 准确性
 
-- If you find 3+ issues in a dimension, that dimension cannot exceed 6.
-- A score of 8 means publishable quality with at most 1-2 very minor issues that don't affect readability.
-- A score of 9-10 means the dimension is essentially flawless.
+事实、数据、逻辑关系是否与原文完全一致。是否有增删、主观篡改、语义偏移。好的译文：读者看完中文和看完英文获得完全相同的信息。
 
-## Pre-check
+### 术语一致性
 
-1. Empty, < 10 words, or not a translation (all English) → output "Input is not a valid translation. Evaluation aborted." and stop.
-2. Major omissions (>30% of original missing) → note "Major omissions detected." AC capped at 3. Omissions of 10-30% → AC capped at 6.
+terms.md 中的纠正项是否正确使用。glossary 中的术语是否一致。首次出现是否有英文(中文)注释。[KEEP] 项是否保留英文。
 
-## Scoring Rubric
+### 格式保留
 
-| Band | Accuracy (AC) | Fluency (FL) | Terminology (TM) | Format (FM) | Style (ST) |
-|------|---------------|--------------|-------------------|-------------|------------|
-| 9-10 | Perfect fidelity. Every fact, data point, logical relationship matches. Zero additions or omissions. | Natural Chinese. Zero translationese. Reads like original Chinese writing. | All corrections correctly handled. First occurrence uses `English(中文)` annotation. Consistent throughout. | All Markdown preserved. Golden quotes/idioms/slang bolded. Links: URL kept, text translated. Special phrases match Step 3 table. | Matches selected style. Translator notes follow `Chinese（English original, explanation）` format when present. |
-| 7-8 | Very minor inaccuracies (1 non-critical). Core meaning perfectly intact. | At most 1 translationese pattern. Mostly natural. | Nearly all corrections correct. At most 1 annotation format inconsistency. | At most 1 very minor format issue. Structure fully preserved. | Closely matches style. Rare minor deviation. |
-| 5-6 | Minor inaccuracies (2-3 non-critical). Core meaning intact. | Some translationese (2-3 patterns from Checklist). Generally readable. | Most corrections correct. 1-2 annotation format errors or inconsistencies. | Minor format issues (1-2). Most structure preserved. | Mostly matches style. Occasional deviations. |
-| 0-4 | Significant misrepresentations, fabricated content, or major omissions. | Heavy translationese (4+ patterns). Unnatural Chinese. | Multiple correction violations. Annotation format ignored. | Major format problems. Broken links, missing bolding, special phrases not followed. | Does not match selected style. |
+Markdown 格式（标题、加粗、斜体、图片、链接、代码块）是否保留。金句/俚语/习语是否加粗。链接地址是否保留、链接文本是否翻译。中英文间距是否正确（中文与英文/数字之间 1 个空格）。
 
-## Weights
+### 完整性
 
-Total = round(AC×0.3 + FL×0.25 + TM×0.2 + FM×0.15 + ST×0.1). Range 0-10.
+逐段对比原文和译文，是否有遗漏的段落、句子或技术细节。列表项是否一一对应。超链接是否全部保留。
 
-## Translationese Checklist
+### 流畅度
 
-FL dimension patterns. Each detected pattern must appear in Issues with the pattern name:
+是否存在明显的翻译腔（照搬英语结构、生硬连接词、不自然的句式）。中文是否自然流畅。好的译文读起来像中文原创。
 
-- Forced English word order: "这是一个...的事实" from "It is a fact that..."
-- Excessive "的" in noun phrases
-- Passive voice overuse: 被, 受到, 被...所
-- Literal article/preposition translation that doesn't exist in Chinese
-- English-style topic sentences instead of Chinese topic-comment structure
-- Stacked modifiers: "具有高性能和低延迟的分布式数据库系统"
-- Unnatural connectors: 因此/然而/此外 as direct translations of "therefore"/"however"/"furthermore"
-
-## Severity
-
-| Severity | Impact |
-|----------|--------|
-| **High** | Score-defining. 2+ High issues in a dimension → that dimension ≤ 5 |
-| **Medium** | Notable. 3+ Medium issues = equivalent to 1 High |
-| **Low** | Minor. Cosmetic or stylistic. |
-
-## Output Report
+## 输出格式
 
 ```markdown
-## Translation Evaluation Report
+## 翻译审阅
 
-**Article:** [title] | **Words:** [N] | **Style:** [Literal/Free] | **Weights:** AC 30% / FL 25% / TM 20% / FM 15% / ST 10%
+### 必须修复
+| # | 维度 | 原文引用 | 问题描述 | 建议修复 |
+|---|------|----------|----------|----------|
+| 1 | 准确性/术语/格式/完整/流畅 | "原文引用" | 原因 | 修复建议 |
 
-### Scores
-| Dimension | Score | Weighted |
-|-----------|-------|----------|
-| Accuracy | [X] | [X×0.3] |
-| Fluency | [X] | [X×0.25] |
-| Terminology | [X] | [X×0.2] |
-| Format | [X] | [X×0.15] |
-| Style | [X] | [X×0.1] |
-| **Total** | | **[X/10]** |
-
-### Issues
-| # | Dim | Severity | Text (verbatim) | Why it fails | Suggested fix |
-|---|-----|----------|-----------------|--------------|---------------|
-| 1 | [AC/FL/TM/FM/ST] | High | > "[exact quote]" | [which rule it violates] | [concrete fix] |
+### 建议优化
+| # | 维度 | 原文引用 | 问题描述 | 建议修复 |
+|---|------|----------|----------|----------|
 ```
 
-For dimensions scoring 9-10 with zero issues: output "No issues found." instead of an empty Issues table.
+如果某维度没有发现问题，输出"无问题"。
 
-## Rules
+## 严重程度说明
 
-1. Single integer per dimension. No ranges.
-2. Every score < 10 must have at least one verbatim quote in Issues.
-3. For FL: cross-reference Translationese Checklist. Name the pattern.
-4. For TM: check against the provided corrections table. Every violation flagged.
+- **必须修复**：误译、信息遗漏、术语错误、格式破损等影响正确性的问题
+- **建议优化**：流畅度改进、风格微调，不影响理解
