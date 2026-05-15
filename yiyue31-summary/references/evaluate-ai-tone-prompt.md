@@ -22,6 +22,7 @@ The following patterns are not exhaustive. Use your judgment to find all express
 4. **Universal audience pandering**: "Whether you're a beginner or an expert", "no matter your experience level"
 5. **Empty promises**: "everything you need to know", "all the essentials", "a comprehensive guide" — not followed by corresponding substance
 6. **Passive / impersonal evasion**: "It is worth noting that", "There are several considerations", "It has been demonstrated" — avoiding first person where a human writer would naturally use one
+7. **Em dash overuse**: Using em dashes (—) excessively for apposition, elaboration, or definition — replacing commas, colons, parentheses, or separate sentences. Natural writing varies punctuation; LLMs default to em dashes for mid-sentence additions.
 
 ## Output Format
 

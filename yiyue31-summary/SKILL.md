@@ -12,7 +12,7 @@ Article summary generator for summarizing technical articles, blog posts, resear
 
 ## Requirements
 - Except for direct human quotes, avoid overly colloquial language during summarization. Maintain a professional, clear, and concise style.
-- Summarize from the reader's perspective, not the author's.
+- Summarize from the reader's perspective, not the author's. Readers want to quickly grasp key information, not reconstruct the author's writing process.
 ---
 ## Directory
 
@@ -41,7 +41,7 @@ Single-shot evaluation: call subagent, get scored report, pass or fail. No loop.
 
 **Returns:** PASS/FAIL + evaluation report path.
 
-**Loop constraint:** When Evaluate Once is called within a generate-evaluate loop, the evaluator MUST use the same LLM throughout all rounds — switching mid-loop is FORBIDDEN.
+**Loop constraint:** When Evaluate Once is called within a generate-evaluate loop, the evaluator MUST use the same LLM throughout all rounds — switching mid-loop is FORBIDDEN. Different LLMs apply different scoring standards; switching mid-loop makes scores non-comparable across rounds.
 
 ---
 
@@ -96,11 +96,12 @@ Retrieve article content using different tools based on the user's input type:
 - Keep important content: processes, concepts, technical details, etc.
 - Highlight quotes and key terms in blockquote `>` format as separate paragraphs.
 - Verbatim quotes: `> **[Verbatim]**: {original sentence}`
-- Any non-heading sentence must end with punctuation.
-- Keep key code/algorithm snippets as-is; simplify supporting code into descriptions or pseudocode.
+- Any non-heading sentence must end with punctuation. Incomplete sentences break readability and signal unfinished content.
+- Keep key code/algorithm snippets as-is; simplify supporting code into descriptions or pseudocode. Full code bloats the summary; descriptions preserve the logic without the noise.
 - Organize content following the original article's flow (content/chronology/logic).
-- Only based on the provided article content. Do not fabricate or add external knowledge (except proper nouns such as company/person/product names).
-- Word count must not exceed the original article word count.
+- Only based on the provided article content. Do not fabricate or add external knowledge (except proper nouns such as company/person/product names). Readers rely on the summary to represent what the original article actually says; fabricated content undermines trust.
+- Word count must not exceed the original article word count. A summary longer than the original defeats the purpose of summarization.
+- Write naturally to avoid AI-generated tone artifacts. Vary punctuation: use commas, colons, parentheses, or separate sentences instead of em dashes (—) for mid-sentence additions. Avoid template openings and closings (e.g., "In today's rapidly evolving landscape").
 
 **Loop parameters:** max 5 rounds, global timeout 30 min, passing threshold score ≥ 8.0 (out of 10).
 
@@ -126,18 +127,17 @@ Retrieve article content using different tools based on the user's input type:
    - Score ≥ 8.0 → copy current round file to `{title}/summary/polished-{title}.md` → Step 6. Score < 8.0 → track best candidate, next round.
 2. **Rounds exhausted**: copy best-scoring round file to `{title}/summary/polished-{title}.md`, inform user of score → Step 6.
 
-### Step 6: AI Tone Check
+### Step 6: AI Tone Check (Generate-Evaluate Loop)
 
-Single-pass problem-finding (no scoring loop). Detect and fix AI-generated tone artifacts.
+Max 5 rounds. Detect and fix AI-generated tone artifacts until no "Must Fix" issues remain.
 
-**Procedure:**
-1. Call subagent with `{skill-dir}/references/evaluate-ai-tone-prompt.md`, providing the polished summary as input.
-2. Save report to `{title}/summary/evaluation-ai-tone-{title}.md`.
-3. **Process results**:
-   - Parse "Must Fix" issues. Apply suggested fixes to the summary. Only revise once.
-   - "Suggested" issues are for reference only, no revision triggered.
-   - If no "Must Fix" issues → skip revision.
-4. Save final output to `{title}/summary/final-{title}.md`. Inform user and provide file path.
+**Loop procedure:**
+1. **Each round**:
+   - Call subagent with `{skill-dir}/references/evaluate-ai-tone-prompt.md`, providing current summary as input.
+   - Save report to `{title}/summary/evaluation-ai-tone-round{N}-{title}.md`.
+   - Parse "Must Fix" issues. Apply suggested fixes to the summary. "Suggested" issues are for reference only, no revision triggered.
+   - If no "Must Fix" issues → copy current summary to `{title}/summary/final-{title}.md` → inform user and provide file path.
+2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/final-{title}.md`, inform user that some AI tone issues may remain → done.
 
 ---
 
