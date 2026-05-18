@@ -1,7 +1,7 @@
 ---
 name: yiyue31-summary
 description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization.
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Tech Article Summarizer
@@ -95,7 +95,7 @@ Retrieve article content using different tools based on the user's input type:
 **Summary formatting rules:**
 - Keep important content: processes, concepts, technical details, etc.
 - Highlight quotes and key terms in blockquote `>` format as separate paragraphs.
-- Verbatim content (golden sentences, slang, idioms, notable original phrasing) must appear **inline within the body text**, wrapped in `[Verbatim]...[/Verbatim]` markers and formatted as ***bold italic***. Do NOT place them in a separate section or as standalone blockquote paragraphs.
+- Verbatim content (memorable quotes, slang, idioms, notable original phrasing) must appear **inline within the body text**, wrapped in `[Verbatim]...[/Verbatim]` markers and formatted as ***bold italic***. Do NOT place them in a separate section or as standalone blockquote paragraphs.
   - Example: The author argues that ***[Verbatim]the only way to go fast is to go well[/Verbatim]***, which challenges the common rush-to-ship mentality.
   - Each verbatim item should appear in the paragraph where its context is discussed, so readers see the original wording in situ.
 - Any non-heading sentence must end with punctuation. Incomplete sentences break readability and signal unfinished content.
@@ -138,8 +138,29 @@ Max 5 rounds. Detect and fix AI-generated tone artifacts until no "Must Fix" iss
    - Call subagent with `{skill-dir}/references/evaluate-ai-tone-prompt.md`, providing current summary as input.
    - Save report to `{title}/summary/evaluation-ai-tone-round{N}-{title}.md`.
    - Parse "Must Fix" issues. Apply suggested fixes to the summary. "Suggested" issues are for reference only, no revision triggered.
-   - If no "Must Fix" issues → copy current summary to `{title}/summary/final-{title}.md` → inform user and provide file path.
-2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/final-{title}.md`, inform user that some AI tone issues may remain → done.
+   - If no "Must Fix" issues → copy current summary to `{title}/summary/final-{title}.md` → Step 7.
+2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/final-{title}.md`, inform user that some AI tone issues may remain → Step 7.
+
+### Step 7: Translate Summary to Chinese
+
+Translate the final summary into Chinese.
+
+**Input:**
+- Summary: `{title}/summary/final-{title}.md`
+- Analysis: `{title}/summary/analysis-{title}.md` (from Step 2)
+
+**Procedure:**
+1. Invoke a subagent with the `yiyue31-translator` skill, providing both the summary and the analysis as input. If the skill requires user confirmation (e.g., translation style, template), use default or AI-recommended options to maximize automation.
+2. After translation completes, inform the user of both file paths:
+   - Original summary: see Input above
+   - Chinese translation: saved by the translator skill.
+
+**Verbatim handling** (include in subagent prompt):
+`[Verbatim]...[/Verbatim]` markers indicate content requiring special care during translation. See the analysis Quotes table for context on each item. Preserve the markers and ***bold italic*** formatting in the output.
+
+**Fallback:**
+- If `yiyue31-translator` is not found, check for any other installed translation skill and use it instead.
+- If no translation skill is installed, inform the user: "No translation skill found. Summary saved at Input path above. Install a translation skill to enable Chinese translation." → done.
 
 ---
 
