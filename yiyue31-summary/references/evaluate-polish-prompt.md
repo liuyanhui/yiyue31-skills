@@ -65,3 +65,4 @@ Default to critical. "Not bad" = 5, not 7. Follow the rubric strictly.
 2. Every score justified by at least one verbatim quote in the Issues table.
 3. Only flag problems clearly present. No speculation about intent.
 4. Severity: **High** (score-defining), **Medium** (notable), **Low** (minor).
+5. **Verbatim check**: `[Verbatim]...[/Verbatim]` content must be inline within body text paragraphs, formatted as ***bold italic***. If verbatim content is isolated in a separate section or lacks correct formatting, flag as a Medium FI/EQ issue.

@@ -95,7 +95,9 @@ Retrieve article content using different tools based on the user's input type:
 **Summary formatting rules:**
 - Keep important content: processes, concepts, technical details, etc.
 - Highlight quotes and key terms in blockquote `>` format as separate paragraphs.
-- Verbatim quotes: `> **[Verbatim]**: {original sentence}`
+- Verbatim content (golden sentences, slang, idioms, notable original phrasing) must appear **inline within the body text**, wrapped in `[Verbatim]...[/Verbatim]` markers and formatted as ***bold italic***. Do NOT place them in a separate section or as standalone blockquote paragraphs.
+  - Example: The author argues that ***[Verbatim]the only way to go fast is to go well[/Verbatim]***, which challenges the common rush-to-ship mentality.
+  - Each verbatim item should appear in the paragraph where its context is discussed, so readers see the original wording in situ.
 - Any non-heading sentence must end with punctuation. Incomplete sentences break readability and signal unfinished content.
 - Keep key code/algorithm snippets as-is; simplify supporting code into descriptions or pseudocode. Full code bloats the summary; descriptions preserve the logic without the noise.
 - Organize content following the original article's flow (content/chronology/logic).

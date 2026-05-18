@@ -50,7 +50,7 @@ Tech learning notes template, suitable for engineers or students to quickly revi
 - **Advantages & Innovations**: {{Content here}}
 - **Disadvantages & Limitations**: {{Only if the article mentions limitations}}
 - **Conclusions & Applications**: {{Content here}}
-- **Standout Quote**: > **[Verbatim]**: {{1-2 memorable sentences that capture key insights}}
+- **Standout Quote**: ***[Verbatim]{{1-2 memorable sentences that capture key insights}}[/Verbatim]***
 
 ## Key Glossary
 
@@ -67,3 +67,4 @@ Tech learning notes template, suitable for engineers or students to quickly revi
 - **Highlight Key Points**: Innovations, practical value, technical comparisons
 - **Target length**: 800-1500 words (aspirational). Hard upper bound: must not exceed original article word count (see SKILL.md).
 - **Conditional items**: "Disadvantages & Limitations" only if the article mentions them. "Key Glossary" only if non-trivial terminology exists.
+- **Inline verbatim**: Memorable sentences must be embedded inline, wrapped in `[Verbatim]...[/Verbatim]` and formatted as ***bold italic***. Do NOT place them in a separate section.

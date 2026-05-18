@@ -44,14 +44,6 @@ Paper notes template, suitable for summarizing research papers, helping readers 
 2. **Innovations**: {{Differences from existing work}}
 3. **Experiments/Validation**: {{How is effectiveness proven? Data or cases}}
 
-## Standout Quotes
-
-> **[Verbatim]**: {{standout sentence 1}} — {{why notable}}
-
-> **[Verbatim]**: {{standout sentence 2}} — {{why notable}}
-
-{{Select 1-3 key claims or memorable conclusions from the paper.}}
-
 ## Reflections
 
 - **Insights**: {{Implications for current work or field}}
@@ -78,3 +70,4 @@ Paper notes template, suitable for summarizing research papers, helping readers 
 
 - **Structure**: Organize by paper sections in order (introduction, related work, methods, experiments, conclusions, etc.)
 - **Conditional sections**: "Questions" and "Extensions" under Reflections only if applicable. "Action Items" and "Key Terminology" only when relevant content exists.
+- **Inline verbatim**: Key claims and memorable conclusions must be embedded inline in the body text where their context is discussed, wrapped in `[Verbatim]...[/Verbatim]` and formatted as ***bold italic***. Do NOT place them in a separate section.

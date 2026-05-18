@@ -46,25 +46,17 @@ Tech learning notes template (enhanced version), suitable for students or engine
 
 {{...remaining sections...}}
 
-## 4. Standout Quotes
-
-> **[Verbatim]**: {{standout sentence 1}} — {{why this quote is notable}}
-
-> **[Verbatim]**: {{standout sentence 2}} — {{why this quote is notable}}
-
-{{Select 2-4 memorable sentences that capture key insights or turning points.}}
-
-## 5. Insights and Inspirations
+## 4. Insights and Inspirations
 
 - {{Insight 1: innovations or breakthroughs, practical value, technical advantages, or lessons learned}}
 - {{Insight 2: ...}}
 {{Typically 3-5 insights.}}
 
-## 6. Potential Issues
+## 5. Potential Issues
 
 {{Point out limitations, challenges, or unresolved issues mentioned in the article. Suggest related further reading or application scenarios (strictly based on article content). If none exist, do not generate this section.}}
 
-## 7. Key Terminology
+## 6. Key Terminology
 
 | Term | Explanation |
 |------|-------------|
@@ -77,5 +69,6 @@ Tech learning notes template (enhanced version), suitable for students or engine
 ## Rules
 
 - **Structure**: Organize by article sections in order (introduction, background, methods, implementation, conclusions, etc.)
-- **Conditional sections**: Sections 6 and 7 are only generated when the article contains relevant content.
+- **Conditional sections**: Sections 5 and 6 are only generated when the article contains relevant content.
 - **Accuracy**: Preserve technical accuracy; explain complex concepts in understandable language.
+- **Inline verbatim**: Golden sentences, slang, idioms, and notable original phrasing must be embedded inline in the body text where their context is discussed, wrapped in `[Verbatim]...[/Verbatim]` and formatted as ***bold italic***. Do NOT place them in a separate section.
