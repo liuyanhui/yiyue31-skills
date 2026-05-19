@@ -29,19 +29,9 @@ The following patterns are not exhaustive. Use your judgment to find all express
 ```markdown
 ## AI Tone Check
 
-### Must Fix
-| # | Pattern | Quote | Problem | Suggested fix |
-|---|---------|-------|---------|---------------|
-| 1 | {pattern} | "{quote}" | {why} | {fix} |
-
-### Suggested
-| # | Pattern | Quote | Problem | Suggested fix |
-|---|---------|-------|---------|---------------|
+| # | Quote | Problem | Suggested fix |
+|---|-------|---------|---------------|
+| 1 | "{quote}" | {why} | {fix} |
 ```
 
 If the text reads naturally, output "No AI tone issues."
-
-## Severity
-
-- **Must Fix**: Clearly exposes AI generation traces, seriously undermines readability and credibility
-- **Suggested**: Mild AI tone but does not affect comprehension; style improvement

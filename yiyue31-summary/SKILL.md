@@ -131,17 +131,27 @@ Retrieve article content using different tools based on the user's input type:
 
 ### Step 6: AI Tone Check (Generate-Evaluate Loop)
 
-Max 5 rounds. Detect and fix AI-generated tone artifacts until no "Must Fix" issues remain.
+Max 5 rounds. Detect and fix AI-generated tone artifacts until no issues remain.
 
 **Loop procedure:**
 1. **Each round**:
    - Call subagent with `{skill-dir}/references/evaluate-ai-tone-prompt.md`, providing current summary as input.
    - Save report to `{title}/summary/evaluation-ai-tone-round{N}-{title}.md`.
-   - Parse "Must Fix" issues. Apply suggested fixes to the summary. "Suggested" issues are for reference only, no revision triggered.
-   - If no "Must Fix" issues → copy current summary to `{title}/summary/final-{title}.md` → Step 7.
-2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/final-{title}.md`, inform user that some AI tone issues may remain → Step 7.
+   - Parse reported issues and apply suggested fixes to the summary.
+   - If no issues → copy current summary to `{title}/summary/tone-fixed-{title}.md` → Step 7.
+2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/tone-fixed-{title}.md`, inform user that some AI tone issues may remain → Step 7.
 
-### Step 7: Translate Summary to Chinese
+### Step 7: Readability Check
+
+Enable subagent to check readability. Use `{skill-dir}/references/evaluate-readability-prompt.md` as the prompt.
+
+**Input**: `{title}/summary/tone-fixed-{title}.md`
+
+**Report saved to**: `{title}/summary/review-readability-{title}.md`
+
+**Processing**: Parse reported issues and apply fixes. Save result to `{title}/summary/final-{title}.md`.
+
+### Step 8: Translate Summary to Chinese
 
 Translate the final summary into Chinese.
 
@@ -151,9 +161,10 @@ Translate the final summary into Chinese.
 
 **Procedure:**
 1. Invoke a subagent with the `yiyue31-translator` skill, providing both the summary and the analysis as input. If the skill requires user confirmation (e.g., translation style, template), use default or AI-recommended options to maximize automation.
-2. After translation completes, inform the user of both file paths:
+2. After translation completes, copy the entire `{title}/translation/` directory to `{title}/summary/translation/`.
+3. Inform the user of both file paths:
    - Original summary: see Input above
-   - Chinese translation: saved by the translator skill.
+   - Chinese translation: `{title}/summary/translation/translated-{title}-zh.md`
 
 **Verbatim handling** (include in subagent prompt):
 `[Verbatim]...[/Verbatim]` markers indicate content requiring special care during translation. See the analysis Quotes table for context on each item. Preserve the markers and ***bold italic*** formatting in the output.
