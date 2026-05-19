@@ -13,18 +13,6 @@ author: Yiyue31
 
 ---
 
-## Subagent 角色定义
-
-| 步骤 | 角色 | 特质 |
-|------|------|------|
-| Step 4 翻译 | 资深英译中技术翻译专家 | 追求准确、流畅、地道的译文 |
-| Step 5 翻译审阅 | 严格的翻译审阅专家 | 以挑剔的眼光审视每一处翻译 |
-| Step 6 翻译腔检查 | 敏锐的翻译腔质检员 | 善于发现不自然、机械化的表达 |
-| Step 7 AI味检查 | 敏锐的AI味质检员 | 善于发现AI生成内容的痕迹 |
-| Step 8 术语维护 | 严谨的术语学家 | 只认证据，不凭感觉增删条目 |
-
----
-
 ## Directory
 
 `{skill-dir}` = this SKILL.md's directory path.
@@ -161,6 +149,16 @@ PYTHONPATH="{skill-dir}/scripts" python -m doc_segmenter "{title}/translation/or
 
 3. 拼接所有 chunk 译文（chunk 之间用空行分隔），写入 `{title}/translation/translated-{title}-zh.md`（字数暂填 `TBD`）。
 4. 运行字数统计：`node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，将结果替换 `TBD`。
+
+### Step 10: 可读性检查
+
+启用 subagent 检查译文。使用 `{skill-dir}/references/evaluate-readability-prompt.md` 作为检查指令。
+
+**输入给 subagent**：合并后的完整译文（`{title}/translation/translated-{title}-zh.md`）。
+
+**报告保存到**：`{title}/translation/review-readability-{title}.md`
+
+**处理检查结果**：根据报告修改译文文件。
 
 ---
 
