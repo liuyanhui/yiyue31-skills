@@ -77,6 +77,23 @@ class SectionParserImpl:
 
         # Build sections from heading positions using character offsets
         sections: list[Section] = []
+
+        # Handle content before the first heading (frontmatter, author info, etc.)
+        first_heading_line = heading_positions[0][0]
+        if first_heading_line > 0:
+            preamble_char_end = line_offsets[first_heading_line]
+            preamble_content = content[:preamble_char_end]
+            sections.append(
+                Section(
+                    level=0,
+                    title="preamble",
+                    content=preamble_content,
+                    size_kb=calc_size_kb(preamble_content),
+                    start_line=0,
+                    end_line=first_heading_line - 1,
+                )
+            )
+
         for idx, (line_idx, level, title) in enumerate(heading_positions):
             # Section starts at this heading line's character offset
             start_char = line_offsets[line_idx]

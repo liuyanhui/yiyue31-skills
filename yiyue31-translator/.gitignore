@@ -1,2 +1,5 @@
 # Ignore generated translation output
 articles/
+
+# Python 字节码缓存
+__pycache__/
