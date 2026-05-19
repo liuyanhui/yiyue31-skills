@@ -61,7 +61,7 @@ Retrieve article content using different tools based on the user's input type:
 **Article Content Preprocessing**
 1. When the article content is not in markdown format, convert and save it as markdown.
 2. Preserve the original structure and format during conversion. Try to keep paragraphs, headings, lists, etc. unchanged. For elements that cannot be accurately converted, keep the original text and add comments to prompt the user to check.
-3. Check the converted file. If unsure about the conversion result, use the AskUserQuestion tool to ask the user to confirm: correct as-is or needs correction.
+3. Check the converted file. Proceed automatically with the conversion result.
 
 ### Step 2: Analyze Article (Generate-Evaluate Loop)
 
@@ -88,7 +88,13 @@ Retrieve article content using different tools based on the user's input type:
 
 ### Step 3: Template Selection
 
-- Based on the analysis results, use the AskUserQuestion tool to recommend a suitable summary template. Ask the user to choose or provide custom input. See [Available Templates](#available-templates) section.
+Auto-select template based on Step 2 analysis results. No user input required unless explicitly requested.
+
+- **Paper signals** (methods, experiments, results, citations, academic tone) → Paper Template
+- **Default** → Tech Article Template
+- **Concise Template** → only when user explicitly requests it
+
+If the user specified a template in their initial input, use that instead.
 
 ### Step 4: Summary Generate-Evaluate Loop
 
@@ -160,7 +166,7 @@ Translate the final summary into Chinese.
 - Analysis: `{title}/summary/analysis-{title}.md` (from Step 2)
 
 **Procedure:**
-1. Invoke a subagent with the `yiyue31-translator` skill, providing both the summary and the analysis as input. If the skill requires user confirmation (e.g., translation style, template), use default or AI-recommended options to maximize automation.
+1. Invoke a subagent with the `yiyue31-translator` skill, providing both the summary and the analysis as input. Use default options (free translation style) for all choices. Do not prompt the user for confirmation.
 2. After translation completes, copy the entire `{title}/translation/` directory to `{title}/summary/translation/`.
 3. Inform the user of both file paths:
    - Original summary: see Input above
@@ -177,9 +183,9 @@ Translate the final summary into Chinese.
 
 ## Available Templates
 
-- **Tech Article Template**: Tech article summary template - Suitable for technical articles, tech blogs, tech announcements, etc. Provides comprehensive analysis and summary, highlighting innovations and practical value. See `{skill-dir}/templates/tech-article.md`.
+- **Tech Article Template**: Tech article summary template - Suitable for technical articles, tech blogs, tech announcements, etc. Provides comprehensive analysis and summary, highlighting innovations and practical value. See `{skill-dir}/templates/tech-article.md`. **Default template**.
 - **Paper Template**: Paper summary template - Suitable for academic paper summaries, helping readers quickly learn and understand the core content and innovations of the paper. See `{skill-dir}/templates/paper.md`.
-- **Concise Template**: Concise summary template - Focused on core knowledge, suitable for quick learning. See `{skill-dir}/templates/concise.md`. **Default template**, used when other templates cannot be matched.
+- **Concise Template**: Concise summary template - Focused on core knowledge, suitable for quick learning. See `{skill-dir}/templates/concise.md`. Only used when user explicitly requests it.
 
 
 **Notes**
