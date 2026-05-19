@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
-version: 2.2.0
+version: 2.3.0
 author: Yiyue31
 ---
 
@@ -9,7 +9,19 @@ author: Yiyue31
 
 ## 功能描述
 
-专业翻译工具，将英文文章翻译为中文。包含文章分析、术语表生成、翻译审阅、翻译腔检查和术语维护。
+你是专业的翻译项目经理，全权负责把英文译为中文的工作。你统筹分段、分析、翻译、审阅和术语维护，确保每个环节交给合适的 subagent 执行，交付高质量的译文。
+
+---
+
+## Subagent 角色定义
+
+| 步骤 | 角色 | 特质 |
+|------|------|------|
+| Step 4 翻译 | 资深英译中技术翻译专家 | 追求准确、流畅、地道的译文 |
+| Step 5 翻译审阅 | 严格的翻译审阅专家 | 以挑剔的眼光审视每一处翻译 |
+| Step 6 翻译腔检查 | 敏锐的翻译腔质检员 | 善于发现不自然、机械化的表达 |
+| Step 7 AI味检查 | 敏锐的AI味质检员 | 善于发现AI生成内容的痕迹 |
+| Step 8 术语维护 | 严谨的术语学家 | 只认证据，不凭感觉增删条目 |
 
 ---
 
@@ -31,7 +43,28 @@ author: Yiyue31
 2. 如果 `{title}/translation/` 目录已存在，删除。非 markdown 格式时转换并保留结构。
 3. 保存到 `{title}/translation/original-{title}.md`。
 
+### Step 1.5: 文章分段
+
+**前置检查**：如果 `{skill-dir}/scripts/doc_segmenter/` 下没有 `__pycache__` 或首次运行，先安装依赖：
+```bash
+pip install -r {skill-dir}/scripts/doc_segmenter/requirements.txt
+```
+
+运行 doc_segmenter 将文章切分为多个 chunk（每个 chunk 包含一个或多个章节）：
+
+```bash
+PYTHONPATH="{skill-dir}/scripts" python -m doc_segmenter "{title}/translation/original-{title}.md" --output-dir "{title}/translation/chunks" --max-size 40
+```
+
+**错误处理**：如果命令返回非零退出码，报告错误并停止。退出码含义：1=文件未找到，2=文件过大，3=校验失败，4=写入失败。
+
+**输出**：`{title}/translation/chunks/` 目录下生成 `chunk-01-xxx.md`、`chunk-02-xxx.md`... 以及 `manifest.md` 和 `progress.json`。
+
+**Chunk 迭代规则**（适用于 Step 2-9）：读取 `manifest.md` 获取有序列表，按序遍历。原文路径 `{title}/translation/chunks/chunk-{NN}-xxx.md`，译文路径 `{title}/translation/translated-chunks/translated-chunk-{NN}.md`。Step 4 前创建译文目录。
+
 ### Step 2: 文章分析 + 生成术语表
+
+**遍历所有 chunk 文件**（按 manifest.md 列表顺序），逐个读取并汇总分析。
 
 1. 提取标题、h2/h3 标题、技术关键词和核心概念。
 2. 加载 `{skill-dir}/references/terms.md`，识别出现在本文中的术语。
@@ -43,6 +76,8 @@ author: Yiyue31
 分析文件包含：Basic Info（标题、语言、关键概念、terms.md 匹配数、glossary 条目数）、Heading Structure、Key Technical Vocabulary、Hyperlinks。
 
 ### Step 3: 特殊词句提取
+
+**遍历所有 chunk 文件**，逐个读取并汇总提取。
 
 **排除项**：跳过 terms.md 和 glossary 中已有的词汇。
 
@@ -56,20 +91,18 @@ author: Yiyue31
 
 ### Step 4: 翻译
 
-启用 subagent 执行翻译任务。
+**逐 chunk 执行翻译**。对每个 chunk 启用独立 subagent。
 
 **通用翻译规则：**
 
-- **准确性优先**：事实、数据与逻辑必须与原文完全吻合。从读者的角度翻译。
+- **准确性优先**：事实、数据与逻辑必须与原文完全吻合。保留原文含义与意图，不增删、不主观篡改。
 - **术语规范**：使用标准译法；术语首次出现时在原文后添加中文注释（或术语表中对应的 Translation 列信息），用括号包围。如 `agent(智能体)`、`Prompt(提示词)`。
 - **修辞处理**：隐喻、习语等修辞性表达，按实际意图翻译而非逐字直译。若源语言意在目标语言中内涵不同，替换为表意、情感效果一致的自然表达。
 - **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）。
-- **尊重原文**：保留原文含义与意图，不增删、不主观篡改。
 - **译者注释**：针对目标读者因术语、文化差异、领域知识难以理解的内容，在其后立即加简洁注释（括号内），用通俗语言释义而非仅标英文原文。格式：`中文译文（English original，必要时添加说明）`。注释深度适配读者：普通读者注释更详细，专业读者可简化。仅必要时注释，避免过度标注浅显词汇。
-- **特殊词句翻译规则**：对于金句、连字符词组、俚语和习语，按照特殊词句提取结果文件中的中文翻译列进行翻译。
-- **金句、俚语和习语**：加粗展示，如：`**{金句}**`。
-- **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` 翻译为 `[译文](https://example.com)`。
-- **中英文间距**：中文与英文/数字之间加 1 个空格（如 `这是 English 文本`）。英文术语后紧跟 `(中文)` 时，术语与 `(` 之间保持空格（如 `Generator (生成器)`，不是 `Generator(生成器)`）。
+- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语加粗展示：`**{金句}**`。
+- **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` → `[译文](https://example.com)`。
+
 
 **意译时的额外翻译规则（默认）：**
 
@@ -79,65 +112,27 @@ author: Yiyue31
 
 **直译风格**（仅用户指定时）：跳过上述"意译时的额外翻译规则"。逐字翻译，保留原文句式结构。
 
-**输入给 subagent**：原文、terms.md 匹配项、glossary、特殊词句表、翻译风格。
+**输入给 subagent**：chunk 原文、terms.md 匹配项、glossary、特殊词句表、翻译风格。
 
-**文件保存**：`{title}/translation/translated-{title}-zh.md`
+**文件保存**：每个 chunk 的译文保存到 `{title}/translation/translated-chunks/translated-chunk-{NN}.md`（NN 为 chunk 编号，从 01 开始）。
 
-**字数统计**：运行 `node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，记录结果。
+### Steps 5-7: 审阅循环（翻译审阅 → 翻译腔 → AI 味）
 
-**YAML Frontmatter**：
+对每个 chunk 依次执行以下检查，每个检查都必须启用独立 subagent。
 
-```yaml
----
-title: {翻译后的标题}
-source_title: {原始英文标题}
-source_url: {url 或空}
-source_author: {author 或空}
-translated_at: {日期}
-translation_style: free 或 literal
-language: English → Chinese
-word_count: {word-counter 输出的总字数}
----
-```
+| 轮次 | Prompt | 报告路径 | Subagent 输入 |
+|------|--------|----------|---------------|
+| 翻译检查 | `{skill-dir}/references/evaluate-translation-prompt.md` | `review-translation-chunk-{NN}.md` | chunk 原文 + 译文 + terms.md 匹配项 + glossary + 特殊词句表 |
+| 翻译腔检查 | `{skill-dir}/references/evaluate-translationese-prompt.md` | `review-translationese-chunk-{NN}.md` | chunk 原文 + 译文 |
+| AI 味检查 | `{skill-dir}/references/evaluate-ai-tone-prompt.md` | `review-ai-tone-chunk-{NN}.md` | chunk 原文 + 译文 |
 
-### Step 5: 翻译审阅
+报告保存到 `{title}/translation/`。
 
-启用 subagent 审阅翻译结果。使用 `{skill-dir}/references/evaluate-translation-prompt.md` 作为审阅指令。
-
-**输入给 subagent**：原文、译文、terms.md 匹配项、glossary、特殊词句表、翻译风格。
-
-**审阅报告保存到**：`{title}/translation/review-translation-{title}.md`
-
-**处理审阅结果**：
-
-- 解析报告中的"必须修复"问题列表。
-- 如果存在"必须修复"问题：提取问题和建议修复，应用到译文中。只修订一次。
-- 如果没有"必须修复"问题：跳过修订，进入下一步。
-- "建议优化"问题仅供参考，不触发修订。
-
-### Step 6: 翻译腔检查
-
-启用 subagent 检查译文中的翻译腔问题。使用 `{skill-dir}/references/evaluate-translationese-prompt.md` 作为检查指令。
-
-**输入给 subagent**：原文、译文。
-
-**检查报告保存到**：`{title}/translation/review-translationese-{title}.md`
-
-**处理检查结果**：与 Step 5 相同。只修订"必须修复"问题。
-
-### Step 7: AI 味检查
-
-启用 subagent 检查译文中的 AI 味问题。使用 `{skill-dir}/references/evaluate-ai-tone-prompt.md` 作为检查指令。
-
-**输入给 subagent**：原文、译文。
-
-**检查报告保存到**：`{title}/translation/review-ai-tone-{title}.md`
-
-**处理检查结果**：与 Step 5 相同。只修订"必须修复"问题。
+**处理规则**（适用于每个subagent）：根据 subagent 审阅报告的结果，修复对应的 chunk 译文。
 
 ### Step 8: 术语维护
 
-启用 subagent 维护 terms.md。**输入**：原文、最终译文、当前 terms.md 内容。
+启用 subagent 维护 terms.md。**输入**：所有原文 chunks（`{title}/translation/chunks/chunk-*.md`）+ 所有译文 chunks（`{title}/translation/translated-chunks/translated-chunk-*.md`）、当前 terms.md 内容。
 
 **Subagent 任务：**
 
@@ -145,16 +140,27 @@ word_count: {word-counter 输出的总字数}
 2. 审查现有条目。如果 LLM 无需纠正项就能正确翻译，标记为建议移除。
 3. 更新 terms.md：追加新条目，移除已标记的条目。
 4. **添加标准**：仅添加有可验证误译证据的术语。**移除标准**：仅移除全文均正确翻译的术语。
+5. 向用户展示发生变化的 terms.md 和变更报告（新增条目列表、移除条目列表、当前总条目数）。
 
-**向用户展示**：
+
+### Step 9: 合并译文
+
+将所有翻译后的 chunk 文件按编号顺序合并为最终译文。
+
+1. 读取 `{title}/translation/translated-chunks/` 下所有 `translated-chunk-*.md` 文件，按编号排序。
+2. 在首个 chunk 译文前添加元信息：
 
 ```markdown
-## Translation Complete
-**Source**: {原始标题} | **Style**: {Free 或 Literal} | **Corrections**: {N} loaded, {N} added | **File**: {title}/translation/translated-{title}-zh.md
+# {翻译后的标题}
 
-## Terms Update
-+ Added: {列表或 "none"} | - Removed: {列表或 "none"} | → terms.md now has {N} entries
+> **原文**：{原始英文标题} | **作者**：{author 或空} | **来源**：{url 或空}
+> **翻译日期**：{日期} | **风格**：{意译 或 直译} | **字数**：{TBD}
+
+---
 ```
+
+3. 拼接所有 chunk 译文（chunk 之间用空行分隔），写入 `{title}/translation/translated-{title}-zh.md`（字数暂填 `TBD`）。
+4. 运行字数统计：`node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，将结果替换 `TBD`。
 
 ---
 
