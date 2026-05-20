@@ -45,16 +45,21 @@ python -m doc_segmenter.cli paper.md --output-dir ./chunks --max-size 30 --min-s
 ## 处理流程
 
 ```
-前置检查 → 章节解析 → 章节切分 → 小文件合并 → 完整性校验 → 生成文件 → 输出报告
+前置检查 → [短路判断] → 章节解析 → 章节切分 → 小文件合并 → 完整性校验 → 生成文件 → 输出报告
 ```
 
-1. **前置检查**：文件不存在则终止（退出码 1）；超过 5MB 则终止（退出码 2）；不超过 max_size 则跳过切分
-2. **章节解析**：按 Markdown 标题（`#` ~ `######`）划分章节
-3. **章节切分**：超过 max_size 的章节在段落边界二次切分，递归深度上限 4 层，超限则强制截断
-4. **小文件合并**：相邻同级别且 < min_size 的 chunk 合并，合并后不超过 max_size
-5. **完整性校验**：行数完整性、内容拼接一致性、无重复、首尾一致
-6. **生成文件**：输出 chunk 文件 + `manifest.md`（目录）+ `progress.json`（翻译进度）
-7. **输出报告**：生成 `report.md`
+1. **前置检查**：文件不存在则终止（退出码 1）；超过 5MB 则终止（退出码 2）
+2. **短路判断**：`file_size < max_size` 时跳过解析、切分、合并，直接生成单 chunk 输出
+3. **章节解析**：按 Markdown 标题（`#` ~ `######`）划分章节
+4. **章节切分**：超过 max_size 的章节在段落边界二次切分，递归深度上限 4 层，超限则强制截断
+5. **小文件合并**：相邻同级别且 < min_size 的 chunk 合并，合并后不超过 max_size
+6. **完整性校验**：行数完整性、内容拼接一致性、无重复、首尾一致
+7. **生成文件**：输出 chunk 文件 + `manifest.md`（目录）+ `progress.json`（翻译进度）
+8. **输出报告**：生成 `report.md`
+
+## 短路行为
+
+当源文件大小（`file_size`）小于 `max_size` 时，doc_segmenter 跳过章节解析、切分、合并三个阶段，直接生成包含完整原文的单个 chunk。输出格式与多 chunk 路径完全一致（chunk 文件、manifest.md、progress.json、report.md），下游工作流可通过 `progress.json` 中的 `total_chunks` 字段判断是否需要迭代处理。
 
 ## 输出文件
 
@@ -80,12 +85,25 @@ output/
 ```json
 {
   "source_file": "original.md",
-  "total_chunks": 8,
+  "source_size_kb": 25.34,
+  "threshold_kb": 40.0,
+  "total_chunks": 1,
   "completed": [],
   "in_progress": null,
-  "pending": ["chunk-01-Abstract.md", "..."]
+  "pending": [
+    {
+      "index": 1,
+      "filename": "chunk-01-original.md",
+      "section": "original",
+      "size_kb": 25.34
+    }
+  ]
 }
 ```
+
+- `source_size_kb`：源文件大小（KB）
+- `threshold_kb`：分段阈值（KB），即 `--max-size` 参数值
+- `total_chunks`：输出 chunk 总数（短路时为 1）
 
 ## 项目结构
 

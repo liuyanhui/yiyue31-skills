@@ -21,6 +21,7 @@ class FileGeneratorImpl:
         chunks: list[Chunk],
         output_dir: str,
         source_info: SourceFileInfo,
+        max_size: float = 40.0,
     ) -> None:
         """Generate output files for all chunks.
 
@@ -28,6 +29,7 @@ class FileGeneratorImpl:
             chunks: The final chunk list.
             output_dir: Directory to write files into.
             source_info: Metadata about the source file.
+            max_size: Maximum chunk size threshold in KB.
 
         Raises:
             SplitError: exit_code=4 if output directory write fails.
@@ -54,7 +56,7 @@ class FileGeneratorImpl:
         self._write_manifest(chunks, output_dir, source_info)
 
         # Write progress.json
-        self._write_progress(chunks, output_dir, source_info)
+        self._write_progress(chunks, output_dir, source_info, max_size)
 
     def _write_manifest(
         self,
@@ -93,6 +95,7 @@ class FileGeneratorImpl:
         chunks: list[Chunk],
         output_dir: str,
         source_info: SourceFileInfo,
+        max_size: float,
     ) -> None:
         """Write progress.json with chunk tracking info."""
         pending = []
@@ -109,6 +112,8 @@ class FileGeneratorImpl:
 
         progress = {
             "source_file": source_info.file_path,
+            "source_size_kb": round(source_info.file_size, 2),
+            "threshold_kb": round(max_size, 2),
             "total_chunks": len(chunks),
             "completed": [],
             "in_progress": None,

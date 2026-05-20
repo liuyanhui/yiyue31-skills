@@ -1,5 +1,30 @@
 # Changelog
 
+## v2.4.0 (2026-05-20)
+
+### 自适应分段
+
+- **doc_segmenter 短路优化**：文件大小 < max_size 时跳过 parse/split/merge 阶段，直接生成单 chunk 输出。输出格式与多 chunk 路径完全一致。
+- **progress.json 新增字段**：`source_size_kb`（原文大小）和 `threshold_kb`（分段阈值），用于工作流分支判断。
+
+### SKILL.md
+
+- **Step 1.5 工作流分支**：根据 `progress.json` 的 `total_chunks` 字段区分单 chunk 和多 chunk 路径。
+- **Steps 2-3**：单 chunk 路径直接读取完整文章，无需遍历 chunks。
+- **Step 4**：单 chunk 路径启用一个翻译 subagent 翻译完整文章，译文直接写入最终文件。
+- **Steps 5-7**：单 chunk 路径对完整译文执行单次审阅检查，报告路径不含 chunk 编号。
+- **Steps 8-9**：单 chunk 路径使用完整原文和译文进行术语维护，跳过合并步骤。
+- **版本号**：2.3.0 → 2.4.0。
+
+### 脚本
+
+- **runner.py**：新增 `file_size < max_size` 短路逻辑，跳过 parse/split/merge，生成单 Chunk。传递 `max_size` 给 generator。
+- **generator.py**：`generate()` 方法新增 `max_size` 参数，progress.json 新增 `source_size_kb` 和 `threshold_kb` 字段。
+
+### 测试
+
+- **test_runner_shortcircuit.py**：新增单元测试，覆盖小文件单 chunk、大文件多 chunk、边界条件、progress.json 元数据、输出结构一致性。
+
 ## v1.0.0 → v2.0.0 Overview
 
 | Dimension | v1.0.0 | v2.0.0 |

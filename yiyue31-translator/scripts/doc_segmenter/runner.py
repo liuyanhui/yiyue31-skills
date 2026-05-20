@@ -2,19 +2,19 @@
 
 Orchestrates all pipeline modules in sequence:
 inspect -> parse -> split -> merge -> check -> generate -> report
+When file_size < max_size, parse/split/merge stages are skipped (single chunk).
 """
 
 from __future__ import annotations
 
 import os
 import sys
-import time
 
 from doc_segmenter.checker import IntegrityCheckerImpl
 from doc_segmenter.generator import FileGeneratorImpl
 from doc_segmenter.inspector import FileInspectorImpl
 from doc_segmenter.merger import ChunkMergerImpl
-from doc_segmenter.models import SplitContext, SplitError
+from doc_segmenter.models import Chunk, SplitContext, SplitError
 from doc_segmenter.parser import SectionParserImpl
 from doc_segmenter.reporter import ReportGeneratorImpl
 from doc_segmenter.splitter import SectionSplitterImpl
@@ -58,17 +58,38 @@ class SplitRunnerImpl:
             with open(file_path, encoding=source_info.file_encoding) as f:
                 original_content = f.read()
 
-            # Stage 1: Parse
-            sections = self.parser.parse(original_content, source_info.file_encoding)
+            # Small file shortcut: skip parse -> split -> merge
+            if source_info.file_size < max_size:
+                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                chunk = Chunk(
+                    source_section=base_name,
+                    level=1,
+                    content=original_content,
+                    size_kb=source_info.file_size,
+                    line_count=source_info.file_lines,
+                    start_line=1,
+                    end_line=source_info.file_lines,
+                    is_merged=False,
+                    merged_sections=[],
+                    estimated_tokens=0,
+                )
+                chunks = [chunk]
+                all_ops = []
+                sections = []
+            else:
+                # Stage 1: Parse
+                sections = self.parser.parse(
+                    original_content, source_info.file_encoding
+                )
 
-            # Stage 2: Split
-            chunks, split_ops = self.splitter.split(sections, max_size)
+                # Stage 2: Split
+                chunks, split_ops = self.splitter.split(sections, max_size)
 
-            # Stage 3: Merge
-            chunks, merge_ops = self.merger.merge(chunks, max_size, min_size)
+                # Stage 3: Merge
+                chunks, merge_ops = self.merger.merge(chunks, max_size, min_size)
 
-            # Combine operations
-            all_ops = split_ops + merge_ops
+                # Combine operations
+                all_ops = split_ops + merge_ops
 
             # Stage 4: Integrity check
             validation_results = self.checker.check(
@@ -104,7 +125,7 @@ class SplitRunnerImpl:
                 validation_results=validation_results,
                 output_dir=output_dir,
             )
-            self.generator.generate(chunks, output_dir, source_info)
+            self.generator.generate(chunks, output_dir, source_info, max_size)
 
             # Stage 6: Generate report
             self.reporter.generate_report(context)
