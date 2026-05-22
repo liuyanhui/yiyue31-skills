@@ -10,3 +10,7 @@ yiyue31-takeaways/*
 
 # yiyue31-translator: terms.md is user-specific
 yiyue31-translator/references/terms.md
+
+# Planner-orchestrator artifacts
+task-list.md
+observe-logs/

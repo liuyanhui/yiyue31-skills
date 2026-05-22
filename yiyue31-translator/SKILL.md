@@ -21,15 +21,18 @@ author: Yiyue31
 
 ## 翻译工作流程
 
-### Step 1: 获取文章内容
+### Step 1: 获取文章内容和预处理
+
+**获取文章内容：**
 
 根据输入类型获取文章：URL→web-access skill（或 wget/curl），文件路径→Read 工具，粘贴→直接处理。缺少内容则要求用户提供。
 
-**处理：**
+**预处理：**
 
-1. 提取标题（优先级：文章标题 → 文件名 → 首句前几个词 → `untitled-{timestamp}`）。去除文件系统不安全字符（`/ \ : * ? " < > |`）。超过 60 字符则截断。文件命名：小写字母，连字符连接。
-2. 如果 `{title}/translation/` 目录已存在，删除。非 markdown 格式时转换并保留结构。
-3. 保存到 `{title}/translation/original-{title}.md`。
+1. 提取标题（优先级：文章标题 → 文件名 → 首句前几个词 → `untitled-{timestamp}`）。只需要字母、数字，不超过6个单词。title=标题。
+2. 如果 `{title}/translation/` 目录已存在，换一个标题。
+3. 内容非 markdown 格式时，要转换为 markdown 格式。无法或不适合转换为 markdown 时，保留原始结构。
+4. 保存到 `{title}/translation/original-{title}.md`。
 
 ### Step 1.5: 文章分段
 
