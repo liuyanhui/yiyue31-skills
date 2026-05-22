@@ -59,7 +59,7 @@ python -m doc_segmenter.cli paper.md --output-dir ./chunks --max-size 30 --min-s
 
 ## 短路行为
 
-当源文件大小（`file_size`）小于 `max_size` 时，doc_segmenter 跳过章节解析、切分、合并三个阶段，直接生成包含完整原文的单个 chunk。输出格式与多 chunk 路径完全一致（chunk 文件、manifest.md、progress.json、report.md），下游工作流可通过 `progress.json` 中的 `total_chunks` 字段判断是否需要迭代处理。
+当源文件大小（`file_size`）小于 `max_size` 时，doc_segmenter 跳过章节解析、切分、合并三个阶段，直接生成包含完整原文的单个 chunk。输出格式与多 chunk 路径完全一致（chunk 文件、manifest.md、progress.json、report.md），下游工作流统一按 chunk 遍历处理，无需区分单/多 chunk。
 
 ## 输出文件
 

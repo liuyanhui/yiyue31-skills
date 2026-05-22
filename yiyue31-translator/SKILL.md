@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
-version: 2.3.1
+version: 2.3.2
 author: Yiyue31
 ---
 
@@ -29,7 +29,7 @@ author: Yiyue31
 
 **预处理：**
 
-1. 提取标题（优先级：文章标题 → 文件名 → 首句前几个词 → `untitled-{timestamp}`）。只需要字母、数字，不超过6个单词。title=标题。
+1. 提取标题（优先级：文章标题 → 文件名 → 首句前几个词）。只需要字母、数字，不超过6个单词。title=标题。
 2. 如果 `{title}/translation/` 目录已存在，换一个标题。
 3. 内容非 markdown 格式时，要转换为 markdown 格式。无法或不适合转换为 markdown 时，保留原始结构。
 4. 保存到 `{title}/translation/original-{title}.md`。
@@ -51,15 +51,14 @@ PYTHONPATH="{skill-dir}/scripts" python -m doc_segmenter "{title}/translation/or
 
 **输出**：`{title}/translation/chunks/` 目录下生成 chunk 文件、`manifest.md` 和 `progress.json`。
 
-读取 `progress.json` 的 `total_chunks` 确定工作流。以下约定适用于所有后续步骤（相对路径基于 `{title}/translation/`）：
+读取 `progress.json` 的 `total_chunks` 确定工作流。以下路径约定适用于所有后续步骤（相对路径基于 `{title}/translation/`）：
 
 | | 原文输入 | 译文输出 | 审阅报告 |
 |---|---|---|---|
-| 单 chunk（`total_chunks == 1`） | `original-{title}.md` | `translated-{title}-zh.md` | `review-{type}.md` |
-| 多 chunk（`total_chunks > 1`） | `chunks/chunk-{NN}-xxx.md` | `translated-chunks/translated-chunk-{NN}.md` | `review-{type}-chunk-{NN}.md` |
+| chunk | `chunks/chunk-{NN}-xxx.md` | `translated-chunks/translated-chunk-{NN}.md` | `review-{type}-chunk-{NN}.md` |
 
-- 多 chunk 按 `manifest.md` 有序列表遍历，Step 4 前创建 `translated-chunks/` 目录
-- 两种路径共享：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`
+- 按 `manifest.md` 有序列表遍历 chunks，Step 4 前创建 `translated-chunks/` 目录
+- 共享路径：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`
 
 ### Step 2: 文章分析 + 生成术语表
 
@@ -86,7 +85,7 @@ PYTHONPATH="{skill-dir}/scripts" python -m doc_segmenter "{title}/translation/or
 
 ### Step 4: 翻译
 
-多 chunk 时每个 chunk 启用独立 subagent；单 chunk 时一个 subagent 翻译全文。
+每个 chunk 启用独立 subagent 进行翻译。
 
 **通用翻译规则：**
 
@@ -109,15 +108,34 @@ PYTHONPATH="{skill-dir}/scripts" python -m doc_segmenter "{title}/translation/or
 
 **Subagent 输入**：原文、terms.md 匹配项、glossary、特殊词句表、翻译风格。
 
-### Steps 5-7: 审阅循环（翻译审阅 → 翻译腔 → AI 味）
+### Step 5: 翻译检查
 
-多 chunk 时每个 chunk 依次执行三种检查（各一个 subagent）；单 chunk 时对完整译文各一个 subagent。审阅报告路径见 Step 1.5 路径约定。
+对每个 chunk 启用独立 subagent 进行翻译质量检查。审阅报告路径见 Step 1.5 路径约定。
 
-| 检查 | Prompt | Subagent 输入 |
-|------|--------|---------------|
-| 翻译检查 | `{skill-dir}/references/evaluate-translation-prompt.md` | 原文 + 译文 + terms.md 匹配项 + glossary + 特殊词句表 |
-| 翻译腔检查 | `{skill-dir}/references/evaluate-translationese-prompt.md` | 原文 + 译文 |
-| AI 味检查 | `{skill-dir}/references/evaluate-ai-tone-prompt.md` | 原文 + 译文 |
+- **检查指令**：`{skill-dir}/references/evaluate-translation-prompt.md`
+- **Subagent 输入**：原文 + 译文 + terms.md 匹配项 + glossary + 特殊词句表
+
+报告保存到 `{title}/translation/`。
+
+**处理规则**：根据 subagent 审阅报告的结果，修复对应的译文。
+
+### Step 6: 翻译腔检查
+
+对每个 chunk 启用独立 subagent 进行翻译腔检查。审阅报告路径见 Step 1.5 路径约定。
+
+- **检查指令**：`{skill-dir}/references/evaluate-translationese-prompt.md`
+- **Subagent 输入**：原文 + 译文
+
+报告保存到 `{title}/translation/`。
+
+**处理规则**：根据 subagent 审阅报告的结果，修复对应的译文。
+
+### Step 7: AI 味检查
+
+对每个 chunk 启用独立 subagent 进行 AI 味检查。审阅报告路径见 Step 1.5 路径约定。
+
+- **检查指令**：`{skill-dir}/references/evaluate-ai-tone-prompt.md`
+- **Subagent 输入**：原文 + 译文
 
 报告保存到 `{title}/translation/`。
 
@@ -138,17 +156,17 @@ PYTHONPATH="{skill-dir}/scripts" python -m doc_segmenter "{title}/translation/or
 
 ### Step 9: 可读性检查
 
-多 chunk 时对每个 chunk 的译文分别执行可读性检查（各一个 subagent）；单 chunk 时对完整译文一个 subagent。审阅报告路径见 Step 1.5 路径约定。
+对每个 chunk 的译文分别执行可读性检查（各一个 subagent）。审阅报告路径见 Step 1.5 路径约定。
 
 **检查指令**：`{skill-dir}/references/evaluate-readability-prompt.md`
 
-**Subagent 输入**：对应的 chunk 译文（多 chunk）或完整译文（单 chunk）。
+**Subagent 输入**：对应的 chunk 译文。
 
 **处理检查结果**：根据报告修改对应的译文文件。
 
 ### Step 10: 合并译文
 
-多 chunk 路径：将 `translated-chunks/` 下所有文件按编号排序合并。单 chunk 路径：译文已就位，跳过合并。
+将 `translated-chunks/` 下所有文件按编号排序合并。
 
 1. 在译文前添加元信息：
 
