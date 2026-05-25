@@ -49,41 +49,53 @@ Single-shot evaluation: call subagent, get scored report, pass or fail. No loop.
 
 The complete step-by-step process from input to final output:
 
-### Step 1: Retrieve Article Content
+### Step 1: Preprocess Content And Title 
 
-Retrieve article content using different tools based on the user's input type:
-- **URL input**: Prefer locally installed skills such as: download article, convert article, search information, operate web page, view web page, etc. Alternatively, use `wget` or `curl` or `agent-browser` to open the web page and download the article content.
+Initialize content based on the input type:
+- **URL input**: Prefer locally installed skills such as: web-access skill, etc. Alternatively, use `wget` or `curl` or other tools to open the web page and download the article content.
 - **File path input**: Use the `Read` tool to read the file content
 - **Direct paste**: Process the input content directly
-- Extract the title from the user's original article/file/pasted content (title extraction priority: extract from heading, filename, first few words of the first sentence, or use `untitled-{timestamp}`). Sanitize the title by removing or replacing filesystem-unsafe characters (`/ \ : * ? " < > |`). If `{title}/summary/` already exists, delete it before saving. Save to: `{title}/summary/original-{title}.md`.
-- **Missing content to summarize**: Ask the user to provide the information
 
-**Article Content Preprocessing**
-1. When the article content is not in markdown format, convert and save it as markdown.
-2. Preserve the original structure and format during conversion. Try to keep paragraphs, headings, lists, etc. unchanged. For elements that cannot be accurately converted, keep the original text and add comments to prompt the user to check.
-3. Check the converted file. Proceed automatically with the conversion result.
+Title extraction rules:
+- Extract the title from the original article/file/pasted content. Priority: article title → file name → first few words of the first sentence.
+- Keep title short(less than 5 words), only using letters, numbers, and hyphens. 
+
+If original content is not in markdown format, convert it to markdown format. 
+
+**Convert Rules**
+- Use subagent. 
+- Provide clear instructions to the subagent to:
+   - Convert content as markdown file.
+   - Preserve the original structure and format during conversion. Try to keep paragraphs, headings, lists, etc. unchanged. For elements that cannot be accurately converted, keep the original text and add comments to prompt the user to check.
+   - input: original content or file path
+   - output: markdown content.
+- Save to: `{title}/summary/original-{title}.md`.
 
 ### Step 2: Analyze Article (Generate-Evaluate Loop)
-
-**Analysis requirements:**
-- **Language**: Input language
-- **Article type**: Tech blog, research paper, documentation, tutorial, video subtitles, general article, etc.
-- **Topic & domain**: Extract topic and domain
-- **Structure**: Identify main sections and hierarchy
-- **Paragraphs**: Extract core viewpoints, steps, pros/cons per paragraph. For code/algorithms/processes, use simplified descriptions or pseudocode. Use bullet points (main point + sub-points).
-- **Entities**: If people, teams, or organizations are involved, analyze their backgrounds
-- **Background**: If events are involved, analyze event context, sources, publication date
-- **Terminology**: Extract key terms and concepts to retain or explain
-- **Quotes**: Select standout sentences as summary highlights. Output table: "Location in original | Original text | Highlight description"
 
 **Loop parameters:** max 3 rounds, passing threshold score ≥ 8.0.
 
 **Loop procedure:**
 1. **Each round**:
-   - Round 1: full analysis per requirements above. Later rounds: re-analyze based on previous evaluation Issues table + original article.
-   - Save to `{title}/summary/analysis-round{N}-{title}.md`.
-   - Evaluate (same pattern as **Evaluate Once**): call subagent using `{skill-dir}/references/evaluate-analysis-prompt.md`, save report to `{title}/summary/evaluation-analysis-round{N}-{title}.md`.
-   - Score ≥ 8.0 → copy current round file to `{title}/summary/analysis-{title}.md` → Step 3. Score < 8.0 → track best candidate, next round.
+   - Use subagent to analyze. 
+   - Prompt: `{skill-dir}/references/analysis-prompt.md`
+   - Input: 
+      - original article: `{title}/summary/original-{title}.md`
+      - previous round analysis (if applicable): `{title}/summary/analysis-round{N}.md`
+      - improvement advice (if applicable): `{title}/summary/evaluation-analysis-round{N-1}.md`
+   - Output: `{title}/summary/analysis-round{N}.md`.
+
+   - Use subagent to evaluate the above analysis.
+   - Prompt: `{skill-dir}/references/evaluate-analysis-prompt.md`
+   - Input: 
+      - original article: `{title}/summary/original-{title}.md`
+      - analysis: `{title}/summary/analysis-round{N}.md`
+   - Output: `{title}/summary/evaluation-analysis-round{N}.md`
+
+   - Extract total score from report.
+      - Score ≥ 8.0 → **PASS** → copy current round file to `{title}/summary/analysis-{title}.md` → Step 3.
+      - Score < 8.0 → **FAIL** → track best candidate, next round.
+
 2. **Rounds exhausted**: copy best-scoring round file to `{title}/summary/analysis-{title}.md`, inform user of score → Step 3.
 
 ### Step 3: Template Selection

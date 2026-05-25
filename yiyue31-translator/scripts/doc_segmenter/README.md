@@ -127,17 +127,28 @@ doc_segmenter/
 ## 测试
 
 ```bash
-# 全部测试（单元 + E2E + UAT）
+# 全部测试
 pytest tests/
 
-# 仅 UAT 测试（通过 subprocess 调用 CLI，验证用户视角行为）
-pytest tests/test_uat_*.py
+# 仅单元测试
+pytest tests/ --ignore=tests/test_integration_pipeline.py
+
+# 仅集成测试
+pytest tests/test_integration_pipeline.py
 ```
 
-共 326 个测试（319 passed, 7 skipped），覆盖三层：
+共 107 个测试（107 passed），覆盖两层：
 
-| 层级 | 文件 | 说明 |
-|------|------|------|
-| 单元/集成 | `test_*.py`（非 uat） | 模块内部契约 |
-| E2E | `test_e2e.py` | 完整管道功能 |
-| UAT | `test_uat_*.py` | 用户视角：CLI 执行、错误信息、鲁棒输入、路径权限、输出可用性、跨平台 |
+| 层级 | 文件 | 测试数 | 说明 |
+|------|------|--------|------|
+| 单元测试 | `test_models.py` | 13 | 数据模型：SplitError、Chunk 默认值、SplitContext 默认值 |
+| 单元测试 | `test_utils.py` | 13 | 工具函数：sanitize_filename、calc_size_kb |
+| 单元测试 | `test_parser.py` | 9 | 章节解析：空内容、纯文本、标题、前言、中文、行号 |
+| 单元测试 | `test_checker.py` | 13 | 完整性校验：行数、拼接、去重、首尾行 |
+| 单元测试 | `test_splitter_basic.py` | 9 | 基本切分：小文件、大文件、切分点、命名、操作记录 |
+| 单元测试 | `test_splitter_protected.py` | 9 | 保护区域：代码块、HTML 表格、pipe 表格 |
+| 单元测试 | `test_splitter_recursive.py` | 4 | 递归切分：无切分点时的回退行为 |
+| 单元测试 | `test_merger.py` | 11 | 小文件合并：同/异级别、合并属性、操作记录 |
+| 单元测试 | `test_inspector.py` | 7 | 前置检查：文件不存在、超大文件、编码、行数 |
+| 单元测试 | `test_runner_shortcircuit.py` | 9 | 短路路径、输出结构、progress.json 元数据 |
+| 集成测试 | `test_integration_pipeline.py` | 10 | 端到端：~80KB 多类型 Markdown 完整管道验证 |

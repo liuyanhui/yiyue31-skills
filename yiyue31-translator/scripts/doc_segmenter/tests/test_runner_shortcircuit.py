@@ -11,57 +11,17 @@ from pathlib import Path
 import pytest
 
 from doc_segmenter.runner import SplitRunnerImpl
+from tests.conftest import (
+    _create_boundary_markdown,
+    _create_large_markdown,
+    _create_small_markdown,
+)
 
 
 @pytest.fixture
 def runner():
     """Create SplitRunnerImpl instance for testing."""
     return SplitRunnerImpl()
-
-
-def _create_small_markdown(tmp_path, filename="small-test.md"):
-    """Create a small markdown file (~5KB) that triggers short-circuit."""
-    file_path = tmp_path / filename
-    lines = ["# Small Test File", ""]
-    for i in range(50):
-        lines.append(f"## Section {i + 1}")
-        lines.append("")
-        lines.append(f"Paragraph content for section {i + 1}. " * 8)
-        lines.append("")
-    file_path.write_text("\n".join(lines), encoding="utf-8")
-    return str(file_path)
-
-
-def _create_large_markdown(tmp_path, filename="large-test.md"):
-    """Create a large markdown file (~50KB) that goes through normal splitting."""
-    file_path = tmp_path / filename
-    lines = ["# Large Test File", ""]
-    for i in range(8):
-        lines.append(f"## Major Section {i + 1}")
-        lines.append("")
-        for j in range(10):
-            lines.append(f"### Subsection {j + 1}")
-            lines.append("")
-            # ~700 bytes per subsection paragraph
-            lines.append(f"Detailed content for subsection {j + 1} of section {i + 1}. " * 50)
-            lines.append("")
-    file_path.write_text("\n".join(lines), encoding="utf-8")
-    return str(file_path)
-
-
-def _create_boundary_markdown(tmp_path, target_kb=40, filename="boundary-test.md"):
-    """Create a markdown file close to the max_size boundary."""
-    file_path = tmp_path / filename
-    lines = ["# Boundary Test File", ""]
-    # Use fewer sections with more content per section to avoid long filenames
-    # 4 sections × ~10KB each ≈ 40KB
-    for i in range(4):
-        lines.append(f"## Section {i + 1}")
-        lines.append("")
-        lines.append(f"Content for section {i + 1}. " * 350)
-        lines.append("")
-    file_path.write_text("\n".join(lines), encoding="utf-8")
-    return str(file_path)
 
 
 class TestSmallFileShortCircuit:
