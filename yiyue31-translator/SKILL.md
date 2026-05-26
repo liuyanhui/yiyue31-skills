@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
-version: 2.3.2
+version: 2.3.3
 author: Yiyue31
 ---
 
@@ -36,15 +36,8 @@ author: Yiyue31
 
 ### Step 1.5: 文章分段
 
-**前置检查**：如果首次运行，先安装依赖：
 ```bash
-pip install -r {skill-dir}/scripts/doc_segmenter/requirements.txt
-```
-
-运行 doc_segmenter：
-
-```bash
-PYTHONPATH="{skill-dir}/scripts" python -m doc_segmenter "{title}/translation/original-{title}.md" --output-dir "{title}/translation/chunks" --max-size 40
+bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/original-{title}.md" --output-dir "{title}/translation/chunks" --max-size 40
 ```
 
 **错误处理**：非零退出码时报告错误并停止（退出码含义见 `{skill-dir}/scripts/doc_segmenter/README.md`）。

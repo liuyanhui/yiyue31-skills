@@ -4,13 +4,12 @@
 
 ## 环境要求
 
-- Python >= 3.10
-- 无外部依赖
+- Bun >= 1.0
 
 ## 使用方法
 
 ```bash
-python -m doc_segmenter.cli <file_path> [options]
+bun run src/cli.ts <file_path> [options]
 ```
 
 ### 参数
@@ -26,10 +25,10 @@ python -m doc_segmenter.cli <file_path> [options]
 
 ```bash
 # 基本用法
-python -m doc_segmenter.cli paper.md
+bun run src/cli.ts paper.md
 
 # 指定输出目录和大小参数
-python -m doc_segmenter.cli paper.md --output-dir ./chunks --max-size 30 --min-size 8
+bun run src/cli.ts paper.md --output-dir ./chunks --max-size 30 --min-size 8
 ```
 
 ### 退出码
@@ -109,46 +108,49 @@ output/
 
 ```
 doc_segmenter/
-├── __init__.py        # 包导出
-├── models.py          # 数据模型（dataclass）
-├── protocols.py       # 模块接口（Protocol）
-├── utils.py           # 工具函数（sanitize_filename, calc_size_kb）
-├── inspector.py       # 前置检查
-├── parser.py          # 章节解析
-├── splitter.py        # 章节切分（含递归）
-├── merger.py          # 小文件合并
-├── checker.py         # 完整性校验
-├── generator.py       # 文件生成
-├── reporter.py        # 报告生成
-├── runner.py          # 流程编排
-└── cli.py             # 命令行入口
+├── src/
+│   ├── constants.ts    # 常量定义
+│   ├── models.ts       # 数据模型
+│   ├── types.ts        # 接口定义
+│   ├── utils.ts        # 工具函数
+│   ├── inspector.ts    # 前置检查
+│   ├── parser.ts       # 章节解析
+│   ├── splitter.ts     # 章节切分（含递归）
+│   ├── merger.ts       # 小文件合并
+│   ├── checker.ts      # 完整性校验
+│   ├── generator.ts    # 文件生成
+│   ├── reporter.ts     # 报告生成
+│   ├── runner.ts       # 流程编排
+│   ├── cli.ts          # 命令行入口
+│   └── index.ts        # 公共 API 导出
+└── tests/              # 测试文件
 ```
 
 ## 测试
 
 ```bash
+# 安装依赖
+bun install
+
 # 全部测试
-pytest tests/
+bun test
 
-# 仅单元测试
-pytest tests/ --ignore=tests/test_integration_pipeline.py
-
-# 仅集成测试
-pytest tests/test_integration_pipeline.py
+# 单个测试文件
+bun test tests/parser.test.ts
 ```
 
 共 107 个测试（107 passed），覆盖两层：
 
 | 层级 | 文件 | 测试数 | 说明 |
 |------|------|--------|------|
-| 单元测试 | `test_models.py` | 13 | 数据模型：SplitError、Chunk 默认值、SplitContext 默认值 |
-| 单元测试 | `test_utils.py` | 13 | 工具函数：sanitize_filename、calc_size_kb |
-| 单元测试 | `test_parser.py` | 9 | 章节解析：空内容、纯文本、标题、前言、中文、行号 |
-| 单元测试 | `test_checker.py` | 13 | 完整性校验：行数、拼接、去重、首尾行 |
-| 单元测试 | `test_splitter_basic.py` | 9 | 基本切分：小文件、大文件、切分点、命名、操作记录 |
-| 单元测试 | `test_splitter_protected.py` | 9 | 保护区域：代码块、HTML 表格、pipe 表格 |
-| 单元测试 | `test_splitter_recursive.py` | 4 | 递归切分：无切分点时的回退行为 |
-| 单元测试 | `test_merger.py` | 11 | 小文件合并：同/异级别、合并属性、操作记录 |
-| 单元测试 | `test_inspector.py` | 7 | 前置检查：文件不存在、超大文件、编码、行数 |
-| 单元测试 | `test_runner_shortcircuit.py` | 9 | 短路路径、输出结构、progress.json 元数据 |
-| 集成测试 | `test_integration_pipeline.py` | 10 | 端到端：~80KB 多类型 Markdown 完整管道验证 |
+| 单元测试 | `models.test.ts` | 13 | 数据模型：SplitError、Chunk 默认值、SplitContext 默认值 |
+| 单元测试 | `utils.test.ts` | 13 | 工具函数：sanitize_filename、calc_size_kb |
+| 单元测试 | `parser.test.ts` | 9 | 章节解析：空内容、纯文本、标题、前言、中文、行号 |
+| 单元测试 | `checker.test.ts` | 13 | 完整性校验：行数、拼接、去重、首尾行 |
+| 单元测试 | `splitter-basic.test.ts` | 9 | 基本切分：小文件、大文件、切分点、命名、操作记录 |
+| 单元测试 | `splitter-protected.test.ts` | 9 | 保护区域：代码块、HTML 表格、pipe 表格 |
+| 单元测试 | `splitter-recursive.test.ts` | 4 | 递归切分：无切分点时的回退行为 |
+| 单元测试 | `merger.test.ts` | 11 | 小文件合并：同/异级别、合并属性、操作记录 |
+| 单元测试 | `inspector.test.ts` | 7 | 前置检查：文件不存在、超大文件、编码、行数 |
+| 单元测试 | `runner-shortcircuit.test.ts` | 9 | 短路路径、输出结构、progress.json 元数据 |
+| 集成测试 | `integration-pipeline.test.ts` | 10 | 端到端：~80KB 多类型 Markdown 完整管道验证 |

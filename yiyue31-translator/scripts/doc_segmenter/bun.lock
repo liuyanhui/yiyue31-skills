@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "doc-segmenter",
+      "dependencies": {
+        "jschardet": "^3.1.0",
+      },
+    },
+  },
+  "packages": {
+    "jschardet": ["jschardet@3.1.4", "https://registry.npmmirror.com/jschardet/-/jschardet-3.1.4.tgz", {}, "sha512-/kmVISmrwVwtyYU40iQUOp3SUPk2dhNCMsZBQX0R1/jZ8maaXJ/oZIzUOiyOqcgtLnETFKYChbJ5iDC/eWmFHg=="],
+  }
+}
