@@ -1,0 +1,11 @@
+{
+  "by": "testuser",
+  "descendants": 10,
+  "id": 12345678,
+  "kids": [100001, 100005, 100007, 100009, 100010],
+  "score": 512,
+  "time": 1705312200,
+  "title": "Test Post: A Discussion About TypeScript Performance",
+  "type": "story",
+  "url": "https://example.com/typescript-perf"
+}

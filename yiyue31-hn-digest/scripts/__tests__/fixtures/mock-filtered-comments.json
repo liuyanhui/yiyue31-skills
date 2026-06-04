@@ -1,0 +1,47 @@
+[
+  {
+    "id": "100001",
+    "author": "commenter1",
+    "parentId": null,
+    "childIds": ["100002", "100004"],
+    "depth": 0,
+    "contentMarkdown": "Great article! TypeScript's type system has really improved performance in the latest versions.",
+    "isOP": false
+  },
+  {
+    "id": "100005",
+    "author": "commenter4",
+    "parentId": null,
+    "childIds": ["100006"],
+    "depth": 0,
+    "contentMarkdown": "The real bottleneck is usually not TypeScript itself but the build pipeline.",
+    "isOP": false
+  },
+  {
+    "id": "100007",
+    "author": "testuser",
+    "parentId": null,
+    "childIds": ["100008"],
+    "depth": 0,
+    "contentMarkdown": "Thanks for the discussion everyone. We're looking into all these suggestions.",
+    "isOP": true
+  },
+  {
+    "id": "100009",
+    "author": "commenter6",
+    "parentId": null,
+    "childIds": [],
+    "depth": 0,
+    "contentMarkdown": "I've been using `ts-ignore` as a workaround for slow compilation. Not ideal but works.",
+    "isOP": false
+  },
+  {
+    "id": "100010",
+    "author": "commenter7",
+    "parentId": null,
+    "childIds": [],
+    "depth": 0,
+    "contentMarkdown": "The benchmarks in the article seem outdated. Here are more recent ones from our team.",
+    "isOP": false
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "name": "yiyue31-hn-digest",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/turndown": "^5.0.6"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "turndown": "^7.2.4"
+  }
+}

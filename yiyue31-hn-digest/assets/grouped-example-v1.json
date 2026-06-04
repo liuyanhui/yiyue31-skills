@@ -1,0 +1,28 @@
+{
+  "postId": "12345678",
+  "groups": [
+    {
+      "name": "性能优化方案",
+      "dimension": "topic",
+      "summary": "...(该组的观点摘要)...",
+      "commentIds": ["abc123", "def456"],
+      "subGroups": [
+        {
+          "name": "支持",
+          "dimension": "stance",
+          "summary": "...",
+          "commentIds": ["abc123"]
+        }
+      ]
+    }
+  ],
+  "controversies": [
+    {
+      "topic": "...",
+      "sides": [
+        { "stance": "支持", "summary": "..." },
+        { "stance": "反对", "summary": "..." }
+      ]
+    }
+  ]
+}

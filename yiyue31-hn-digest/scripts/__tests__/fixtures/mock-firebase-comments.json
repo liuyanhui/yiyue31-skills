@@ -1,0 +1,92 @@
+[
+  {
+    "by": "commenter1",
+    "id": 100001,
+    "kids": [100002, 100004],
+    "parent": 12345678,
+    "text": "<p>Great article! TypeScript's type system has really improved performance in the latest versions.</p>",
+    "time": 1705312500,
+    "type": "comment"
+  },
+  {
+    "by": "commenter2",
+    "id": 100002,
+    "kids": [100003],
+    "parent": 100001,
+    "text": "<p>I agree, but there are still edge cases where compilation is slow.</p>",
+    "time": 1705312800,
+    "type": "comment"
+  },
+  {
+    "by": "testuser",
+    "id": 100003,
+    "kids": [],
+    "parent": 100002,
+    "text": "<p>That's a fair point. We're working on incremental compilation improvements.</p>",
+    "time": 1705313100,
+    "type": "comment"
+  },
+  {
+    "by": "commenter3",
+    "id": 100004,
+    "kids": [],
+    "parent": 100001,
+    "text": "<p>Have you tried using project references? That helped our team significantly.</p>",
+    "time": 1705312920,
+    "type": "comment"
+  },
+  {
+    "by": "commenter4",
+    "id": 100005,
+    "kids": [100006],
+    "parent": 12345678,
+    "text": "<p>The real bottleneck is usually not TypeScript itself but the build pipeline.</p>",
+    "time": 1705313400,
+    "type": "comment"
+  },
+  {
+    "by": "commenter5",
+    "id": 100006,
+    "kids": [],
+    "parent": 100005,
+    "text": "<p>Exactly! esbuild and swc have changed the game for us.</p>",
+    "time": 1705313700,
+    "type": "comment"
+  },
+  {
+    "by": "testuser",
+    "id": 100007,
+    "kids": [100008],
+    "parent": 12345678,
+    "text": "<p>Thanks for the discussion everyone. We're looking into all these suggestions.</p>",
+    "time": 1705314000,
+    "type": "comment"
+  },
+  {
+    "by": "commenter1",
+    "id": 100008,
+    "kids": [],
+    "parent": 100007,
+    "text": "<p>Happy to help! Looking forward to the improvements.</p>",
+    "time": 1705314300,
+    "type": "comment"
+  },
+  {
+    "by": "commenter6",
+    "id": 100009,
+    "kids": [],
+    "parent": 12345678,
+    "text": "<p>I've been using <code>ts-ignore</code> as a workaround for slow compilation. Not ideal but works.</p>",
+    "time": 1705314600,
+    "type": "comment"
+  },
+  {
+    "by": "commenter7",
+    "id": 100010,
+    "kids": [],
+    "parent": 12345678,
+    "text": "<p>The benchmarks in the article seem outdated. Here are more recent ones from our team.</p>",
+    "time": 1705314900,
+    "type": "comment"
+  }
+]
