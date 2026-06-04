@@ -25,6 +25,34 @@ For consolidated error handling rules and the full terminal message catalog, see
 
 ---
 
+## Subagent Architecture
+
+This skill uses a **main agent + evaluation subagent** architecture.
+
+### Roles
+
+| Role | Responsibilities |
+|------|-----------------|
+| **Main agent** (you) | Executes all steps: parsing, configuration, fetching, filtering, grouping, article generation, article revision, and applying quality fixes based on evaluation feedback. |
+| **Evaluation subagent** | Independently evaluates article quality, AI tone, translationese, and readability. Reads the article and writes an evaluation report. **Must NOT modify the article or any other content file.** |
+
+### Why evaluation subagent only
+
+The evaluation subagent provides an **independent quality assessment** — it sees the article fresh without the generation bias. Keeping evaluation separate from generation/fixing ensures the evaluator focuses purely on finding problems, not on how to solve them.
+
+The main agent applies fixes itself because it retains full context (why it wrote things a certain way) and can make more informed revisions than a separate generation subagent that only sees the evaluation report.
+
+### Evaluation subagent dispatch
+
+When dispatching an evaluation subagent, pass:
+- The article file path for it to read.
+- The evaluation prompt file path from `{skill-dir}/references/`.
+- The output evaluation report file path for it to write to.
+
+The evaluation subagent must not modify any file except the evaluation report it writes.
+
+---
+
 ## Step 1: Parse Input
 
 The user provides a Hacker News thread reference. Expect either:
@@ -318,7 +346,7 @@ Input: filtered comments + `config.groupBy` + `config.sortGroupsBy` + the loaded
 
 If the filtered comments exceed 40 comments:
 1. Split into batches of approximately 20 comments each (in array order).
-2. For each batch, dispatch a subagent to produce a partial 02-grouped result (same grouping instructions apply).
+2. Process each batch to produce a partial grouping result (same grouping instructions apply).
 3. Merge batches: combine groups with the same name, deduplicate `commentIds`.
 4. Produce a single final `02-grouped.json` output.
 
@@ -332,13 +360,7 @@ The output must follow the structure shown in `{skill-dir}/assets/grouped-exampl
 
 ## Step 8: Article Generation (Generate-Evaluate Loop)
 
-This step uses a **subagent architecture** with a generate-evaluate loop for quality assurance.
-
-### Architecture Rules
-
-- **Main agent** (you): orchestrates the loop, reads score summaries from evaluation reports, makes pass/fail decisions. Does NOT carry full article content in context.
-- **Subagent** (max 1 layer): performs generation or evaluation. Receives input via file paths. Writes output to files. No subagent-to-subagent calls.
-- **Intermediate files**: all drafts and evaluation reports persist as files for observability.
+This step uses a generate-evaluate loop for quality assurance. The main agent generates and revises the article; an evaluation subagent provides independent quality assessment.
 
 ### Loop Parameters
 
@@ -349,31 +371,20 @@ This step uses a **subagent architecture** with a generate-evaluate loop for qua
 
 **Round 1 — Initial Generation:**
 
-1. Dispatch a subagent to generate the article.
-   - Input file paths: `{outputDir}/{postId}/02-grouped.json`, post metadata from `01-raw-data.json`, filtered comments from memory, and `{skill-dir}/assets/article-{templateVersion}.md`.
-   - The subagent reads the article template for structure and quality constraints.
-   - Output file: `{outputDir}/{postId}/article-draft-round1.md`
-
-2. Dispatch a subagent to evaluate the article.
-   - Provide the evaluation prompt from `{skill-dir}/references/evaluate-article-prompt.md`.
-   - Input: the article draft file path + original comments file path (for accuracy cross-check) + `{outputDir}/{postId}/02-grouped.json` (for per-group coverage check).
-   - Output file: `{outputDir}/{postId}/evaluation-article-round1.md`
-
-3. Read the evaluation report. Extract the overall score.
-   - Score >= 8.0 → PASS → copy this round's draft to `{outputDir}/{postId}/03-article.md` → proceed to Step 9 (AI Tone Check).
-   - Score < 8.0 → FAIL → track this round as the best candidate (if it has the highest score so far). Proceed to next round.
+1. Generate the article. Read `{skill-dir}/assets/article-{templateVersion}.md` for the article template structure. Use `{outputDir}/{postId}/02-grouped.json`, post metadata, filtered comments, and (if fetched) original post content as input.
+2. Write the article to `{outputDir}/{postId}/article-draft-round1.md`.
+3. Dispatch an **evaluation subagent** with the prompt from `{skill-dir}/references/evaluate-article-prompt.md`.
+   - The subagent reads: the article draft, original comments (`01-raw-data.json`), and `{outputDir}/{postId}/02-grouped.json`.
+   - The subagent writes: `{outputDir}/{postId}/evaluation-article-round1.md`.
+4. Read the evaluation report's **Overall Score** line. Score >= 8.0 → PASS → copy draft to `{outputDir}/{postId}/03-article.md` → Step 9. Score < 8.0 → FAIL → track as best candidate → next round.
 
 **Rounds 2–3 — Revision:**
 
-1. Dispatch a subagent to revise the article.
-   - Input: same as Round 1, plus the previous round's draft file path and the previous round's evaluation report file path (containing improvement suggestions).
-   - The subagent reads the evaluation feedback and addresses the specific issues.
-   - Output file: `{outputDir}/{postId}/article-draft-round{N}.md`
-
-2. Dispatch a subagent to evaluate the revised article (same process as Round 1).
-   - Output file: `{outputDir}/{postId}/evaluation-article-round{N}.md`
-
-3. Read the score. Score >= 8.0 → PASS → copy to 03-article.md → Step 9. Score < 8.0 → FAIL → track best candidate, next round.
+1. Revise the article based on the previous round's evaluation report (improvement suggestions). Apply the fixes yourself, using your full context of why the article was written a certain way.
+2. Write the revised article to `{outputDir}/{postId}/article-draft-round{N}.md`.
+3. Dispatch an evaluation subagent (same pattern as Round 1).
+   - Output: `{outputDir}/{postId}/evaluation-article-round{N}.md`.
+4. Read the Overall Score. Score >= 8.0 → PASS → copy to 03-article.md → Step 9. Score < 8.0 → FAIL → track best candidate → next round.
 
 ### Rounds Exhausted
 
@@ -382,8 +393,6 @@ If all 3 rounds complete without a PASS:
 - Terminal output: "文章质量评分: {bestScore}/10"
 
 ### Generation Rules
-
-These rules apply to the subagent performing generation:
 
 1. **Background section**:
    - If original post content was fetched and passed as input, include it as background.
@@ -402,18 +411,13 @@ These rules apply to the subagent performing generation:
 
 5. **Overwrite warning**: If `{outputDir}/{postId}/03-article.md` already exists, overwrite it and terminal output: "正在覆盖已有输出"
 
-6. **Disclaimer protection** (critical): The article begins with a `<small>` disclaimer line (AI-generated notice) placed between the title and the first section heading. All subagents (generation, AI tone, translationese, readability) must preserve this line exactly as-is. Do NOT reword, move, remove, or "optimize" it. This line is metadata, not article content.
+6. **Disclaimer protection** (critical): The article begins with a `<small>` disclaimer line (AI-generated notice) placed between the title and the first section heading. This line must be preserved exactly as-is throughout all generation and quality fix steps. Do NOT reword, move, remove, or "optimize" it. This line is metadata, not article content.
 
 ---
 
 ## Step 9: AI Tone Check
 
 This step detects and fixes AI-generated writing artifacts in the article.
-
-### Architecture
-
-- Uses the same subagent architecture as Step 8: main agent dispatches, subagent evaluates and fixes.
-- Max 1 layer of subagent. No nesting.
 
 ### Loop Parameters
 
@@ -422,15 +426,16 @@ This step detects and fixes AI-generated writing artifacts in the article.
 
 ### Loop Procedure (Each Round)
 
-1. Dispatch a subagent with the evaluation prompt from `{skill-dir}/references/evaluate-ai-tone-prompt.md`.
-   - Provide the current article file path as input.
-   - The subagent reads the article, detects AI tone issues, applies fixes, and writes an evaluation report.
-   - Report output: `{outputDir}/{postId}/evaluation-ai-tone-round{N}.md`
-   - The article file is fixed in-place by the subagent.
+1. Dispatch an **evaluation subagent** with the prompt from `{skill-dir}/references/evaluate-ai-tone-prompt.md`.
+   - The subagent reads: `{outputDir}/{postId}/03-article.md`.
+   - The subagent writes: `{outputDir}/{postId}/evaluation-ai-tone-round{N}.md`.
+   - The subagent does NOT modify the article.
 
-2. Read the report's verdict line.
+2. Read the report's **Verdict** line.
    - "NO ISSUES REMAIN" → PASS → proceed to Step 10 (Translationese Check).
-   - "ISSUES FOUND" → FAIL → next round.
+   - "ISSUES FOUND" → FAIL → apply the suggested fixes to the article yourself → next round.
+
+3. After applying fixes, write the updated article to `{outputDir}/{postId}/03-article.md` (overwrite).
 
 ### Rounds Exhausted (5)
 
@@ -459,13 +464,16 @@ Before executing this step, determine the dominant language of the source commen
 
 ### Execution (Single Pass, No Loop)
 
-1. Dispatch a subagent with the evaluation prompt from `{skill-dir}/references/evaluate-translationese-prompt.md`.
-   - Provide the current article file path as input.
-   - The subagent reads the article, detects translationese issues, applies fixes, and writes a report.
-   - Report output: `{outputDir}/{postId}/evaluation-translationese.md`
-   - The article file is fixed in-place by the subagent.
+1. Dispatch an **evaluation subagent** with the prompt from `{skill-dir}/references/evaluate-translationese-prompt.md`.
+   - The subagent reads: `{outputDir}/{postId}/03-article.md`.
+   - The subagent writes: `{outputDir}/{postId}/evaluation-translationese.md`.
+   - The subagent does NOT modify the article.
 
-2. Read the report summary. Proceed to Step 11 regardless of findings (single pass, no retry loop).
+2. Read the report's **Summary** line. If issues were found, apply the suggested fixes to the article yourself.
+
+3. Write the updated article to `{outputDir}/{postId}/03-article.md` (overwrite).
+
+4. Proceed to Step 11 regardless of findings (single pass, no retry loop).
 
 ---
 
@@ -473,18 +481,21 @@ Before executing this step, determine the dominant language of the source commen
 
 ### Readability Check (Single Pass)
 
-1. Dispatch a subagent with the evaluation prompt from `{skill-dir}/references/evaluate-readability-prompt.md`.
-   - Provide the current article file path as input.
-   - The subagent reads the article, identifies readability issues, applies fixes, and writes a report.
-   - Report output: `{outputDir}/{postId}/evaluation-readability.md`
-   - The article file is fixed in-place by the subagent.
+1. Dispatch an **evaluation subagent** with the prompt from `{skill-dir}/references/evaluate-readability-prompt.md`.
+   - The subagent reads: `{outputDir}/{postId}/03-article.md`.
+   - The subagent writes: `{outputDir}/{postId}/evaluation-readability.md`.
+   - The subagent does NOT modify the article.
 
-2. Read the report summary. Proceed to final output regardless (single pass, no loop).
+2. Read the report's **Summary** line. If issues were found, apply the suggested fixes to the article yourself.
+
+3. Write the updated article to `{outputDir}/{postId}/03-article.md` (overwrite).
+
+4. Proceed to final output regardless (single pass, no loop).
 
 ### Final Output
 
 1. **Verify final article** at `{outputDir}/{postId}/03-article.md`.
-   - This file was already written by Step 8 and modified in-place by Steps 9–11 subagents. Verify it exists and contains the final, polished version.
+   - This file was written by Step 8 and subsequently modified by the main agent in Steps 9–11. Verify it exists.
 
 2. **Generate human-readable final copy**: copy `{outputDir}/{postId}/03-article.md` to `{outputDir}/{postId}/final-{slug}-{postId}.md`.
    - `{slug}` was generated in Step 1.5.
@@ -517,8 +528,8 @@ Read these on demand — do not load all at once.
 | `{skill-dir}/references/error-handling.md` | Consolidated error decision table; cross-references to step-level error descriptions. Read when an unusual error occurs or when retry/fallback behavior is unclear. |
 | `{skill-dir}/references/terminal-messages.md` | Full catalog of every terminal message the skill can output, in execution order, with trigger conditions and language-aware variants. Read when verifying message wording or adding a new message. |
 | `{skill-dir}/references/evaluate-article-prompt.md` | Used by Step 8 evaluation subagent. |
-| `{skill-dir}/references/evaluate-ai-tone-prompt.md` | Used by Step 9 subagent. |
-| `{skill-dir}/references/evaluate-translationese-prompt.md` | Used by Step 10 subagent. |
-| `{skill-dir}/references/evaluate-readability-prompt.md` | Used by Step 11 subagent. |
+| `{skill-dir}/references/evaluate-ai-tone-prompt.md` | Used by Step 9 evaluation subagent. |
+| `{skill-dir}/references/evaluate-translationese-prompt.md` | Used by Step 10 evaluation subagent. |
+| `{skill-dir}/references/evaluate-readability-prompt.md` | Used by Step 11 evaluation subagent. |
 
 ---

@@ -65,7 +65,8 @@ hn-digest/
 │   ├── evaluate-article-prompt.md
 │   ├── evaluate-ai-tone-prompt.md
 │   ├── evaluate-translationese-prompt.md
-│   └── evaluate-readability-prompt.md
+│   ├── evaluate-readability-prompt.md
+│   └── architecture.md
 ├── assets/                   # 输出模板
 │   ├── article-v1.md
 │   └── grouped-example-v1.json
@@ -100,7 +101,7 @@ bun test
 - **抓取输出统一格式**：三种抓取方式都收敛到同一个 JSON 结构，下游步骤无需区分来源
 - **深度截断只在过滤管道中进行**（Step 6.1），不在抓取阶段做
 - **Jina 输出需要 AI 手动正规化**（详见 SKILL.md Step 4 Method 3）
-- **质量评估走 subagent 架构**：主 agent 调度、subagent 执行生成/评估，避免主上下文被长文章污染
+- **质量评估走 subagent 架构**：主 agent 负责生成和修复，评估 subagent 负责独立评估（只读文章、写报告、不修改文件）。详见 [SKILL.md](./SKILL.md) 和 [architecture.md](./references/architecture.md)
 
 ## Changelog
 
