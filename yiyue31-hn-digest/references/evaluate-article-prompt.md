@@ -85,6 +85,16 @@ Check the following:
 - Acceptable: an unanswered question worth watching, a practical implication, a higher-level observation, or addressing the title's question.
 - Deduct if the summary is just a recap that ends with "讨论没有共识."
 
+**Sharp viewpoint highlighting:**
+- Are sharp, counter-intuitive, or particularly insightful viewpoints marked with **bold**?
+- Are important original quotes formatted as **{translated text}**（{original text}）?
+  - When config.lang matches the source language, just use **bold** without parenthetical.
+  - Full-width parentheses （）in Chinese articles; half-width () in English articles.
+- Is bold highlighting used at an appropriate density (1–3 per section, not zero, not excessive)?
+- Are original quotes kept to at most 1–2 per section?
+- Deduct 1–2 points if no bold highlighting is used at all (the article feels flat and undifferentiated).
+- Deduct 1–2 points if bold is overused (more than 3 per section) or applied to trivial points, making it meaningless.
+
 **Controversy depth (if applicable):**
 - Does the Controversies section identify the ROOT of disagreements, or just restate "X says A, Y says B"?
 - If the discussion is one-sided, does it describe the consensus instead of forcing a false dichotomy?

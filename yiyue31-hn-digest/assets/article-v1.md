@@ -36,6 +36,25 @@ Controversy rules (conditional):
   Example: "分歧的本质在于：指数基金的职责到底是被动跟踪市场，还是保护被动投资者？"
 - If the discussion is one-sided: state the consensus and note any dissenting nuances.
 
+Sharp viewpoint rules:
+- When a group's summary or a comment contains a sharp, counter-intuitive, or particularly
+  insightful point, wrap it with **bold** in the article text.
+  Example: "指数基金的本质问题不在于费用，而在于**它们让资本失去了惩罚坏公司的能力**。"
+- Keep bold highlights to 1–3 per section. Too many bold lines dilute the effect; too few
+  makes the article feel flat. Apply bold only when the point genuinely surprises or reframes
+  the reader's understanding.
+
+Original quote rules:
+- When quoting a commenter's exact words that are sharp or important, format as:
+  **{translated text in article language}**（{original text}）
+  Example (zh article, en source): **指数基金让资本失去了惩罚坏公司的能力**（index funds have stripped capital of the ability to punish bad companies）
+  Example (en article, en source): **index funds have stripped capital of the ability to punish bad companies**
+- When config.lang matches the source language (e.g., both "en"), skip the parenthetical — just use **bold**.
+- Use original quotes sparingly: at most 1–2 quotes per group section. Only quote when the
+  original wording is significantly more impactful than any paraphrase would be.
+- Use full-width parentheses （）for the original-text parenthetical in Chinese articles;
+  use half-width () in English articles.
+
 Summary rules:
 - Do NOT end with "讨论没有达成共识" or equivalent — this provides no value.
 - The summary must give the reader something beyond a recap:
@@ -61,7 +80,7 @@ Summary rules:
   - [HN 讨论](https://news.ycombinator.com/item?id={postId})
 -->
 
-# {帖子标题 / Post Title}
+# [Hacker News] {帖子标题 / Post Title}
 
 <small>本文使用 Yiyue31 开发的 Skill 基于 Hacker News讨论自动生成，可能与原始评论存在差异，请自行甄别。</small>
 
