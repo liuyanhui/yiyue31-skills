@@ -82,7 +82,7 @@ Summary rules:
 
 # [Hacker News] {帖子标题 / Post Title}
 
-<small>本文使用 Yiyue31 开发的 Skill 基于 Hacker News讨论自动生成，可能与原始评论存在差异，请自行甄别。</small>
+<small>本文由 Yiyue31 开发的 Skill 基于 Hacker News讨论总结而成，可能与原始评论存在差异，请自行甄别。</small>
 
 ## 背景 / Background
 {读者钩子（1句）+ 帖子上下文（2-3句）}
