@@ -1,6 +1,6 @@
 ---
 name: yiyue31-hn-digest
-description: "当用户要求总结、提炼、Digest 一个 Hacker News (HN) 讨论帖时启用。用户提供 HN 帖子 URL 或 ID，希望快速了解评论核心观点、争论焦点、各方立场时启用。英文触发表达包括：summarize/digest/break down/analyze this HN thread, what are people saying/what is the consensus/key takeaways from this HN post, tldr/TLDR this HN thread, Hacker News discussion summary, HN post analysis, 以及其他语义等价的变体。不用于：通用摘要、新闻翻译、单纯抓取网页。"
+description: Use when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID. Transforms a Hacker News discussion thread into a structured article with grouped viewpoints, controversies, and multi-style recommendation summaries.
 version: 0.0.3
 author: yiyue31
 ---
