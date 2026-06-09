@@ -29,9 +29,9 @@ summarize what HN is saying in this post
 
 ## 工作流程
 
-1. 解析输入 → 2. 加载配置 → 3. 检查缓存 → 4. 抓取数据（Algolia → Firebase → Jina，自动 fallback）→ 5. 写 `01-raw-data.json` → 5A.（可选）抓原文 → 6. 过滤评论（深度 / 活跃度 / 数量 / OP 标记）→ 7. 分组 → `02-grouped.json` → 8. 生成文章（最多 3 轮 generate-evaluate 循环）→ 9. AI 语气检查（最多 5 轮）→ 10. 翻译腔检查（条件执行）→ 11. 可读性检查 → 最终输出 `03-article.md`
+1. 解析输入 → 2. 加载配置 → 3. 检查缓存 → 4. 抓取并缓存数据 → 5. 准备输出并校验 → 6. 过滤评论 → 7. 分组 → 8. 生成文章（最多 3 轮 generate-evaluate）→ 9. AI 语气检查 → 10. 翻译腔检查（条件）→ 11. 可读性检查 + 最终输出 → 12. 推荐摘要 → `03-article.md` + `recommendation-*.md`
 
-主流程见 [SKILL.md](./SKILL.md)。错误处理和终端消息目录见 [references/error-handling.md](./references/error-handling.md) 和 [references/terminal-messages.md](./references/terminal-messages.md)。
+主流程见 [SKILL.md](./SKILL.md)。
 
 ## 输出
 
@@ -41,6 +41,7 @@ summarize what HN is saying in this post
 01-raw-data.json              # 原始统一 JSON
 02-grouped.json               # 分组结果
 03-article.md                 # 最终文章
+recommendation-{slug}-{postId}.md  # 多风格推荐摘要
 article-draft-round{N}.md     # 各轮草稿（可观测性）
 evaluation-*.md               # 各评估报告（可观测性）
 ```
@@ -59,16 +60,14 @@ hn-digest/
 │   ├── jina.ts
 │   ├── lib/utils.ts
 │   └── __tests__/            # bun:test 测试套件
-├── references/               # 按需加载的规则文档与评估 prompt
-│   ├── error-handling.md
-│   ├── terminal-messages.md
+├── references/               # 按需加载的评估 prompt
 │   ├── evaluate-article-prompt.md
 │   ├── evaluate-ai-tone-prompt.md
 │   ├── evaluate-translationese-prompt.md
-│   ├── evaluate-readability-prompt.md
-│   └── architecture.md
+│   └── evaluate-readability-prompt.md
 ├── assets/                   # 输出模板
 │   ├── article-v1.md
+│   ├── recommendation-v1.md
 │   └── grouped-example-v1.json
 ├── package.json
 └── bun.lock
@@ -105,6 +104,11 @@ bun test
 
 ## Changelog
 
+- **0.0.3**（2026-06-09）：标题前缀 + 推荐摘要
+  - 文章 H1 标题强制以 `[Hacker News]` 开头（Generation Rule 7 + 评估检查）
+  - 新增 Step 12：工作流结束后自动生成多风格推荐摘要文档（技术/爆款/活泼/新闻/播客口播/极简一句话，共 11 段）
+  - 新增 `assets/recommendation-v1.md` 推荐摘要模板
+  - 新增终端消息 19、20
 - **0.0.2**（2026-06-03）：代码清理 + 模板迭代
   - 修复 Algolia 字段名错误（`comment_text` → `text`，`story_text` → `text`），1133 条评论全部有内容
   - 移除死代码：`story_text`、`num_comments`、截断警告逻辑

@@ -75,7 +75,7 @@ bun scripts/jina.ts <postId>
 
 ## 错误处理
 
-每个脚本失败时退出码为 1，stderr 包含错误描述。SKILL.md 的 Step 4 描述了上层（Claude）如何根据错误类型决定 retry / fallback / terminate。详见 [../references/error-handling.md](../references/error-handling.md)。
+每个脚本失败时退出码为 1，stderr 包含错误描述。SKILL.md 的 Step 4 描述了上层（Claude）如何根据错误类型决定 retry / fallback / terminate。
 
 常见错误：
 - `Post not found: <id>` → 404
