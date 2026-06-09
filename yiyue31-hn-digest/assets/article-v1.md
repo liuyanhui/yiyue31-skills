@@ -74,10 +74,14 @@ Summary rules:
 - Append a "参考资料 / References" section at the end of the article.
 - Always include the HN discussion link: https://news.ycombinator.com/item?id={postId}
 - If the post has an external URL (post.url), include it as the original article link.
+- IMPORTANT: Show the raw URL explicitly on a separate indented line after each Markdown link,
+  so that URL information is preserved when converting to other formats (HTML, PDF, WeChat, etc.).
 - Format:
   ## 参考资料 / References
   - [原文章标题或"原文"](post.url)
+    post.url
   - [HN 讨论](https://news.ycombinator.com/item?id={postId})
+    https://news.ycombinator.com/item?id={postId}
 -->
 
 # [Hacker News] {帖子标题 / Post Title}
@@ -98,4 +102,6 @@ Summary rules:
 {回应核心问题 + 超出复述的读者价值（未解答的关键问题 / 实际影响 / 趋势判断）}
 ## 参考资料 / References
 - [原文]({post.url})
+  {post.url}
 - [HN 讨论](https://news.ycombinator.com/item?id={postId})
+  https://news.ycombinator.com/item?id={postId}
