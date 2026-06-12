@@ -19,29 +19,25 @@ Generate CLAUDE.md files for every directory in a project, providing layered con
 
 ## Architecture
 
-**Main agent + subagent** pattern to avoid context overflow:
+**Main agent + subagent** pattern. To prevent context overflow in large projects, the main agent handles decisions and dispatching, subagents handle execution in isolated contexts.
 
-- **Main agent**: scan directory structure, plan tasks, dispatch subagents to handle individual directories, track progress, generate final report. Never read file contents for summarization — delegate that to subagents.
+- **Main agent**: scan directory structure, plan tasks, dispatch subagents to handle individual directories, track progress, generate final report.
 - **Subagent**: receive a single directory, analyze files, generate summaries, determine entry files, write CLAUDE.md content directly to disk.
 
-Parent directories are processed before their children. Up to 5 subagents run concurrently.
+Parent directories are processed before their children so that higher-level context is available before diving into subdirectories. Up to 5 subagents run concurrently.
 
 ## Workflows
 
-### Phase 1: Scan & Plan
+### Step 1: Scan & Plan
 
-1. **Detect project language**:
-   - Check if root `CLAUDE.md` or `README.md` (or `README.*`) exists.
-   - If exists, read the first 50 lines and detect language: if it contains Chinese characters, use Chinese; otherwise English.
-   - If no such file exists, default to Chinese (中文).
+1. **Detect project language**: Determine the language from existing CLAUDE.md or README files. Default to Chinese (中文) if none found.
 
 2. **Read `.gitignore` files**: Read all `.gitignore` files in the project and use their patterns as additional exclusion rules.
 
-3. **Build exclusion rules** (three layers combined):
-   - **Built-in default excludes**: `node_modules`, `.git`, `dist`, `build`, `__pycache__`, `venv`, `.env`, `.next`, `.nuxt`, `coverage`, `.turbo`, `.cache`, `target`, `vendor/bundle`, `Pods`
-   - **`.gitignore` patterns** from every level
-   - **`--exclude`** parameter additions; **`--include`** overrides both defaults and `.gitignore`
-   - Skip binary files by extension: images, fonts, audio, video, archives, compiled binaries
+3. **Build exclusion rules** (three layers):
+   - Exclude dependency directories, build outputs, cache directories, IDE configs, and environment directories. Skip binary files.
+   - `.gitignore` patterns from every level
+   - `--exclude` additions; `--include` overrides
 
 4. **Scan directory tree**: List all directories under the target path. Apply exclusion rules bidirectionally (excluded directories are neither scanned nor written to). Skip symlinks pointing outside the project root.
 
@@ -51,7 +47,7 @@ Parent directories are processed before their children. Up to 5 subagents run co
 
 6. **Confirm with user**: Present the directory list and counts. Do NOT proceed without user confirmation.
 
-### Phase 2: Dispatch Subagents
+### Step 2: Dispatch Subagents
 
 For each directory (parent before children), dispatch a subagent with the following prompt (fill in `{variables}`):
 
@@ -65,14 +61,7 @@ Steps:
 
 2. For each subdirectory, write a one-line description based on the name. If unclear, skip the description.
 
-3. For each file:
-   a. Skip binary files by extension.
-   b. Read the first 20 lines. Try rule-based extraction:
-      - File header comment describing purpose
-      - Exported function/class/type names and their doc comments
-      - For package.json/Cargo.toml/pyproject.toml: read "description" or "name" field
-   c. If rule-based extraction yields nothing, AND file is <=500 lines, read full file and generate a one-line summary. Be extremely concise.
-   d. If file >500 lines and rule-based extraction failed, just list the filename without description.
+3. For each file, generate a one-line summary of its purpose. Be extremely concise. Skip binary files. For large files (>500 lines), do not read the full file — extract key info only.
 
 4. Determine entry file based on common conventions for the project type and config file hints. If no clear entry file, skip.
 
@@ -89,11 +78,13 @@ The content between `<!-- skill: ai-context -->` and `<!-- /ai-context -->` is m
 
 ```markdown
 # AI Coding Auto Sections
-<!-- skill: ai-context | version: 0.0.1 | generated: {date} -->
+<!-- skill: ai-context | version: 0.0.1 | updated: {date} -->
 
-## {Section headings in detected language}
+## {目录结构 / Directory Structure}
+{directories first, then files, one line each}
 
-{content}
+## {入口文件 / Entry File} (if any)
+- filename — description
 
 <!-- /ai-context -->
 ```
@@ -102,43 +93,17 @@ The content between `<!-- skill: ai-context -->` and `<!-- /ai-context -->` is m
 
 **If CLAUDE.md exists but has NO `# AI Coding Auto Sections` heading** — append to end of file.
 
-**Section heading language**:
-- Chinese: `## 目录结构`, `## 入口文件`
-- English: `## Directory Structure`, `## Entry File`
-- The `# AI Coding Auto Sections` heading and HTML comments always stay in English.
+**Section heading language**: Match the detected project language. The `# AI Coding Auto Sections` heading and HTML comments always stay in English.
 
-### Phase 3: Track Progress & Handle Failures
+### Step 3: Track Progress & Handle Failures
 
 - Track completed directories. Directories already containing `# AI Coding Auto Sections` are skipped on re-run.
 - If a subagent fails, retry once. If retry also fails, mark as failed and continue.
 - If context is running low, stop dispatching new subagents and output a partial report.
 
-### Phase 4: Final Report
+### Step 4: Final Report
 
-Output to user (in conversation, not to a file):
-
-```markdown
-## AI Context Generation Report
-
-- **Target path**: {path}
-- **Project language**: {language}
-- **Directories processed**: {count}
-- **Directories skipped**: {count} (with reasons)
-- **Directories failed**: {count} (with names)
-- **CLAUDE.md created**: {count}
-- **CLAUDE.md updated**: {count}
-
-### Processed Directories
-{list of all processed directory paths}
-
-### Skipped Directories
-{list with reasons}
-
-### Failed Directories
-{list with error descriptions}
-```
-
-To process remaining directories, re-run `/ai-context` — already-processed directories are automatically skipped.
+Output a report to the user (in conversation, not to a file) covering: target path, project language, counts of processed/skipped/failed directories, CLAUDE.md created/updated counts, lists of processed and failed directories with reasons.
 
 ## Parameters
 
@@ -151,12 +116,6 @@ To process remaining directories, re-run `/ai-context` — already-processed dir
 
 ## Rules
 
-- Directory depth: only describe **direct children** (one level deep). Deeper content belongs to child directory CLAUDE.md files.
-- File summary: one line per file, as concise as possible. No filler words.
-- Large files (>500 lines): rule-based extraction only, no full read.
-- Binary files: skip entirely, do not attempt to read.
-- Symlinks pointing outside project root: skip.
-- Never modify content outside `<!-- skill: ai-context -->` ... `<!-- /ai-context -->` markers in existing CLAUDE.md files.
+- Never modify content outside `<!-- skill: ai-context -->` ... `<!-- /ai-context -->` markers. These markers protect user-written content from being overwritten — only the section between markers is managed by this skill.
 - The `# AI Coding Auto Sections` section is managed exclusively by this skill.
-- Parent directories must be processed before their children.
-- Confirm plan with user before writing files.
+- Confirm plan with user before writing files. This is a write-heavy operation that touches many files across the project — user awareness is essential.
