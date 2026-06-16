@@ -2,7 +2,7 @@
  * CLI entry point module.
  *
  * Exports an async `run()` function that orchestrates the full
- * ai-context-checker pipeline: parse args, load config, validate input,
+ * yiyue31-context-checker pipeline: parse args, load config, validate input,
  * scan directories, run the validation pipeline, and generate a report.
  *
  * Returns an exit code (0 = success, 1 = failure) for testability.
@@ -25,7 +25,7 @@ import { generateReport } from "./modules/report-generator.js";
 // Usage text
 // ---------------------------------------------------------------------------
 
-const USAGE = `Usage: ai-context-checker [options]
+const USAGE = `Usage: yiyue31-context-checker [options]
 
 Options:
   -t, --target <path>       Target directory to scan (required)

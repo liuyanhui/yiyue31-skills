@@ -1,6 +1,6 @@
 ---
-name: ai-context
-description: Use when user asks to "ai-context","generate CLAUDE.md","生成项目上下文","AI coding friendly","初始化AI上下文","project context", or wants to generate layered CLAUDE.md context files for directories in a project.
+name: yiyue31-context
+description: Use when user asks to "generate CLAUDE.md","生成项目上下文","AI coding friendly","初始化AI上下文","project context", or wants to generate layered CLAUDE.md context files for directories in a project.
 version: 0.0.1
 ---
 
@@ -11,10 +11,10 @@ Generate CLAUDE.md files for every directory in a project, providing layered con
 ## Quick Start
 
 ```
-/ai-context              # Generate for entire project
-/ai-context ./src        # Generate for specific path
-/ai-context --exclude=vendor,tmp  # Add extra exclusions
-/ai-context --include=dist        # Force include excluded directory
+/yiyue31-context              # Generate for entire project
+/yiyue31-context ./src        # Generate for specific path
+/yiyue31-context --exclude=vendor,tmp  # Add extra exclusions
+/yiyue31-context --include=dist        # Force include excluded directory
 ```
 
 ## Architecture
@@ -72,13 +72,13 @@ Steps:
 
 **Output Format — write to `{directory_path}/CLAUDE.md`:**
 
-The content between `<!-- skill: ai-context -->` and `<!-- /ai-context -->` is managed exclusively by this skill. Never modify anything outside these markers.
+The content between `<!-- skill: yiyue31-context -->` and `<!-- /yiyue31-context -->` is managed exclusively by this skill. Never modify anything outside these markers.
 
 **If CLAUDE.md does not exist** — create with:
 
 ```markdown
 # AI Coding Auto Sections
-<!-- skill: ai-context | version: 0.0.1 | updated: {date} -->
+<!-- skill: yiyue31-context | version: 0.0.1 | update_time: {date} -->
 
 ## {目录结构 / Directory Structure}
 {directories first, then files, one line each}
@@ -86,10 +86,10 @@ The content between `<!-- skill: ai-context -->` and `<!-- /ai-context -->` is m
 ## {入口文件 / Entry File} (if any)
 - filename — description
 
-<!-- /ai-context -->
+<!-- /yiyue31-context -->
 ```
 
-**If CLAUDE.md exists with `# AI Coding Auto Sections` heading** — find the heading, replace everything from `<!-- skill: ai-context ... -->` through `<!-- /ai-context -->` (inclusive) with new content. If `<!-- /ai-context -->` is missing, replace from `<!-- skill: ai-context -->` to the next level-1 heading or EOF. Preserve all content before and after the section.
+**If CLAUDE.md exists with `# AI Coding Auto Sections` heading** — find the heading, replace everything from `<!-- skill: yiyue31-context ... -->` through `<!-- /yiyue31-context -->` (inclusive) with new content. If `<!-- /yiyue31-context -->` is missing, replace from `<!-- skill: yiyue31-context -->` to the next level-1 heading or EOF. Preserve all content before and after the section.
 
 **If CLAUDE.md exists but has NO `# AI Coding Auto Sections` heading** — append to end of file.
 
@@ -116,6 +116,6 @@ Output a report to the user (in conversation, not to a file) covering: target pa
 
 ## Rules
 
-- Never modify content outside `<!-- skill: ai-context -->` ... `<!-- /ai-context -->` markers. These markers protect user-written content from being overwritten — only the section between markers is managed by this skill.
+- Never modify content outside `<!-- skill: yiyue31-context -->` ... `<!-- /yiyue31-context -->` markers. These markers protect user-written content from being overwritten — only the section between markers is managed by this skill.
 - The `# AI Coding Auto Sections` section is managed exclusively by this skill.
 - Confirm plan with user before writing files. This is a write-heavy operation that touches many files across the project — user awareness is essential.

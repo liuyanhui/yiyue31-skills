@@ -18,8 +18,8 @@ import { tmpdir } from "node:os";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const START_MARKER = "<!-- skill: ai-context -->";
-const END_MARKER = "<!-- /ai-context -->";
+const START_MARKER = "<!-- skill: yiyue31-context -->";
+const END_MARKER = "<!-- /yiyue31-context -->";
 
 /**
  * Create a temporary directory with a valid CLAUDE.md file.
@@ -92,7 +92,7 @@ describe("CLI entry point (run)", () => {
 
     expect(exitCode).toBe(0);
     expect(stdoutSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Usage: ai-context-checker"),
+      expect.stringContaining("Usage: yiyue31-context-checker"),
     );
 
     stdoutSpy.mockRestore();
@@ -108,7 +108,7 @@ describe("CLI entry point (run)", () => {
 
     expect(exitCode).toBe(0);
     expect(stdoutSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Usage: ai-context-checker"),
+      expect.stringContaining("Usage: yiyue31-context-checker"),
     );
 
     stdoutSpy.mockRestore();
@@ -124,7 +124,7 @@ describe("CLI entry point (run)", () => {
 
     expect(exitCode).toBe(0);
     expect(stdoutSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Usage: ai-context-checker"),
+      expect.stringContaining("Usage: yiyue31-context-checker"),
     );
 
     stdoutSpy.mockRestore();

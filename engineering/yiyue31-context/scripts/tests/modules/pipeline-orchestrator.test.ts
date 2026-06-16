@@ -33,8 +33,8 @@ import { DEFAULT_CONFIG } from "../../src/types/index";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const START_MARKER = "<!-- skill: ai-context -->";
-const END_MARKER = "<!-- /ai-context -->";
+const START_MARKER = "<!-- skill: yiyue31-context -->";
+const END_MARKER = "<!-- /yiyue31-context -->";
 
 function makeConfig(overrides: Partial<CheckConfig> = {}): CheckConfig {
   return {

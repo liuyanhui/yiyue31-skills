@@ -1,7 +1,6 @@
 ---
 name: "yiyue31-orchestrator"
 description: "Use when the user wants to execute a task plan document task by task. Triggers: 'orchestrate project tasks based on task list', '根据任务计划执行项目任务', '执行项目任务列表', 'project task orchestration'."
-disable-model-invocation: true
 version: 0.3.0
 author: Yiyue31
 ---

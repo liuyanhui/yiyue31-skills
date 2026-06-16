@@ -20,8 +20,8 @@ import { join } from "node:path";
 const FIXTURE_ROOT = join(__dirname, "..", "fixtures", "consistency");
 
 const MARKERS: MarkerConfig = {
-  start: "<!-- skill: ai-context -->",
-  end: "<!-- /ai-context -->",
+  start: "<!-- skill: yiyue31-context -->",
+  end: "<!-- /yiyue31-context -->",
   update_time_field: "update_time",
 };
 

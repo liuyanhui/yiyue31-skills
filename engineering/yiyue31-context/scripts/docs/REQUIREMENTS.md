@@ -14,10 +14,10 @@ CLI 命令行工具，支持命令行参数和配置文件两种输入方式。
 
 ```bash
 # 命令行参数
-npx ai-context-check --target ./src --exclude node_modules,dist --filename CLAUDE.md
+npx yiyue31-context-check --target ./src --exclude node_modules,dist --filename CLAUDE.md
 
 # 配置文件
-npx ai-context-check --config ./check-config.json
+npx yiyue31-context-check --config ./check-config.json
 ```
 
 ### 2.1 参数合并策略
@@ -52,8 +52,8 @@ npx ai-context-check --config ./check-config.json
   "include": [],
   "filename": "CLAUDE.md",
   "markers": {
-    "start": "<!-- skill: ai-context -->",
-    "end": "<!-- /ai-context -->",
+    "start": "<!-- skill: yiyue31-context -->",
+    "end": "<!-- /yiyue31-context -->",
     "update_time_field": "update_time"
   },
   "required_any_patterns": ["## 目录结构", "## Directory Structure"],
@@ -77,8 +77,8 @@ npx ai-context-check --config ./check-config.json
 | `exclude` | string[] | 否 | `[]` | 排除的目录名 |
 | `include` | string[] | 否 | `[]` | 强制包含的目录名，覆盖 exclude |
 | `filename` | string | 否 | `"CLAUDE.md"` | 检查的目标文件名，必须为 `.md` 格式 |
-| `markers.start` | string | 否 | `"<!-- skill: ai-context -->"` | 成对标记的开始标记 |
-| `markers.end` | string | 否 | `"<!-- /ai-context -->"` | 成对标记的结束标记 |
+| `markers.start` | string | 否 | `"<!-- skill: yiyue31-context -->"` | 成对标记的开始标记 |
+| `markers.end` | string | 否 | `"<!-- /yiyue31-context -->"` | 成对标记的结束标记 |
 | `markers.update_time_field` | string | 否 | `"update_time"` | 开始标记中时间戳的字段名 |
 | `required_any_patterns` | string[] | 否 | `[]` | 至少匹配其中一项（正则） |
 | `required_all_patterns` | string[] | 否 | `[]` | 全部必须匹配（正则） |
@@ -249,7 +249,7 @@ issue 标识符完整枚举值：`missing_start_marker`、`missing_end_marker`�
 从开始标记中按 `markers.update_time_field` 配置的字段名提取时间戳：
 
 ```
-<!-- skill: ai-context | version: 0.0.1 | update_time: 2026-06-11T20:30:00 -->
+<!-- skill: yiyue31-context | version: 0.0.1 | update_time: 2026-06-11T20:30:00 -->
 ```
 
 - 遍历该目录下的实际文件，对比每个文件的 `mtime` 与时间戳
@@ -279,11 +279,11 @@ issue 标识符完整枚举值：`missing_start_marker`、`missing_end_marker`�
 ### 6.1 成对标记
 
 ```markdown
-<!-- skill: ai-context | version: 0.0.1 | update_time: {ISO 8601 时间} -->
+<!-- skill: yiyue31-context | version: 0.0.1 | update_time: {ISO 8601 时间} -->
 
 ...内容...
 
-<!-- /ai-context -->
+<!-- /yiyue31-context -->
 ```
 
 ### 6.2 目录结构条目格式

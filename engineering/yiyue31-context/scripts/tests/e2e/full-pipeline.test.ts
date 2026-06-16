@@ -31,8 +31,8 @@ import { tmpdir } from "node:os";
 // Constants
 // ---------------------------------------------------------------------------
 
-const START_MARKER = "<!-- skill: ai-context -->";
-const END_MARKER = "<!-- /ai-context -->";
+const START_MARKER = "<!-- skill: yiyue31-context -->";
+const END_MARKER = "<!-- /yiyue31-context -->";
 
 /** Valid CLAUDE.md content with markers, listed files, and sufficient content. */
 const VALID_CLAUDE_MD = [

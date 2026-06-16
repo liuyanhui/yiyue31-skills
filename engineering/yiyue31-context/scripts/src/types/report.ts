@@ -136,7 +136,7 @@ export interface DirectoryReport {
  * Metadata attached to every generated report.
  */
 export interface ReportMeta {
-  /** Version string of the ai-context-checker tool. */
+  /** Version string of the yiyue31-context-checker tool. */
   tool_version: string;
   /** ISO-8601 timestamp of when the report was generated. */
   timestamp: string;

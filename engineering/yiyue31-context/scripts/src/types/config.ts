@@ -2,12 +2,12 @@ import type { MarkerIssueIdentifier } from "./enums.js";
 
 /**
  * Configuration for paired marker delimiters used to identify
- * AI-context blocks within target files.
+ * yiyue31-context blocks within target files.
  */
 export interface MarkerConfig {
-  /** The opening marker string, e.g. `<!-- skill: ai-context -->`. */
+  /** The opening marker string, e.g. `<!-- skill: yiyue31-context -->`. */
   start: string;
-  /** The closing marker string, e.g. `<!-- /ai-context -->`. */
+  /** The closing marker string, e.g. `<!-- /yiyue31-context -->`. */
   end: string;
   /**
    * Name of the YAML-like field inside the marker block that stores
@@ -36,7 +36,7 @@ export interface OutputConfig {
  * falling back to {@link DEFAULT_CONFIG} values.
  */
 export interface CheckConfig {
-  /** Root directory to scan for AI-context coverage. */
+  /** Root directory to scan for yiyue31-context coverage. */
   target: string;
   /** Glob patterns of directory names to exclude from scanning. */
   exclude: string[];
@@ -45,7 +45,7 @@ export interface CheckConfig {
   /**
    * Filename to look for in each directory (e.g. `"CLAUDE.md"`).
    * The tool checks whether every scanned directory contains this file
-   * with a valid AI-context marker block.
+   * with a valid yiyue31-context marker block.
    */
   filename: string;
   /** Marker delimiter configuration. */
@@ -117,8 +117,8 @@ export const DEFAULT_CONFIG: Omit<CheckConfig, "target"> = {
   max_file_size: 51200,
   expected_encoding: "utf-8",
   markers: {
-    start: "<!-- skill: ai-context -->",
-    end: "<!-- /ai-context -->",
+    start: "<!-- skill: yiyue31-context -->",
+    end: "<!-- /yiyue31-context -->",
     update_time_field: "update_time",
   },
   output: {},

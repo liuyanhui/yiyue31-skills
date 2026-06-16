@@ -2,14 +2,14 @@
 
 Two agents for structured project planning and execution: **planner** produces a verified task plan, **orchestrator** executes it task by task. They are decoupled and communicate only through the plan document.
 
-> Chinese reference translations: `planner/yiyue31-planner-CN.md`, `orchestrator/yiyue31-orchestrator-CN.md` (the English `SKILL.md` files are authoritative).
+> Chinese reference translations: `yiyue31-planner/yiyue31-planner-CN.md`, `yiyue31-orchestrator/yiyue31-orchestrator-CN.md` (the English `SKILL.md` files are authoritative).
 
 ## Agents
 
 | Agent | File | Purpose |
 | ----- | ---- | ------- |
-| **yiyue31-planner** | `planner/SKILL.md` | Generate a structured, reviewed task plan (YAML) from user requirements |
-| **yiyue31-orchestrator** | `orchestrator/SKILL.md` | Execute the plan task by task through an Orchestrator-Generator-Evaluator loop |
+| **yiyue31-planner** | `yiyue31-planner/SKILL.md` | Generate a structured, reviewed task plan (YAML) from user requirements |
+| **yiyue31-orchestrator** | `yiyue31-orchestrator/SKILL.md` | Execute the plan task by task through an Orchestrator-Generator-Evaluator loop |
 
 ## Design Principles
 
@@ -55,7 +55,7 @@ User Requirements
 
 ### Format Contract: Task List
 
-The task format is defined **only in planner** (`planner/SKILL.md` → Plan Document Format). The plan is YAML and self-describing: the overview carries the field definitions once, and each task has `id` + `seq` plus the fields orchestrator needs (`description`, `constraints`, `deliverable`, `evaluation_criteria`, `evaluation_method`, etc.). orchestrator reads the file and understands the format from the document itself — no separate spec.
+The task format is defined **only in planner** (`yiyue31-planner/SKILL.md` → Plan Document Format). The plan is YAML and self-describing: the overview carries the field definitions once, and each task has `id` + `seq` plus the fields orchestrator needs (`description`, `constraints`, `deliverable`, `evaluation_criteria`, `evaluation_method`, etc.). orchestrator reads the file and understands the format from the document itself — no separate spec.
 
 ## Triggering
 
@@ -77,3 +77,14 @@ The task format is defined **only in planner** (`planner/SKILL.md` → Plan Docu
 | Loop unit | Entire plan | Each task |
 | Max rounds | Fixed 5 | Per-task (3 or 5) |
 | Permission | Generator writes plan only | Generator writes within task constraints |
+
+## yiyue31-context
+
+A skill (not an agent) that lives in this directory alongside planner and orchestrator. It generates layered `CLAUDE.md` context files for every directory in a project, giving AI coding agents (primarily Claude Code) project-aware context. It is independent of the planner/orchestrator contract above — it does not read or write the plan document.
+
+- **File:** `yiyue31-context/SKILL.md`
+- **How:** invoke as a skill — `/yiyue31-context`, `/yiyue31-context ./src`, or with `--exclude` / `--include`.
+- **What it does:** scans the directory tree (honoring `.gitignore`), dispatches up to 5 subagents to summarize each directory, and writes a managed `# AI Coding Auto Sections` block into each `CLAUDE.md` between `<!-- skill: yiyue31-context -->` markers. Re-runs update only the marked block and leave surrounding user content untouched.
+- **Companion tool:** `yiyue31-context/scripts` (`yiyue31-context-checker`) validates that generated marker blocks are present, well-formed, and fresh.
+
+**Example:** `/yiyue31-context` (whole project) or `/yiyue31-context --exclude=dist,node_modules`.

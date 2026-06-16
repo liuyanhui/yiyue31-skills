@@ -225,8 +225,8 @@ describe("DEFAULT_CONFIG matches CheckConfig", () => {
     expect(config.filename).toBe("CLAUDE.md");
     expect(config.max_file_size).toBe(51200);
     expect(config.expected_encoding).toBe("utf-8");
-    expect(config.markers.start).toBe("<!-- skill: ai-context -->");
-    expect(config.markers.end).toBe("<!-- /ai-context -->");
+    expect(config.markers.start).toBe("<!-- skill: yiyue31-context -->");
+    expect(config.markers.end).toBe("<!-- /yiyue31-context -->");
     expect(config.markers.update_time_field).toBe("update_time");
   });
 });

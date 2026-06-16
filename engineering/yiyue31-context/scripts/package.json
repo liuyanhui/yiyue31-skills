@@ -1,5 +1,5 @@
 {
-  "name": "ai-context-checker",
+  "name": "yiyue31-context-checker",
   "version": "0.1.0",
   "description": "CLI tool for directory coverage validation and report generation",
   "main": "dist/index.js",

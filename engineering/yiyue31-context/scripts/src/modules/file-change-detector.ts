@@ -108,7 +108,7 @@ function scanFiles(
  * @param directoryPath     - Parent directory containing the file and its siblings.
  * @param startMarkerContent - Content of the start marker line (pipe-delimited
  *                             key-value pairs, e.g.
- *                             `<!-- skill: ai-context | version: 0.0.1 | update_time: 2026-06-11T20:30:00 -->`).
+ *                             `<!-- skill: yiyue31-context | version: 0.0.1 | update_time: 2026-06-11T20:30:00 -->`).
  * @param updateTimeField   - Name of the timestamp field in the marker (e.g. `"update_time"`).
  * @param fallbackMtime     - Fallback baseline timestamp (Date or ISO string) when the
  *                             update_time field is absent.

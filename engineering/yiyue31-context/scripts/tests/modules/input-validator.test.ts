@@ -22,8 +22,8 @@ function makeConfig(overrides: Partial<CheckConfig> = {}): CheckConfig {
     exclude: [],
     include: [],
     markers: {
-      start: "<!-- skill: ai-context -->",
-      end: "<!-- /ai-context -->",
+      start: "<!-- skill: yiyue31-context -->",
+      end: "<!-- /yiyue31-context -->",
       update_time_field: "update_time",
     },
     required_any_patterns: [],

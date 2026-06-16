@@ -111,7 +111,7 @@ describe("detectFileChanges — all files older than baseline", () => {
   it("returns no stale files when all files have mtime older than update_time", () => {
     const dir = join(FIXTURE_ROOT, "all-older");
     const content = markerContent({
-      skill: "ai-context",
+      skill: "yiyue31-context",
       version: "0.0.1",
       update_time: BASELINE_TS,
     });
@@ -133,7 +133,7 @@ describe("detectFileChanges — one file newer than baseline", () => {
   it("records a single stale file when one file's mtime is newer", () => {
     const dir = join(FIXTURE_ROOT, "one-newer");
     const content = markerContent({
-      skill: "ai-context",
+      skill: "yiyue31-context",
       version: "0.0.1",
       update_time: BASELINE_TS,
     });
@@ -156,7 +156,7 @@ describe("detectFileChanges — missing update_time field", () => {
     const dir = join(FIXTURE_ROOT, "all-older");
     // Marker content without update_time field
     const content = markerContent({
-      skill: "ai-context",
+      skill: "yiyue31-context",
       version: "0.0.1",
     });
 
@@ -171,7 +171,7 @@ describe("detectFileChanges — missing update_time field", () => {
 
   it("accepts a string fallbackMtime", () => {
     const dir = join(FIXTURE_ROOT, "all-older");
-    const content = markerContent({ skill: "ai-context" });
+    const content = markerContent({ skill: "yiyue31-context" });
 
     const result = detectFileChanges(dir, content, "update_time", BASELINE_TS);
 
@@ -188,7 +188,7 @@ describe("detectFileChanges — invalid timestamp format", () => {
   it("returns staleness=null with error when timestamp is invalid", () => {
     const dir = join(FIXTURE_ROOT, "all-older");
     const content = markerContent({
-      skill: "ai-context",
+      skill: "yiyue31-context",
       update_time: "not-a-date",
     });
 
@@ -203,7 +203,7 @@ describe("detectFileChanges — invalid timestamp format", () => {
 
   it("returns error when fallbackMtime string is invalid", () => {
     const dir = join(FIXTURE_ROOT, "all-older");
-    const content = markerContent({ skill: "ai-context" });
+    const content = markerContent({ skill: "yiyue31-context" });
 
     const result = detectFileChanges(dir, content, "update_time", "bad-fallback");
 
@@ -221,7 +221,7 @@ describe("detectFileChanges — empty directory", () => {
   it("returns empty stale_files array for an empty directory", () => {
     const dir = join(FIXTURE_ROOT, "empty-dir");
     const content = markerContent({
-      skill: "ai-context",
+      skill: "yiyue31-context",
       update_time: BASELINE_TS,
     });
 
@@ -240,7 +240,7 @@ describe("detectFileChanges — multiple stale files", () => {
   it("records all files with mtime newer than baseline", () => {
     const dir = join(FIXTURE_ROOT, "multi-newer");
     const content = markerContent({
-      skill: "ai-context",
+      skill: "yiyue31-context",
       update_time: BASELINE_TS,
     });
 
@@ -262,7 +262,7 @@ describe("detectFileChanges — subdirectories are skipped", () => {
   it("only considers files, not subdirectories", () => {
     const dir = join(FIXTURE_ROOT, "with-subdir");
     const content = markerContent({
-      skill: "ai-context",
+      skill: "yiyue31-context",
       update_time: BASELINE_TS,
     });
 
@@ -300,7 +300,7 @@ describe("detectFileChanges — file mtime equals baseline", () => {
   it("does not flag files whose mtime exactly equals the baseline", () => {
     const dir = join(FIXTURE_ROOT, "same-mtime");
     const content = markerContent({
-      skill: "ai-context",
+      skill: "yiyue31-context",
       update_time: BASELINE_TS,
     });
 
