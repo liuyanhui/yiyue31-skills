@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
-version: 2.3.3
+version: 2.3.4
 author: Yiyue31
 ---
 
@@ -103,36 +103,15 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 ### Step 5: 翻译检查
 
-对每个 chunk 启用独立 subagent 进行翻译质量检查。审阅报告路径见 Step 1.5 路径约定。
-
-- **检查指令**：`{skill-dir}/references/evaluate-translation-prompt.md`
-- **Subagent 输入**：原文 + 译文 + terms.md 匹配项 + glossary + 特殊词句表
-
-报告保存到 `{title}/translation/`。
-
-**处理规则**：根据 subagent 审阅报告的结果，修复对应的译文。
+每个 chunk 一个独立 subagent。检查指令：`{skill-dir}/references/evaluate-translation-prompt.md`；输入：原文 + 译文 + terms.md 匹配项 + glossary + 特殊词句表。报告见 Step 1.5 路径约定 → 按报告修复译文。
 
 ### Step 6: 翻译腔检查
 
-对每个 chunk 启用独立 subagent 进行翻译腔检查。审阅报告路径见 Step 1.5 路径约定。
-
-- **检查指令**：`{skill-dir}/references/evaluate-translationese-prompt.md`
-- **Subagent 输入**：原文 + 译文
-
-报告保存到 `{title}/translation/`。
-
-**处理规则**：根据 subagent 审阅报告的结果，修复对应的译文。
+每个 chunk 一个独立 subagent。检查指令：`{skill-dir}/references/evaluate-translationese-prompt.md`；输入：原文 + 译文。报告见 Step 1.5 路径约定 → 按报告修复译文。
 
 ### Step 7: AI 味检查
 
-对每个 chunk 启用独立 subagent 进行 AI 味检查。审阅报告路径见 Step 1.5 路径约定。
-
-- **检查指令**：`{skill-dir}/references/evaluate-ai-tone-prompt.md`
-- **Subagent 输入**：原文 + 译文
-
-报告保存到 `{title}/translation/`。
-
-**处理规则**：根据 subagent 审阅报告的结果，修复对应的译文。
+每个 chunk 一个独立 subagent。检查指令：`{skill-dir}/references/evaluate-ai-tone-prompt.md`；输入：原文 + 译文。报告见 Step 1.5 路径约定 → 按报告修复译文。
 
 ### Step 8: 术语维护
 
