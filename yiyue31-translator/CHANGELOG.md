@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.3.3 (2026-06-18)
+
+### 清理死代码
+
+- **删除 `scripts/doc_segmenter/__pycache__/`**：Python→TypeScript 迁移残留的字节码缓存（12 个 `.pyc`），对应 `.py` 源文件已不存在，已被 `.gitignore` 忽略（仅本地清理）。
+- **删除 `references/markdown-format-checklist.md`**：v2.0.0 即计划删除（11/12 检查项 LLM 本就会），唯一有用的中英文空格规则已内联到 SKILL.md Step 4，且未被任何步骤引用。
+- **修正 v2.3.1 条目**：过时的 Python 文件引用（`runner.py`/`generator.py`/`test_runner_shortcircuit.py`）更正为当前 TypeScript 文件。
+
 ## v2.3.2 (2026-05-22)
 
 ### 工作流统一
@@ -16,9 +24,9 @@
 
 ### doc_segmenter 短路优化
 
-- **runner.py**：文件大小 < max_size 时跳过 parse/split/merge 阶段，直接生成单 chunk 输出。输出格式与多 chunk 路径完全一致。
-- **generator.py**：`generate()` 方法新增 `max_size` 参数，progress.json 新增 `source_size_kb` 和 `threshold_kb` 字段。
-- **test_runner_shortcircuit.py**：新增单元测试，覆盖小文件单 chunk、大文件多 chunk、边界条件、progress.json 元数据、输出结构一致性。
+- **runner.ts**：文件大小 < max_size 时跳过 parse/split/merge 阶段，直接生成单 chunk 输出。输出格式与多 chunk 路径完全一致。
+- **generator.ts**：`generate()` 方法新增 `max_size` 参数，progress.json 新增 `source_size_kb` 和 `threshold_kb` 字段。
+- **runner-shortcircuit.test.ts**：新增单元测试，覆盖小文件单 chunk、大文件多 chunk、边界条件、progress.json 元数据、输出结构一致性。
 
 ## v1.0.0 → v2.0.0 Overview
 
