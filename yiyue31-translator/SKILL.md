@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
-version: 2.3.4
+version: 2.3.5
 author: Yiyue31
 ---
 
@@ -162,9 +162,13 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 ## Corrections
 
-文件位置：`{skill-dir}/references/terms.md`
+文件位置：`{skill-dir}/references/terms.md`（本地运行态文件，已 gitignore；随翻译自动维护）。
 
-仅包含 LLM 在没有此条目的情况下会翻译错误或不一致的术语。
+**收录标准（须全部满足）：**
+
+1. **可验证误译**：LLM 在没有此条目时会实际翻译错误或不一致（有证据，而非“可能”）。
+2. **跨篇复现**：能出现在多篇不同文章里。单篇文章特有的金句、整句、代码标识符、一次性隐喻 → 归入 per-article 的 `special-phrases-{title}.md`，不进本表。
+3. **非 LLM 已会**：LLM 本就能翻对的常见词不收。
 
 ```markdown
 | English Term | Correct Translation | Why |

@@ -6,7 +6,6 @@
  */
 
 import { existsSync, statSync, readFileSync } from "node:fs";
-import jschardet from "jschardet";
 
 import { type SourceFileInfo } from "./models";
 import { SplitError } from "./models";
@@ -36,13 +35,9 @@ export class FileInspectorImpl {
       );
     }
 
-    // Read raw bytes and detect encoding
+    // Read content as UTF-8 (web sources are assumed UTF-8; the decoder strips any BOM)
     const rawBytes = readFileSync(filePath);
-    const encoding = this.detectEncoding(rawBytes);
-
-    // Read content as text with detected encoding
-    const decoder = new TextDecoder(encoding);
-    let content = decoder.decode(rawBytes);
+    let content = new TextDecoder("utf-8").decode(rawBytes);
 
     // Normalize line endings (Python's open(encoding=...) does this automatically)
     content = normalizeNewlines(content);
@@ -71,45 +66,7 @@ export class FileInspectorImpl {
       fileSize,
       fileLines,
       fileChars,
-      fileEncoding: encoding,
+      fileEncoding: "utf-8",
     };
-  }
-
-  /**
-   * Detect encoding of raw bytes.
-   *
-   * Uses jschardet for detection with fallback to common encodings.
-   * Normalizes encoding names to standard forms.
-   *
-   * @param rawBytes - The raw file bytes.
-   * @returns The detected encoding string.
-   */
-  private detectEncoding(rawBytes: Uint8Array): string {
-    const result = jschardet.detect(Buffer.from(rawBytes));
-    let detected = result.encoding || "";
-
-    if (detected) {
-      // Normalize common aliases
-      const detectedLower = detected.toLowerCase();
-      if (detectedLower === "ascii" || detectedLower === "utf-8" || detectedLower === "utf-8-sig") {
-        return "utf-8";
-      }
-      if (detectedLower === "gb2312" || detectedLower === "gb18030" || detectedLower === "gbk") {
-        return detectedLower;
-      }
-      return detectedLower;
-    }
-
-    // Fallback: try common encodings
-    for (const enc of ["utf-8", "gbk", "latin-1"]) {
-      try {
-        const decoder = new TextDecoder(enc);
-        decoder.decode(rawBytes);
-        return enc;
-      } catch {
-        continue;
-      }
-    }
-    return "latin-1";
   }
 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.3.5 (2026-06-18)
+
+### terms.md 收录门槛
+
+- **写入 SKILL.md 的 Corrections 节**（tracked）：明确收录标准——可验证误译 / 跨篇复现 / 非 LLM 已会；单篇金句、整句、代码标识符归入 per-article 的 `special-phrases-{title}.md`。
+- **本地 terms.md 清理**：terms.md 为 gitignore 的本地运行态文件（提交 392339d 起 untrack），据上述标准移除 9 条违规条目（6 条整句/金句、2 条单篇代码标识符、1 条自述 LLM 能翻对），74 → 65 条。此清理仅作用于本地文件，不进版本库。
+
+### doc_segmenter 去除 jschardet 依赖
+
+- **假设 UTF-8**：移除 `jschardet` 与编码探测逻辑，inspector 直接按 UTF-8 解码（TextDecoder 自动剥离 BOM）。`fileEncoding` 保留为常量 `"utf-8"`，runner / parser / reporter / 测试无需改动。
+- **零依赖**：package.json 移除 dependencies；无依赖后 bun 自动删除 bun.lock。107 个测试全部通过。
+
 ## v2.3.4 (2026-06-18)
 
 ### SKILL.md 精简
