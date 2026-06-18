@@ -1,21 +1,18 @@
 ---
 name: Concise
 display_name: Concise Notes
-version: 1.2.0
-default_language: zh
+version: 2.2.0
 target_length: 800-1500
 target_reading_time: 3-5 minutes
 sections:
   - title_overview
   - content_outline
   - core_insights
-  - standout_quotes
   - key_glossary
 guidelines_length:
   title_overview: 1-2 sentences
   content_outline: hierarchical by section
   core_insights: 5-8 points
-  standout_quotes: 1-2 quotes
   key_glossary: 5-10 terms
 features:
   - Focus on core knowledge
@@ -50,7 +47,6 @@ Tech learning notes template, suitable for engineers or students to quickly revi
 - **Advantages & Innovations**: {{Content here}}
 - **Disadvantages & Limitations**: {{Only if the article mentions limitations}}
 - **Conclusions & Applications**: {{Content here}}
-- **Standout Quote**: ***[Verbatim]{{1-2 memorable sentences that capture key insights}}[/Verbatim]***
 
 ## Key Glossary
 
@@ -65,6 +61,6 @@ Tech learning notes template, suitable for engineers or students to quickly revi
 ## Rules
 
 - **Highlight Key Points**: Innovations, practical value, technical comparisons
-- **Target length**: 800-1500 words (aspirational). Hard upper bound: must not exceed original article word count (see SKILL.md).
+- **Target length**: 800-1500 words (aspirational). Aim to stay shorter than the original article. Word count is advisory (no hard cap — mixed Chinese/English/code counts are not directly comparable). See `generate-summary-prompt.md`.
 - **Conditional items**: "Disadvantages & Limitations" only if the article mentions them. "Key Glossary" only if non-trivial terminology exists.
-- **Inline verbatim**: Memorable sentences must be embedded inline, wrapped in `[Verbatim]...[/Verbatim]` and formatted as ***bold italic***. Do NOT place them in a separate section.
+- **Inline verbatim**: Follow the Verbatim rule in `references/generate-summary-prompt.md` — memorable sentences must be embedded inline (***bold italic***, `[Verbatim]...[/Verbatim]`), never in a separate section.

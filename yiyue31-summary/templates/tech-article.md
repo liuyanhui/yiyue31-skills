@@ -1,7 +1,7 @@
 ---
 name: Tech-Article-Summary
 display_name: Tech Article Summary Template
-version: 1.2.0
+version: 2.2.0
 ---
 
 # Tech Article Summary Template
@@ -71,4 +71,4 @@ Tech learning notes template (enhanced version), suitable for students or engine
 - **Structure**: Organize by article sections in order (introduction, background, methods, implementation, conclusions, etc.)
 - **Conditional sections**: Sections 5 and 6 are only generated when the article contains relevant content.
 - **Accuracy**: Preserve technical accuracy; explain complex concepts in understandable language.
-- **Inline verbatim**: Golden sentences, slang, idioms, and notable original phrasing must be embedded inline in the body text where their context is discussed, wrapped in `[Verbatim]...[/Verbatim]` and formatted as ***bold italic***. Do NOT place them in a separate section.
+- **Inline verbatim**: Follow the Verbatim rule in `references/generate-summary-prompt.md` — golden sentences, slang, idioms, and notable original phrasing must be embedded inline (***bold italic***, `[Verbatim]...[/Verbatim]`), never in a separate section.
