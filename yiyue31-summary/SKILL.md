@@ -171,12 +171,19 @@ Translate the final summary into Chinese.
 **Procedure:**
 1. Invoke a subagent with the `yiyue31-translator` skill, providing both the summary and the analysis as input. Use default options (free translation style) for all choices. Do not prompt the user for confirmation.
 2. After translation completes, copy the entire `{title}/translation/` directory to `{title}/summary/translation/`.
-3. Inform the user of both file paths:
+3. **Verify verbatim preservation** on `{title}/summary/translation/translated-{title}-zh.md`:
+   - Zero literal `[Verbatim]`/`[/Verbatim]` tags remain (tags were stripped).
+   - Every original-text entry from the analysis Quotes table appears in the translation (the English original is preserved as the parenthetical half of each pair).
+   - If either fails → re-invoke the translator with the failures listed, or inform the user of the gap.
+4. Inform the user of both file paths:
    - Original summary: see Input above
    - Chinese translation: `{title}/summary/translation/translated-{title}-zh.md`
 
 **Verbatim handling** (include in subagent prompt):
-`[Verbatim]...[/Verbatim]` markers indicate content requiring special care during translation. See the analysis Quotes table for context on each item. Preserve the markers and ***bold italic*** formatting in the output.
+For each `[Verbatim]原文[/Verbatim]` in the English summary: keep the English original, prepend its Chinese translation, format the whole pair as ***bold italic***, and strip the `[Verbatim]`/`[/Verbatim]` tags. Result shape: `***中文译文（英文原文）***` (full-width parentheses). Surrounding non-verbatim text is translated normally.
+- Example: `***[Verbatim]the only way to go fast is to go well[/Verbatim]***` → `***欲速则不达（the only way to go fast is to go well）***`.
+- See the analysis Quotes table for each item's highlight context.
+- The Chinese translation must NOT contain any literal `[Verbatim]` or `[/Verbatim]` tags.
 
 **Fallback:**
 - If `yiyue31-translator` is not found, check for any other installed translation skill and use it instead.
