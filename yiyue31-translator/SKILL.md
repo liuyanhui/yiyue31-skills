@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
-version: 2.3.5
+version: 2.3.6
 author: Yiyue31
 ---
 

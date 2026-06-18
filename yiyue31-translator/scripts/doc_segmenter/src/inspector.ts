@@ -45,14 +45,6 @@ export class FileInspectorImpl {
     // file_size based on disk bytes (matches os.path.getsize in Python)
     const fileSize = diskSize / 1024.0;
 
-    // Re-check size against 5MB
-    if (diskSize > MAX_FILE_SIZE_BYTES) {
-      throw new SplitError(
-        `File content exceeds 5MB limit (${fileSize} KB)`,
-        2
-      );
-    }
-
     // Line count: matches Python's content.count("\n") + (1 if content and not content.endswith("\n") else 0)
     let fileLines = content.split("\n").length - 1; // number of \n characters
     if (content && !content.endsWith("\n")) {
