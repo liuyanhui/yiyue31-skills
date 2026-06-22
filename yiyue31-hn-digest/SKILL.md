@@ -80,9 +80,9 @@ All methods exhausted → output "所有抓取方式均失败: {methods + reason
 
 ## Step 5: Prepare Output & Validate
 
-1. Create `{outputDir}/{postId}/` (fail → terminate silently).
-2. Write unified JSON to `{outputDir}/{postId}/01-raw-data.json` (fail → terminate silently).
-3. Generate `{slug}` from `post.title`: lowercase, strip punctuation and stop words (articles, prepositions, auxiliary verbs, conjunctions, pronouns, negation), take first 4 remaining words, join with hyphens. Example: "Can the stockmarket swallow Anthropic, SpaceX and OpenAI?" → `stockmarket-swallow-anthropic-spacex`.
+1. Generate `{slug}` from `post.title`: lowercase, strip punctuation and stop words (articles, prepositions, auxiliary verbs, conjunctions, pronouns, negation), take first 4 remaining words, join with hyphens. Example: "Can the stockmarket swallow Anthropic, SpaceX and OpenAI?" → `stockmarket-swallow-anthropic-spacex`.
+2. Create `{outputDir}/{postId}-{slug}/` (fail → terminate silently).
+3. Write unified JSON to `{outputDir}/{postId}-{slug}/01-raw-data.json` (fail → terminate silently).
 4. If `config.fetchOriginalPost === true` and `post.url` exists: fetch via Jina (`https://r.jina.ai/{post.url}`, fallback `https://r.jinaai.cn/{post.url}`), extract first 3 paragraphs as background. On failure → output "原文抓取失败，将从评论推断背景".
 5. If `comments` array is empty → output "该帖子暂无评论" → terminate.
 
@@ -111,7 +111,7 @@ Read `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for outp
 
 **Overflow handling**: If >40 comments, batch into ~20, group each batch, merge by group name, deduplicate `commentIds`.
 
-Write to `{outputDir}/{postId}/02-grouped.json`.
+Write to `{outputDir}/{postId}-{slug}/02-grouped.json`.
 
 ---
 
@@ -124,7 +124,7 @@ Max 3 rounds. Passing threshold: Overall Score >= 8.0.
 Each round:
 
 1. Generate (round 1) or revise (rounds 2-3) the article using template from `{skill-dir}/assets/article-{templateVersion}.md`, grouped data, post metadata, filtered comments, and original post content (if fetched).
-2. Write to `{outputDir}/{postId}/article-draft-round{N}.md`.
+2. Write to `{outputDir}/{postId}-{slug}/article-draft-round{N}.md`.
 3. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-article-prompt.md`. Subagent reads: draft + `01-raw-data.json` + `02-grouped.json`. Writes: `evaluation-article-round{N}.md`.
 4. Overall Score >= 8.0 → PASS → copy draft to `03-article.md` → Step 9. Score < 8.0 → track as best candidate → next round.
 
@@ -167,20 +167,20 @@ Proceed to Step 11 regardless.
 
 1. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-readability-prompt.md`. Reads `03-article.md`, writes `evaluation-readability.md`.
 2. If issues found → apply fixes, overwrite `03-article.md`.
-3. Copy `03-article.md` to `{outputDir}/{postId}/final-{slug}-{postId}.md` (overwrite if exists).
+3. Copy `03-article.md` to `{outputDir}/{postId}-{slug}/final-{slug}-{postId}.md` (overwrite if exists).
 4. Do NOT clean up intermediate files.
 
 ---
 
 ## Step 12: Recommendation Summaries
 
-Read `{outputDir}/{postId}/03-article.md` as sole content source. Read `{skill-dir}/assets/recommendation-{config.templateVersion}.md` for style definitions (fallback to highest version if missing).
+Read `{outputDir}/{postId}-{slug}/03-article.md` as sole content source. Read `{skill-dir}/assets/recommendation-{config.templateVersion}.md` for style definitions (fallback to highest version if missing).
 
 Generate 11 summaries (5 styles × 2 variants + 1 TL;DR): Technical, Viral, Lively, News, Podcast (each ~100字/words + ~200字/words), plus TL;DR (30–50字/words). No evaluation subagent.
 
 **Rules**: Output in `config.lang`. Character counts: zh = Chinese characters (excluding punctuation/spaces), en = English words. Each style must be genuinely distinct. Each summary self-contained. Stay within ±10% of target.
 
-Write to `{outputDir}/{postId}/recommendation-{slug}-{postId}.md`.
+Write to `{outputDir}/{postId}-{slug}/recommendation-{slug}-{postId}.md`.
 
 **Terminal output**:
 1. "输出文件:" + all output file paths.

@@ -35,7 +35,7 @@ summarize what HN is saying in this post
 
 ## 输出
 
-每个帖子在 `{outputDir}/{postId}/` 下生成：
+每个帖子在 `{outputDir}/{postId}-{slug}/` 下生成：
 
 ```
 01-raw-data.json              # 原始统一 JSON
