@@ -70,4 +70,4 @@ Default: **Tech Blog**. Tech News is NOT penalized for lacking implementation de
 3. Only flag problems clearly present. No speculation about the original article.
 4. Internal consistency checks only — do NOT verify claims against external sources.
 5. Severity: **High** (score-defining), **Medium** (notable), **Low** (minor).
-6. **Verbatim check**: Verbatim markers must be inline within body text paragraphs (not in a standalone section) and formatted as ***bold italic***, per the Verbatim rule in `generate-summary-prompt.md`. If verbatim content is isolated in a separate section or lacks the correct formatting, flag as a Medium TD/EQ issue.
+6. **Verbatim check**: `[Verbatim]...[/Verbatim]` tags are intentional (consumed by the Step 7 translator) — do NOT flag their presence. Flag (Medium TD/EQ) only: (a) verbatim content isolated in a separate "quotes" section instead of inline in body paragraphs, or (b) verbatim content missing its `***...***` bold-italic wrapping.

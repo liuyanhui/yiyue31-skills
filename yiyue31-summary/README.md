@@ -6,7 +6,7 @@ Intelligent article summary generator supporting multiple templates.
 
 - **Multiple Templates** - Tech Article / Paper / Concise Notes (default)
 - **Intelligent Analysis** - Auto-detect article type, topic, terminology, highlights
-- **Quality Assurance** - Generate-Evaluate loops with scored evaluation, plus AI-tone and readability checks
+- **Quality Assurance** - Generate-Evaluate loops with scored evaluation, an AI-tone check, and a cold-reader audit gate
 - **Multiple Inputs** - URL, file path, direct paste
 
 ## Quick Start
@@ -42,8 +42,9 @@ digraph workflow {
     step2 [label="Step 2\nAnalyze Article\n(Generate-Evaluate Loop ×3)", fillcolor="#fff3e0"];
     step3 [label="Step 3\nTemplate Selection", fillcolor="#e8f5e9"];
     step4 [label="Step 4\nGenerate & Polish Summary\n(Generate-Evaluate Loop ×5)", fillcolor="#fff3e0"];
-    step5 [label="Step 5\nReader Experience Check\n(AI tone + readability, ×5)", fillcolor="#fff3e0"];
-    step6 [label="Step 6\nTranslate to Chinese", fillcolor="#e8f5e9"];
+    step5 [label="Step 5\nAI Tone Check (×5)", fillcolor="#fff3e0"];
+    step6 [label="Step 6\nReader Audit\n(3 cold readers + editor, ×5)", fillcolor="#fff3e0"];
+    step7 [label="Step 7\nTranslate to Chinese", fillcolor="#e8f5e9"];
     done [label="Done → final-{title}.md\n+ translated-{title}-zh.md", shape=ellipse, fillcolor="#c8e6c9"];
 
     step1 -> step2;
@@ -51,7 +52,8 @@ digraph workflow {
     step3 -> step4;
     step4 -> step5;
     step5 -> step6;
-    step6 -> done;
+    step6 -> step7;
+    step7 -> done;
 }
 ```
 
@@ -89,7 +91,7 @@ digraph loop {
 }
 ```
 
-> Step 5 (Reader Experience) uses a lighter detect-and-fix pattern — each round runs the AI-tone and readability checks, applies all suggested fixes, and repeats until both come back clean (max 5 rounds). No score threshold.
+> Steps 5 and 6 use a lighter detect-and-fix pattern — each round checks, applies all fixes, and repeats until the report(s) come back clean (max 5 rounds). No score threshold. Step 5 (AI tone) runs one check; Step 6 (reader audit) runs 3 parallel cold readers per round and a full-context editor applies the fixes.
 
 ### Loop Parameters per Step
 
@@ -97,9 +99,10 @@ digraph loop {
 | ----- | ----- | ---------- | ------- | ------ |
 | Step 2 | Analysis | 3 | — | `analysis-{title}.md` |
 | Step 4 | Summary | 5 | 30 min | `summary-{title}.md` |
-| Step 5 | Reader Experience | 5 | — | `final-{title}.md` |
+| Step 5 | AI Tone | 5 | — | `tone-polished-{title}.md` |
+| Step 6 | Reader Audit | 5 | — | `final-{title}.md` |
 
-Steps 3 (template selection) and 6 (translation) are not loops.
+Steps 3 (template selection) and 7 (translation) are not loops.
 
 ## Output Files
 
@@ -113,9 +116,10 @@ Steps 3 (template selection) and 6 (translation) are not loops.
   ├── evaluation-round{N}-{title}.md            # Summary eval reports (Step 4)
   ├── summary-{title}.md                        # Best summary (Step 4 output)
   ├── evaluation-ai-tone-round{N}-{title}.md    # AI tone reports (Step 5)
-  ├── evaluation-readability-round{N}-{title}.md # Readability reports (Step 5)
-  ├── final-{title}.md                          # Final summary (Step 5 output)
-  └── translation/                              # Chinese translation (Step 6)
+  ├── tone-polished-{title}.md                  # Tone-polished summary (Step 5 output)
+  ├── evaluation-reader-audit-round{N}-{profile}-{title}.md # Cold-reader reports (Step 6)
+  ├── final-{title}.md                          # Final summary (Step 6 output)
+  └── translation/                              # Chinese translation (Step 7)
       └── translated-{title}-zh.md
 ```
 

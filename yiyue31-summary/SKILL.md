@@ -1,7 +1,7 @@
 ---
 name: yiyue31-summary
 description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization.
-version: 2.2.0
+version: 2.2.1
 ---
 
 # Tech Article Summarizer
@@ -13,7 +13,7 @@ Article summary generator for summarizing technical articles, blog posts, resear
 ## Requirements
 - Except for direct human quotes, avoid overly colloquial language during summarization. Maintain a professional, clear, and concise style.
 - Summarize from the reader's perspective, not the author's. Readers want to quickly grasp key information, not reconstruct the author's writing process.
-- **Output language**: Generate the summary in English regardless of the source article's language. The Chinese version is produced in Step 6. (The Step 2 analysis may follow the source language; the summary itself stays English so the Steps 4-5 quality checks apply consistently.)
+- **Output language**: Generate the summary in English regardless of the source article's language. The Chinese version is produced in Step 7. (The Step 2 analysis may follow the source language; the summary itself stays English so the Steps 4-6 quality checks apply consistently.)
 ---
 ## Directory
 
@@ -57,11 +57,9 @@ Repeatedly generate (or revise) an artifact and score it until the score meets t
 - `{best-file}`: Where to copy the best result (e.g. `{title}/summary/{type}-{title}.md`)
 - `{max-rounds}`: Round cap
 - `{threshold}`: Passing score, default 8.0
-- `{timeout-check}` (optional): A command run at the start of each round; if it reports `"expired": true`, stop early and keep the best-so-far
 
 **Procedure:**
 1. **Each round N (1..{max-rounds}):**
-   - (If `{timeout-check}`) run it; if expired, copy the best-so-far round to `{best-file}` and stop.
    - Generate/revise via `{generate-prompt}`: round 1 produces a fresh draft from `{generate-inputs}`; later rounds revise the previous round to resolve every item in the previous `{eval-file}`. Save to `{round-file}`.
    - Evaluate (same pattern as **Evaluate Once**): call subagent with `{eval-prompt}`, save report to `{eval-file}`.
    - Extract total score:
@@ -140,27 +138,51 @@ Run a **Generate-Evaluate Loop** with these parameters:
 - `{best-file}`: `{title}/summary/summary-{title}.md`
 - `{max-rounds}`: 5
 - `{threshold}`: 8.0
-- `{timeout-check}`: at loop start `node {skill-dir}/scripts/timer.js start --tag {title}`; at the start of each round `node {skill-dir}/scripts/timer.js check --tag {title} --timeout 1800` (30 min)
 
 Each round, also run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-round{N}-{title}.md` to display word count (advisory).
 
 On PASS or rounds-exhausted → proceed to Step 5.
 
-### Step 5: Reader Experience Check (max 5 rounds)
+### Step 5: AI Tone Check (max 5 rounds)
 
-Detect and fix reader-facing issues — AI-generated tone artifacts and readability problems — in a single loop. Each round runs both checks on the current summary, then applies all suggested fixes; the loop ends when both reports come back clean. (The prior Step 6 AI tone and Step 7 readability are merged here — both are detect-fix passes over the same final text, so running them together avoids a redundant pass.)
+Detect and fix AI-generated tone artifacts in the summary. Each round checks tone on the current summary and applies the suggested fixes; the loop ends when the tone report comes back clean.
+
+**Input:** `{title}/summary/summary-{title}.md` (from Step 4). **Output:** `{title}/summary/tone-polished-{title}.md`.
 
 **Loop procedure:**
-1. **Each round**:
+1. **Each round N (1..5)**:
    - AI tone check: call subagent with `{skill-dir}/references/evaluate-ai-tone-prompt.md`, providing the current summary as input. Save report to `{title}/summary/evaluation-ai-tone-round{N}-{title}.md`.
-   - Readability check: call subagent with `{skill-dir}/references/evaluate-readability-prompt.md`, providing the same current summary as input. Save report to `{title}/summary/evaluation-readability-round{N}-{title}.md`.
-   - If both reports indicate no issues → copy current summary to `{title}/summary/final-{title}.md` → Step 6.
-   - Otherwise: parse all issues from both reports and apply the suggested fixes to the summary, next round.
-2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/final-{title}.md`, inform user that some reader-experience issues may remain → Step 6.
+   - If the report indicates no issues → copy current summary to `{title}/summary/tone-polished-{title}.md` → Step 6.
+   - Otherwise: parse the issues and apply the suggested fixes to the working summary, next round.
+2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/tone-polished-{title}.md`, inform user that some AI-tone issues may remain → Step 6.
 
-**Note:** Fixes are applied to the working summary and carried across rounds; intermediate rounds are not saved as separate files (unlike Steps 2/4). Only the final result is written to `final-{title}.md`. Each round's evaluation reports are still saved.
+**Note:** Fixes are applied to the working summary and carried across rounds; intermediate rounds are not saved as separate files (unlike Steps 2/4). Only the final result is written to `tone-polished-{title}.md`. Each round's evaluation report is still saved.
 
-### Step 6: Translate Summary to Chinese
+### Step 6: Reader Audit (max 5 rounds)
+
+The final quality gate before translation. Cold readers — who see ONLY the summary, never the original article — read it sentence by sentence and report where they get stuck. They report **phenomena only, never fixes**: a real reader knows where they are confused, not how to rewrite the text. A full-context editor then resolves every reported phenomenon. The loop repeats with a fresh batch of cold readers each round until none reports a **blocking comprehension problem**.
+
+**Blocking vs. look-up-able (important for dense/technical summaries):** readers distinguish *blocking* comprehension problems from *look-up-able* domain vocabulary (see `evaluate-reader-audit-prompt.md` for the full taxonomy). Only blocking problems converge the loop; look-up-able terms are expected in a specialist summary and are listed for completeness, not fixed.
+
+**Why summary-only readers:** a real reader of the summary has no original article. Giving readers the original lets them fill gaps from memory and miss the gaps a real reader hits. The editor, by contrast, gets full context (original + analysis) so it can fix correctly. This reader/editor asymmetry is the core of the step: the reader is deliberately limited to surface real blind spots; the editor is fully informed to fix them well.
+
+**Input:** `{title}/summary/tone-polished-{title}.md` (from Step 5). **Output:** `{title}/summary/final-{title}.md`.
+
+**Loop procedure:**
+1. **Each round N (1..5)**:
+   - Spawn **3 cold readers in parallel**, each a subagent with `{skill-dir}/references/evaluate-reader-audit-prompt.md` and a distinct reader profile. Each receives ONLY the current summary — never the original article or analysis. Profiles:
+     - `non-expert` — curious reader with no domain background; flags jargon and unexplained terms.
+     - `skim-reader` — busy, reads once and will not re-read; flags dense sentences, weak transitions, structural confusion.
+     - `non-native` — non-native English reader with limited vocabulary; flags idioms, complex grammar, ambiguous references.
+   - Save each reader's report to `{title}/summary/evaluation-reader-audit-round{N}-{profile}-{title}.md`.
+   - **Aggregate:** collect and dedupe all **blocking** phenomena across the 3 reports.
+   - If no reader reports a blocking comprehension problem → copy current summary to `{title}/summary/final-{title}.md` → Step 7.
+   - Otherwise: act as **editor**. For each blocking phenomenon, decide and apply a fix using the full context — current summary + original article `{title}/summary/original-{title}.md` + analysis `{title}/summary/analysis-{title}.md`. Apply all fixes to the working summary. Next round.
+2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/final-{title}.md`, inform user that some reader-experience issues may remain → Step 7.
+
+**Note:** Like Step 5, fixes are applied to the working summary and carried across rounds; intermediate rounds are not saved as separate summary files. Only the final result is written to `final-{title}.md`. Each round's reader reports are still saved. Subagents are stateless, so every round is a genuinely fresh cold read — the convergence criterion is "any batch of new readers hits no blocking comprehension problem," not a fixed round count.
+
+### Step 7: Translate Summary to Chinese
 
 Translate the final summary into Chinese.
 
@@ -173,7 +195,7 @@ Translate the final summary into Chinese.
 2. After translation completes, copy the entire `{title}/translation/` directory to `{title}/summary/translation/`.
 3. **Verify verbatim preservation** on `{title}/summary/translation/translated-{title}-zh.md`:
    - Zero literal `[Verbatim]`/`[/Verbatim]` tags remain (tags were stripped).
-   - Every original-text entry from the analysis Quotes table appears in the translation (the English original is preserved as the parenthetical half of each pair).
+   - Every `[Verbatim]...[/Verbatim]` item present in the English summary appears in the translation, with the English original preserved as the parenthetical half of each `***中文译文（English original）***` pair. Note: the summary typically uses a subset of the analysis Quotes table, so verify against the summary's actual verbatim markers, not the full Quotes table.
    - If either fails → re-invoke the translator with the failures listed, or inform the user of the gap.
 4. Inform the user of both file paths:
    - Original summary: see Input above
