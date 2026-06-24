@@ -9,6 +9,9 @@ Quality constraints for recommendation generation:
 - Each style must be distinctly different in tone and structure, not just a rephrase of the same sentences.
 - No markdown formatting within summary text (no bold, no links, no headings, no bullet points).
 - Each summary must be self-contained and understandable without having read the full article.
+- Timestamp: immediately AFTER the H1 (and before any summary section), add a `<small>` line:
+  zh → `<small>讨论截至：{latestCommentAt}</small>`   en → `<small>Discussion as of: {latestCommentAt}</small>`
+  Value = 01-raw-data.json top-level `latestCommentAt`. Omit the line if null. (This line is outside the summaries, so the "no markdown in summary text" rule still holds.)
 
 Section names by language:
   zh → en
@@ -21,6 +24,8 @@ Section names by language:
 -->
 
 # 推荐摘要 / Recommendation Summaries
+
+<small>讨论截至：{latestCommentAt}</small>
 
 ## 技术风格 / Technical
 

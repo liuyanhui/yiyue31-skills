@@ -1,70 +1,33 @@
 <!--
-Quality constraints for article generation:
-- Preserve ALL distinct viewpoints. Do not merge or discard differing opinions.
-- After generating, self-check: are there any important viewpoints from the comments that were omitted?
-- Write naturally. Vary punctuation (commas, colons, parentheses, separate sentences); avoid em dashes (—)
-  for mid-sentence additions. No template openings/closings (e.g., "在当今快速发展的时代").
-- When target language differs from comment source language, express ideas natively in the target language.
-  Do not translate sentence-by-sentence. Restructure for natural flow.
-- Only content from the provided comments. Do not fabricate or add external knowledge.
-- Section names must follow config.lang: use the Chinese or English column below.
+Generation constraints (read before writing the article):
+- Source fidelity: preserve ALL distinct viewpoints — do not merge or discard differing opinions. Use ONLY content from the provided comments; no fabrication or external knowledge. After writing, self-check for omitted viewpoints.
+- Tone: write naturally with varied punctuation (commas, colons, parentheses, separate sentences) — no em dashes (—) for mid-sentence additions, no template openings/closings (e.g., "在当今快速发展的时代"). When the target language differs from the source, express natively — do not translate sentence-by-sentence.
+- Section names follow config.lang (see the language table below).
 
-Citation rules:
-- Do NOT use commenter usernames as attribution. Replace with generic references:
-  "有评论者认为……""另一方指出……""支持方认为……""反对方则认为……"
-- Only name a commenter when quoting their exact words AND the quote is a key insight worth preserving.
-  Even then, prefix with context: "一位金融背景的评论者 augstein 引用 Hedgeye 分析称……"
+Citation:
+- No commenter usernames as attribution — use generic references ("有评论者认为……""支持方认为……").
+- Name a commenter only when quoting their exact, key-insight words, prefixed with context ("一位金融背景的评论者 augstein 引用 Hedgeye 分析称……").
 
-Jargon rules:
-- Financial/technical terms must be explained on first use with a brief parenthetical or appositive.
-  Example: "S&P 500（标普500指数，大量基金跟踪它）""401k（美国个人退休账户）"
-- If a term can be replaced with plain language without losing meaning, do that instead.
+Jargon:
+- Explain financial/technical terms on first use with a brief parenthetical/appositive ("S&P 500（标普500指数）""401k（美国个人退休账户）"), or replace with plain language if meaning is preserved.
 
-Paragraph rules:
-- Each paragraph covers ONE idea or ONE angle. If a paragraph exceeds 5 sentences, split it.
-- Between subsections (###), include a transition sentence explaining how the next topic relates to the previous one.
+Paragraph & background:
+- One idea per paragraph; split any paragraph over 5 sentences. Between subsections (###), add a transition sentence linking the next topic to the previous.
+- Background: open with a reader-stakes hook ("如果你有退休金账户……"), then context. Keep to 3–4 sentences (~100 words). Give large numbers a reference point ("$965B 估值，接近瑞典全年 GDP").
 
-Background rules:
-- Open with a sentence that connects the topic to the reader's interest or stakes.
-  Example: "如果你有退休金账户，这些公司的上市可能直接影响你的投资。"
-- Then provide context (what the post is about, why it matters).
-- Keep background to 3-4 sentences (~100 words).
-- If the article involves large numbers, provide a reference point. Example: "$965B 估值——接近瑞典全年 GDP"。
+Controversy (conditional):
+- If viewpoints oppose: identify the ROOT of the disagreement, not just "X says A, Y says B." ("分歧的本质在于：……"). If one-sided: state the consensus and note dissenting nuances.
 
-Controversy rules (conditional):
-- If opposing viewpoints exist: identify the ROOT of the disagreement, not just "X says A, Y says B."
-  Example: "分歧的本质在于：指数基金的职责到底是被动跟踪市场，还是保护被动投资者？"
-- If the discussion is one-sided: state the consensus and note any dissenting nuances.
+Aggregation voice (anti-AI-texture — the strongest tells in a multi-viewpoint digest):
+- Do NOT stack "pendulum" sentences that symmetrically recite opposing sides ("有评论者认为……另一方则指出……" / "Some think X, while others argue Y."). Land on the concrete disagreement instead of a balanced restatement. (Reinforces the Controversy rule.)
+- Do NOT open group sections with meta-narration ("第一组讨论了……" / "Group A discusses..."). The heading names the topic — open with the viewpoint itself. Vary how viewpoints are introduced across sections.
 
-Aggregation voice rules (anti-AI-texture — the strongest AI tells in a multi-viewpoint digest):
-- Do NOT stack "pendulum" sentences that symmetrically recite opposing sides: "有评论者认为……另一方则指出……" / "Some think X, while others argue Y." Repeating this X-vs-Y shape across sections is the most obvious AI-texture tell. When viewpoints oppose, land on the concrete disagreement — what exactly is contested and why — instead of a balanced restatement. (This reinforces the Controversy rule above.)
-- Do NOT open group sections (###) with meta-narration about the group itself: "第一组讨论了……" / "第二组聚焦于……" / "Group A discusses..." The heading already names the topic — open the section with the viewpoint itself.
-- Vary how viewpoints are introduced across sections. Mix direct claims, contrasts, and quoted insights instead of repeating the same "评论者指出……" template in every paragraph.
+Sharp viewpoints & quotes:
+- Wrap sharp/counter-intuitive points in **bold** (1–3 per section, only when they genuinely reframe understanding).
+- Quote exact words sparingly (≤1–2 per section) as **{translated text}（{original text}）**. Skip the parenthetical when lang matches source. Full-width （） in Chinese, half-width () in English.
 
-Sharp viewpoint rules:
-- When a group's summary or a comment contains a sharp, counter-intuitive, or particularly
-  insightful point, wrap it with **bold** in the article text.
-  Example: "指数基金的本质问题不在于费用，而在于**它们让资本失去了惩罚坏公司的能力**。"
-- Keep bold highlights to 1–3 per section. Too many bold lines dilute the effect; too few
-  makes the article feel flat. Apply bold only when the point genuinely surprises or reframes
-  the reader's understanding.
-
-Original quote rules:
-- When quoting a commenter's exact words that are sharp or important, format as:
-  **{translated text in article language}**（{original text}）
-  Example (zh article, en source): **指数基金让资本失去了惩罚坏公司的能力**（index funds have stripped capital of the ability to punish bad companies）
-  Example (en article, en source): **index funds have stripped capital of the ability to punish bad companies**
-- When config.lang matches the source language (e.g., both "en"), skip the parenthetical — just use **bold**.
-- Use original quotes sparingly: at most 1–2 quotes per group section. Only quote when the
-  original wording is significantly more impactful than any paraphrase would be.
-- Use full-width parentheses （）for the original-text parenthetical in Chinese articles;
-  use half-width () in English articles.
-
-Summary rules:
-- Do NOT end with "讨论没有达成共识" or equivalent — this provides no value.
-- The summary must give the reader something beyond a recap:
-  an unanswered question worth watching, a practical implication, or a higher-level observation.
-- If the title poses a question, the summary should address it (even if the answer is "it depends, and here's what it depends on").
+Summary:
+- Do NOT end with "讨论没有达成共识" or equivalent. Give something beyond a recap: an unanswered question, a practical implication, or a higher-level observation. If the title poses a question, address it.
 -->
 
 <!-- Section names by language:

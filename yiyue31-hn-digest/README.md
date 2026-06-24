@@ -105,6 +105,10 @@ bun test
 
 ## Changelog
 
+- **0.0.6**（2026-06-24）：followups
+  - 修复 `error-scenarios.test.ts` 4 个过期断言（对齐当前 SKILL.md 措辞；行为不变）
+  - `article-v1.md` 生成指令注释块精简去冗，与 `evaluate-article-prompt.md` 的重叠减少
+  - `recommendation-v1.md` 推荐摘要文档也加 `latestCommentAt` 时间戳行
 - **0.0.5**（2026-06-24）：AI 痕迹治理（C 档）
   - 新增 `references/evaluate-reader-audit-prompt.md`：3 个冷读读者（普通/略读/门外汉或 non-native）只读文章报告卡壳点，并入 Step 11 成为 11.2 读者审计（最多 3 轮，主 agent 拿全上下文修复）
   - 合并 summary 的 3 类 AI 语气模式（虚假互动/讨好全受众/空头承诺）进 `evaluate-ai-tone-prompt.md`，并强化"推销词"纳入空泛强化词

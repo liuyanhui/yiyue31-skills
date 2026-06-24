@@ -157,8 +157,8 @@ describe("Error Scenario 3: Corrupted cache file rule in SKILL.md", () => {
   test("SKILL.md describes corrupted cache detection behavior", () => {
     const skillContent = readFileSync(SKILL_MD_PATH, "utf-8");
 
-    // Rule: "Cache hit + invalid JSON" must be described
-    expect(skillContent).toContain("invalid JSON");
+    // Rule: corrupted cache detection must be described (current wording: "Corrupted")
+    expect(skillContent).toContain("Corrupted");
 
     // Rule: corrupted cache triggers re-fetch
     expect(
@@ -190,8 +190,8 @@ describe("Error Scenario 4: Malformed config.json rule in SKILL.md", () => {
   test("SKILL.md describes using defaults for malformed config", () => {
     const skillContent = readFileSync(SKILL_MD_PATH, "utf-8");
 
-    // Rule: malformed JSON in config triggers default usage
-    expect(skillContent).toContain("malformed JSON");
+    // Rule: malformed JSON in config triggers default usage (current wording: "Malformed JSON")
+    expect(skillContent).toContain("Malformed JSON");
 
     // Rule: defaults are used when config is invalid
     expect(
@@ -213,8 +213,8 @@ describe("Error Scenario 4: Malformed config.json rule in SKILL.md", () => {
   test("SKILL.md describes config merge priority", () => {
     const skillContent = readFileSync(SKILL_MD_PATH, "utf-8");
 
-    // CLI > config.json > built-in defaults
-    expect(skillContent).toContain("CLI arguments > config.json > built-in defaults");
+    // CLI > config.json > built-in defaults (current wording)
+    expect(skillContent).toContain("CLI args > config.json > defaults");
   });
 });
 
@@ -352,8 +352,8 @@ describe("Error Scenario 7: All fetch methods fail for invalid postId", () => {
         "utf-8"
       );
 
-      // Must describe "All Methods Exhausted" section
-      expect(skillContent).toContain("All Methods Exhausted");
+      // Must describe the all-methods-exhausted behavior (current wording)
+      expect(skillContent).toContain("All methods exhausted");
 
       // Must say to terminate without generating output files
       expect(
@@ -361,10 +361,8 @@ describe("Error Scenario 7: All fetch methods fail for invalid postId", () => {
           skillContent.includes("terminate")
       ).toBe(true);
 
-      // Must NOT generate output files on total failure
-      expect(
-        skillContent.includes("Do NOT generate any output files")
-      ).toBe(true);
+      // Must specify the exhausted-path output message (current spec wording)
+      expect(skillContent.includes("所有抓取方式均失败")).toBe(true);
     }
   );
 });

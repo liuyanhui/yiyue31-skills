@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Use when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID. Transforms a Hacker News discussion thread into a structured article with grouped viewpoints, controversies, and multi-style recommendation summaries.
-version: 0.0.5
+version: 0.0.6
 author: yiyue31
 ---
 
@@ -207,7 +207,7 @@ Read `{outputDir}/{postId}-{slug}/03-article.md` as sole content source. Read `{
 
 Generate 11 summaries (5 styles × 2 variants + 1 TL;DR): Technical, Viral, Lively, News, Podcast (each ~100字/words + ~200字/words), plus TL;DR (30–50字/words). No evaluation subagent.
 
-**Rules**: Output in `config.lang`. Character counts: zh = Chinese characters (excluding punctuation/spaces), en = English words. Each style must be genuinely distinct. Each summary self-contained. Stay within ±10% of target.
+**Rules**: Output in `config.lang`. Character counts: zh = Chinese characters (excluding punctuation/spaces), en = English words. Each style must be genuinely distinct. Each summary self-contained. Stay within ±10% of target. Add a `<small>` timestamp line right after the H1 (zh `讨论截至：{latestCommentAt}` / en `Discussion as of: {latestCommentAt}`) from `01-raw-data.json`'s `latestCommentAt`; omit if null.
 
 Write to `{outputDir}/{postId}-{slug}/recommendation-{slug}-{postId}.md`.
 
