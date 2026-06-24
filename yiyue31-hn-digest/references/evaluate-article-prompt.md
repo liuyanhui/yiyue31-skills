@@ -71,6 +71,7 @@ Is the article well-written for a general audience?
 - **Summary value**: Does the summary provide value beyond a recap? (Anti-pattern: "讨论没有共识" — provide an unanswered question, practical implication, or higher-level observation instead.)
 - **Sharp viewpoint highlighting**: Mark sharp/counter-intuitive viewpoints with **bold**. Format important original quotes as **{translated text}**（{original text}）（when lang differs from source; full-width （） in zh, half-width () in en）. Keep bold to 1–3 per section and quotes to 1–2 per section.
 - **Controversy depth**: Identify the ROOT of disagreements, not just "X says A, Y says B."
+- **Aggregation voice**: Does the article avoid the AI-texture tells of a digest? (a) No stacked "pendulum" sentences that symmetrically recite opposing sides across sections ("有评论者认为……另一方指出……" / "Some think X, while others argue Y."). (b) No meta-narration group openings ("第一组讨论了……" / "Group A discusses...") — sections open with the viewpoint itself, since the heading already names the topic. Deduct when these patterns dominate the prose.
 
 - 10: All checks pass. Reads like a well-edited publication piece.
 - 7–9: Most checks pass, 1-2 minor issues.

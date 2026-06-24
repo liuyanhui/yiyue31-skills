@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Use when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID. Transforms a Hacker News discussion thread into a structured article with grouped viewpoints, controversies, and multi-style recommendation summaries.
-version: 0.0.3
+version: 0.0.5
 author: yiyue31
 ---
 
@@ -74,6 +74,8 @@ For each method: output "正在获取数据... (使用 {Method} 方式)". On suc
 
 **Jina normalization**: Parse markdown → extract title, author, comments → build unified JSON (each comment: `id`, `author`, `parentId: null`, `childIds: []`, `depth: 0`, `contentMarkdown`). Validate: `post.title` non-empty and `comments` array exists.
 
+**`latestCommentAt`**: The unified JSON top level carries `latestCommentAt` — the ISO 8601 UTC timestamp of the newest comment, set by the fetch scripts. Step 8 renders it in the article as the discussion snapshot time. (Jina path: leave it `null`; the article then omits the timestamp line.)
+
 All methods exhausted → output "所有抓取方式均失败: {methods + reasons}" → terminate.
 
 ---
@@ -137,7 +139,8 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 3. **Background**: Use fetched original content if available; otherwise infer from title + comments.
 4. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
 5. **Disclaimer** (critical): Preserve the `<small>` disclaimer line exactly as-is. Do NOT reword, move, or remove.
-6. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
+6. **Timestamp**: Immediately after the disclaimer `<small>` line, add a `<small>` line with the discussion snapshot time = `01-raw-data.json` top-level `latestCommentAt`. zh: `讨论截至：{latestCommentAt}`; en: `Discussion as of: {latestCommentAt}`. If `latestCommentAt` is null, omit the line.
+7. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
 
 ---
 
@@ -163,12 +166,38 @@ Proceed to Step 11 regardless.
 
 ---
 
-## Step 11: Readability Check + Final Output
+## Step 11: Readability Check + Reader Audit + Final Output
+
+### 11.1 Readability Check
 
 1. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-readability-prompt.md`. Reads `03-article.md`, writes `evaluation-readability.md`.
 2. If issues found → apply fixes, overwrite `03-article.md`.
-3. Copy `03-article.md` to `{outputDir}/{postId}-{slug}/final-{slug}-{postId}.md` (overwrite if exists).
-4. Do NOT clean up intermediate files.
+
+### 11.2 Reader Audit (max 3 rounds)
+
+Cold readers — who see ONLY `03-article.md`, never the raw comments or grouped data — read it sentence by sentence and report where they get stuck. They report **phenomena only, never fixes**. You then act as editor with full context to resolve every **blocking** comprehension problem. The loop ends when no reader reports a blocking problem.
+
+**Why article-only readers:** a real reader of the digest has no original thread. Giving readers the raw/grouped data lets them fill gaps from memory and miss the gaps a real reader hits. You, the editor, get full context (`01-raw-data.json` + `02-grouped.json`) so you can fix correctly — this reader/editor asymmetry is the core of the step.
+
+**Distinguishing blocking vs look-up-able:** readers separate blocking problems (the article's own ungrounded concepts) from look-up-able domain vocabulary (tool names, jargon any reader of the topic would look up). Only blocking problems converge the loop; look-up-able terms are expected in a specialist digest and are ignored here.
+
+**Loop procedure:**
+1. **Each round N (1..3)**:
+   - Spawn **3 cold readers in parallel**, each a subagent with `{skill-dir}/references/evaluate-reader-audit-prompt.md` and a distinct profile. Each receives ONLY `03-article.md`. Profiles follow `config.lang`:
+     - zh: `普通读者` / `略读读者` / `门外汉`
+     - en: `casual-reader` / `skim-reader` / `non-native`
+   - Save each report to `{outputDir}/{postId}-{slug}/evaluation-reader-audit-round{N}-{profile}.md`.
+   - **Aggregate:** collect and dedupe all **blocking** phenomena across the 3 reports (ignore look-up-able domain terms).
+   - No reader reports a blocking problem → **PASS** → proceed to 11.3.
+   - Otherwise: act as **editor**. For each blocking phenomenon, decide and apply a fix using full context — current `03-article.md` + `01-raw-data.json` + `02-grouped.json`. Overwrite `03-article.md`. Next round.
+2. **Rounds exhausted (3 rounds)**: keep `03-article.md`, output "部分读者体验问题可能残留".
+
+**Boundary:** readers report comprehension problems only. AI-tone/style are handled in Step 9; readability mechanics in 11.1. Do not let this step duplicate those.
+
+### 11.3 Final Output
+
+1. Copy `03-article.md` to `{outputDir}/{postId}-{slug}/final-{slug}-{postId}.md` (overwrite if exists).
+2. Do NOT clean up intermediate files.
 
 ---
 

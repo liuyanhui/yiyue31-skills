@@ -26,6 +26,7 @@ interface FetchMeta {
   skippedDeleted: number;
   skippedDead: number;
   maxDepthReached: boolean;
+  latestTime: number;
 }
 
 async function fetchItem(id: number): Promise<FirebaseItem | null> {
@@ -75,6 +76,11 @@ async function fetchCommentTree(
     if (item.dead) {
       meta.skippedDead++;
       continue;
+    }
+
+    // Track latest live-comment timestamp (unix seconds)
+    if (item.time && item.time > meta.latestTime) {
+      meta.latestTime = item.time;
     }
 
     // Recurse into children
@@ -147,6 +153,7 @@ async function main(): Promise<void> {
     skippedDeleted: 0,
     skippedDead: 0,
     maxDepthReached: false,
+    latestTime: 0,
   };
 
   const commentTrees = postItem.kids
@@ -174,6 +181,7 @@ async function main(): Promise<void> {
   // Build unified output
   const output = {
     source: "firebase",
+    latestCommentAt: meta.latestTime ? new Date(meta.latestTime * 1000).toISOString() : null,
     post: {
       id: String(postItem.id),
       title: postItem.title,

@@ -29,7 +29,7 @@ summarize what HN is saying in this post
 
 ## 工作流程
 
-1. 解析输入 → 2. 加载配置 → 3. 检查缓存 → 4. 抓取并缓存数据 → 5. 准备输出并校验 → 6. 过滤评论 → 7. 分组 → 8. 生成文章（最多 3 轮 generate-evaluate）→ 9. AI 语气检查 → 10. 翻译腔检查（条件）→ 11. 可读性检查 + 最终输出 → 12. 推荐摘要 → `03-article.md` + `recommendation-*.md`
+1. 解析输入 → 2. 加载配置 → 3. 检查缓存 → 4. 抓取并缓存数据 → 5. 准备输出并校验 → 6. 过滤评论 → 7. 分组 → 8. 生成文章（最多 3 轮 generate-evaluate）→ 9. AI 语气检查 → 10. 翻译腔检查（条件）→ 11. 可读性检查 + 读者审计 + 最终输出 → 12. 推荐摘要 → `03-article.md` + `recommendation-*.md`
 
 主流程见 [SKILL.md](./SKILL.md)。
 
@@ -38,7 +38,7 @@ summarize what HN is saying in this post
 每个帖子在 `{outputDir}/{postId}-{slug}/` 下生成：
 
 ```
-01-raw-data.json              # 原始统一 JSON
+01-raw-data.json              # 原始统一 JSON（顶层含 latestCommentAt 时间戳）
 02-grouped.json               # 分组结果
 03-article.md                 # 最终文章
 recommendation-{slug}-{postId}.md  # 多风格推荐摘要
@@ -64,6 +64,7 @@ hn-digest/
 │   ├── evaluate-article-prompt.md
 │   ├── evaluate-ai-tone-prompt.md
 │   ├── evaluate-translationese-prompt.md
+│   ├── evaluate-reader-audit-prompt.md
 │   └── evaluate-readability-prompt.md
 ├── assets/                   # 输出模板
 │   ├── article-v1.md
@@ -104,6 +105,14 @@ bun test
 
 ## Changelog
 
+- **0.0.5**（2026-06-24）：AI 痕迹治理（C 档）
+  - 新增 `references/evaluate-reader-audit-prompt.md`：3 个冷读读者（普通/略读/门外汉或 non-native）只读文章报告卡壳点，并入 Step 11 成为 11.2 读者审计（最多 3 轮，主 agent 拿全上下文修复）
+  - 合并 summary 的 3 类 AI 语气模式（虚假互动/讨好全受众/空头承诺）进 `evaluate-ai-tone-prompt.md`，并强化"推销词"纳入空泛强化词
+  - `article-v1.md` 新增聚合语气生成规则：禁钟摆式对立复述、禁元叙述式分组开头
+  - `evaluate-article-prompt.md` Writing Quality 维度新增"聚合语气"反向检查，让 Step 8 生成循环在源头压住模式
+- **0.0.4**（2026-06-24）：时间戳
+  - 抓取脚本在统一 JSON 顶层写入 `latestCommentAt`（最新评论的 ISO 8601 UTC 时间）
+  - 文章在免责声明下方新增 `<small>` 时间戳行，标注讨论截至时间（Generation Rule 6）
 - **0.0.3**（2026-06-09）：标题前缀 + 推荐摘要
   - 文章 H1 标题强制以 `[Hacker News]` 开头（Generation Rule 7 + 评估检查）
   - 新增 Step 12：工作流结束后自动生成多风格推荐摘要文档（技术/爆款/活泼/新闻/播客口播/极简一句话，共 11 段）

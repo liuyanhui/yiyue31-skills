@@ -37,6 +37,19 @@ function convertAlgoliaTreeToCommentNode(child: AlgoliaChild): CommentNode {
   };
 }
 
+// Latest comment timestamp across the tree. ISO 8601 strings sort chronologically.
+function latestCommentAt(children: AlgoliaChild[]): string | null {
+  const times: string[] = [];
+  const walk = (nodes: AlgoliaChild[]): void => {
+    for (const n of nodes) {
+      if (n.created_at) times.push(n.created_at);
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(children);
+  return times.length ? (times.sort().pop() ?? null) : null;
+}
+
 async function main(): Promise<void> {
   const input = process.argv[2];
   if (!input) {
@@ -113,6 +126,7 @@ async function main(): Promise<void> {
   // Build unified output
   const output = {
     source: "algolia",
+    latestCommentAt: latestCommentAt(data.children || []),
     post: {
       id: String(data.id),
       title: data.title,

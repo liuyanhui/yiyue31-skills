@@ -36,6 +36,11 @@ Controversy rules (conditional):
   Example: "分歧的本质在于：指数基金的职责到底是被动跟踪市场，还是保护被动投资者？"
 - If the discussion is one-sided: state the consensus and note any dissenting nuances.
 
+Aggregation voice rules (anti-AI-texture — the strongest AI tells in a multi-viewpoint digest):
+- Do NOT stack "pendulum" sentences that symmetrically recite opposing sides: "有评论者认为……另一方则指出……" / "Some think X, while others argue Y." Repeating this X-vs-Y shape across sections is the most obvious AI-texture tell. When viewpoints oppose, land on the concrete disagreement — what exactly is contested and why — instead of a balanced restatement. (This reinforces the Controversy rule above.)
+- Do NOT open group sections (###) with meta-narration about the group itself: "第一组讨论了……" / "第二组聚焦于……" / "Group A discusses..." The heading already names the topic — open the section with the viewpoint itself.
+- Vary how viewpoints are introduced across sections. Mix direct claims, contrasts, and quoted insights instead of repeating the same "评论者指出……" template in every paragraph.
+
 Sharp viewpoint rules:
 - When a group's summary or a comment contains a sharp, counter-intuitive, or particularly
   insightful point, wrap it with **bold** in the article text.
@@ -84,9 +89,20 @@ Summary rules:
     https://news.ycombinator.com/item?id={postId}
 -->
 
+<!--
+Timestamp rule:
+- Immediately AFTER the disclaimer <small> line, add a <small> line with the discussion snapshot time.
+- Value: 01-raw-data.json top-level `latestCommentAt` (newest comment, ISO 8601 UTC).
+- zh → 讨论截至：{latestCommentAt}   en → Discussion as of: {latestCommentAt}
+- If latestCommentAt is null, omit the line.
+- Do NOT modify the disclaimer line itself.
+-->
+
 # [Hacker News] {帖子标题 / Post Title}
 
 <small>本文由 Yiyue31 开发的 Skill 基于 Hacker News讨论总结而成，可能与原始评论存在差异，请自行甄别。</small>
+
+<small>讨论截至：{latestCommentAt}</small>
 
 ## 背景 / Background
 {读者钩子（1句）+ 帖子上下文（2-3句）}
