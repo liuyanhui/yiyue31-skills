@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Use when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID. Transforms a Hacker News discussion thread into a structured article with grouped viewpoints, controversies, and multi-style recommendation summaries.
-version: 0.0.6
+version: 0.0.7
 author: yiyue31
 ---
 
@@ -139,7 +139,7 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 3. **Background**: Use fetched original content if available; otherwise infer from title + comments.
 4. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
 5. **Disclaimer** (critical): Preserve the `<small>` disclaimer line exactly as-is. Do NOT reword, move, or remove.
-6. **Timestamp**: Immediately after the disclaimer `<small>` line, add a `<small>` line with the discussion snapshot time = `01-raw-data.json` top-level `latestCommentAt`. zh: `讨论截至：{latestCommentAt}`; en: `Discussion as of: {latestCommentAt}`. If `latestCommentAt` is null, omit the line.
+6. **Timestamp**: Immediately after the disclaimer `<small>` line, add the `<small>` snapshot-time line per `article-{templateVersion}.md` (value = `01-raw-data.json` top-level `latestCommentAt`; omit if null).
 7. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
 
 ---
@@ -177,9 +177,9 @@ Proceed to Step 11 regardless.
 
 Cold readers — who see ONLY `03-article.md`, never the raw comments or grouped data — read it sentence by sentence and report where they get stuck. They report **phenomena only, never fixes**. You then act as editor with full context to resolve every **blocking** comprehension problem. The loop ends when no reader reports a blocking problem.
 
-**Why article-only readers:** a real reader of the digest has no original thread. Giving readers the raw/grouped data lets them fill gaps from memory and miss the gaps a real reader hits. You, the editor, get full context (`01-raw-data.json` + `02-grouped.json`) so you can fix correctly — this reader/editor asymmetry is the core of the step.
+**Why article-only readers:** feeding readers the raw/grouped data lets them fill gaps from memory and miss the gaps a real reader hits; you (editor) get full context — `01-raw-data.json` + `02-grouped.json` — to fix correctly.
 
-**Distinguishing blocking vs look-up-able:** readers separate blocking problems (the article's own ungrounded concepts) from look-up-able domain vocabulary (tool names, jargon any reader of the topic would look up). Only blocking problems converge the loop; look-up-able terms are expected in a specialist digest and are ignored here.
+**Distinguishing blocking vs look-up-able:** only blocking problems (the article's own ungrounded concepts) converge the loop; look-up-able domain vocabulary (tool names, jargon) is expected in a specialist digest and is ignored.
 
 **Loop procedure:**
 1. **Each round N (1..3)**:
@@ -191,8 +191,6 @@ Cold readers — who see ONLY `03-article.md`, never the raw comments or grouped
    - No reader reports a blocking problem → **PASS** → proceed to 11.3.
    - Otherwise: act as **editor**. For each blocking phenomenon, decide and apply a fix using full context — current `03-article.md` + `01-raw-data.json` + `02-grouped.json`. Overwrite `03-article.md`. Next round.
 2. **Rounds exhausted (3 rounds)**: keep `03-article.md`, output "部分读者体验问题可能残留".
-
-**Boundary:** readers report comprehension problems only. AI-tone/style are handled in Step 9; readability mechanics in 11.1. Do not let this step duplicate those.
 
 ### 11.3 Final Output
 
@@ -207,7 +205,7 @@ Read `{outputDir}/{postId}-{slug}/03-article.md` as sole content source. Read `{
 
 Generate 11 summaries (5 styles × 2 variants + 1 TL;DR): Technical, Viral, Lively, News, Podcast (each ~100字/words + ~200字/words), plus TL;DR (30–50字/words). No evaluation subagent.
 
-**Rules**: Output in `config.lang`. Character counts: zh = Chinese characters (excluding punctuation/spaces), en = English words. Each style must be genuinely distinct. Each summary self-contained. Stay within ±10% of target. Add a `<small>` timestamp line right after the H1 (zh `讨论截至：{latestCommentAt}` / en `Discussion as of: {latestCommentAt}`) from `01-raw-data.json`'s `latestCommentAt`; omit if null.
+**Rules**: Output in `config.lang`. Character counts: zh = Chinese characters (excluding punctuation/spaces), en = English words. Each style must be genuinely distinct. Each summary self-contained. Stay within ±10% of target. Add the `<small>` timestamp line per `recommendation-{templateVersion}.md` (right after the H1; omit if null).
 
 Write to `{outputDir}/{postId}-{slug}/recommendation-{slug}-{postId}.md`.
 

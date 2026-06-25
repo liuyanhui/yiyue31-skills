@@ -96,15 +96,18 @@ bun test
 
 ## 设计决策
 
-- **SKILL.md 是提示词文档**，不是可执行代码。它指导 Claude Code 按工作流执行
 - **抓取脚本**（`scripts/*.ts`）是可执行 TypeScript，单独调试时可直接 `bun scripts/algolia.ts <postId>`
-- **抓取输出统一格式**：三种抓取方式都收敛到同一个 JSON 结构，下游步骤无需区分来源
-- **深度截断只在过滤管道中进行**（Step 6.1），不在抓取阶段做
-- **Jina 输出需要 AI 手动正规化**（详见 SKILL.md Step 4 Method 3）
-- **质量评估走 subagent 架构**：主 agent 负责生成和修复，评估 subagent 负责独立评估（只读文章、写报告、不修改文件）。详见 [SKILL.md](./SKILL.md) 和 [architecture.md](./references/architecture.md)
+- **质量评估走 subagent 架构**：主 agent 负责生成和修复，评估 subagent 负责独立评估（只读文章、写报告、不修改文件）。详见 [SKILL.md](./SKILL.md)
 
 ## Changelog
 
+- **0.0.7**（2026-06-25）：提示词文档精简（行为不变）
+  - 删除 5 个评估 prompt 的 File Access Constraint 块（含过期的 `readFiles`/`writeFiles` 契约）
+  - SKILL.md Step 8/12 timestamp 规则指向 asset 模板，去除 zh/en 格式串复述
+  - SKILL.md 11.2 WHY 段精简（保留 guardrail）、删除 Boundary 行
+  - reader-audit-prompt 内部去重（「无原始评论线程」「只报问题不修」各留一处）
+  - README 删除 `architecture.md` 死链；设计决策节 6 → 2 条
+  - evaluate-article-prompt aggregation voice 压缩；article-v1.md 删元注释
 - **0.0.6**（2026-06-24）：followups
   - 修复 `error-scenarios.test.ts` 4 个过期断言（对齐当前 SKILL.md 措辞；行为不变）
   - `article-v1.md` 生成指令注释块精简去冗，与 `evaluate-article-prompt.md` 的重叠减少

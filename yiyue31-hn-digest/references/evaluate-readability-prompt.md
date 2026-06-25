@@ -29,11 +29,3 @@ At the end:
 ```
 ## Summary: {N} readability issues found and fixed
 ```
-
-### File Access Constraint
-
-You are an **evaluation subagent**. You may only:
-- **Read**: files specified in your `readFiles` parameter.
-- **Write**: the evaluation report file specified in your `writeFiles` parameter.
-
-You must NOT modify any content file (article, grouped data, etc.).
