@@ -36,7 +36,7 @@ Step 6. Write Final Report
 
 ### Step 1 — Requirement Understanding Checkpoint (forced)
 
-Do NOT skip this even if the requirement seems clear. The goal is to surface assumptions so errors are visible before you invest in a full plan.
+Do NOT skip this even if the requirement seems clear (see "Why unconditional" below).
 
 1. Read the requirement.
 2. Check the objective checklist; for each item not supplied by the user, you MUST state an explicit assumption:
@@ -50,6 +50,8 @@ Do NOT skip this even if the requirement seems clear. The goal is to surface ass
 4. **Wait for user confirmation/correction of the assumptions.** Do not proceed to Step 2 until confirmed.
 5. Carry the assumption list through to the Final Report (so wrong assumptions stay discoverable at execution time).
 
+**Why unconditional:** the model's own "is this clear enough?" judgment is unreliable — so always surface understanding + assumptions, even when it seems clear. The user's confirmation is what catches wrong reads.
+
 ### Step 2 — Scale Estimation & Layout Decision (hard gate)
 
 Estimate the likely task count from the confirmed scope/feature boundaries. This is a rough estimate from scope — NOT full task generation, no task bodies.
@@ -58,7 +60,9 @@ Estimate the likely task count from the confirmed scope/feature boundaries. This
 - **> ~15 estimated tasks** → **forced multi-phase layout**: overview with `phases:` manifest, each phase ≤ ~15 tasks written to its own `./tasks-NN.yaml`.
 - **User insists on one-shot mega-plan** (e.g. ~200 tasks at once) → **refuse**. State plainly: a single production pass at this scale exceeds the model's one-shot output limit and will truncate; the plan must be phased. Do not attempt it.
 
-**Read-scale hazard (read-only investigation tasks).** A `code-review [read-only]` task reads source files to analyze them — its input is far larger than its output, so it blows the executor's context far more easily than an implementation task. If you find yourself designing a single read-only task that reads a whole package or many files to "investigate everything first", STOP and restructure:
+**Why the ~15 threshold:** a single task item ≈ 15 lines / 300-500 chars of YAML; past ~15 tasks the one-shot output approaches the truncation ceiling, so each pass must stay below it.
+
+**Read-scale hazard (read-only investigation tasks).** A `code-review [read-only]` task's input ≫ output, so it blows the executor's context far more easily than an implementation task. If you find yourself designing a single read-only task that reads a whole package or many files to "investigate everything first", STOP and restructure:
 - **No whole-package globs in `constraints`** (e.g. `manager/*.java`). Name specific files, or instruct "grep/search to filter, then read only the hits".
 - **Cap read-only task input at ~8 files.** If an investigation needs more, split it into multiple sub-investigations (one per package/concern) plus one synthesis task that reads only the sub-investigations' small outputs.
 - **No "funnel" structure**: do NOT produce one big read-only "investigate-all" task that every fix task depends on. Instead, fold the needed source-reading into each fix task's `constraints` (each fix task reads the few files it changes) — distribute investigation, do not centralize it.

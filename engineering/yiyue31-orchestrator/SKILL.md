@@ -30,6 +30,8 @@ When first activated:
 8. Confirm with user before starting the first task.
 9. Begin workflow from the first pending task (per the start rule above).
 
+**Stall-timeout backstop.** `BASH_MAX_OUTPUT_MS` (default 600000ms = 10min) terminates any subagent that produces no output past the stall timeout. This is the harness-level backstop for the read-scale pre-check (Workflow step 4): even if an over-broad task slips past the pre-check, the subagent reading too much fails fast instead of spinning. If you observe frequent stalls, the user may lower this via env / `settings.json`.
+
 ## Core Principles
 
 1. **NEVER produce deliverables yourself.** You plan, delegate, and decide — never write code, create documents, or generate task output. Generator does the building.
@@ -40,7 +42,7 @@ When first activated:
    - Malformed/empty output: log issue, re-dispatch once with explicit format reminder. Still malformed → mark task blocked with reason "subagent output error".
    - Runtime error/exception: re-dispatch once. Still fails → mark task blocked with reason "subagent error: {detail}".
    - All re-dispatches count toward the task's Max Retries.
-   - After marking blocked, continue to Workflow step 10 (save) → step 11 (progress) → step 12 (log).
+   - After marking blocked, continue to Workflow step 11 (save) → step 12 (progress) → step 13 (log).
 6. **Respect the task plan as contract.** Do not add, remove, reorder, or alter the TASK DEFINITIONS (id, seq, description, constraints, deliverable, evaluation criteria, dependencies). The orchestrator MAY write only runtime status fields back into task items (`status`, `current_round`, `evaluation_result`) — these are orchestrator-owned, not part of the definition. If a problem is found with the plan itself, report it to the user and wait for instruction — do not silently adjust the definitions.
 
 ### Max Retries Policy
@@ -56,7 +58,7 @@ pending → in-progress → evaluating → passed
                                  → blocked (dependency issue or unresolvable question)
 blocked → pending (unblocked automatically when all dependencies pass — see Workflow step 1)
 
-Retry: when decision is FAIL and Current Round ≤ Max Retries, status loops back to in-progress (Workflow step 9 → step 3).
+Retry: when decision is FAIL and Current Round ≤ Max Retries, status loops back to in-progress (Workflow step 10 → step 3).
 ```
 
 There is intentionally no `deferred` status. If a criterion cannot be verified by the current task (e.g., it belongs to a later task), that is a PLAN defect — report it via Plan Issues, do not invent a status.
@@ -86,26 +88,31 @@ For each task, follow this loop. Ensure the current phase's sub-document is load
    - Any dependency `failed`/`blocked` → mark task blocked with reason "dependency {id} is {status}", goto step 1
    - Any dependency not yet resolved → goto step 1
 3. Save task (increment Current Round, mark status: in-progress)
-4. Dispatch Generator subagent with ONLY the current task's info (see Generator template — send description, constraints, deliverable, and related file paths only)
-5. Receive Generator output:
-   - Deliverable received → verify files exist at reported paths. If missing → treat as malformed output (apply Core Principle 5). If present → proceed to step 6
-   - Both deliverable and questions received → accept deliverable, log questions as non-blocking notes, proceed to step 6
-   - Questions received (no deliverable) → answer from context. If unable to answer → mark task blocked with reason "unresolvable generator question", goto step 10
+4. **Read-scale pre-check (before dispatching Generator).** A subagent reading too much blows its context and stalls. Before step 5, verify the task is safe to dispatch:
+   - If `constraints` contains a whole-package glob (e.g. `*.java`, `**/*.ts`) → **refuse to dispatch**. Report a Plan Issue ("task constraints use a whole-package glob — too broad for one Generator pass; re-plan with specific files"), mark the task blocked with reason "over-broad task", goto step 11. Do NOT silently narrow it (Core Principle 6).
+   - Compute the byte size of the files the Generator will read: run `wc -c` on the related file paths (the task's own deliverable target files + any related files from completed tasks the Generator must read for context). If the total exceeds **~120 KB** (≈ 30-40k tokens — leaves room for reasoning + output within the subagent's context) → **refuse to dispatch** for the same reason (over-broad task), report Plan Issue, mark blocked, goto step 11.
+   - Note: a single large file (e.g. a multi-thousand-line generated class or test suite) can exceed the budget alone — that is exactly what the byte check catches that a file-count check cannot.
+   - This pre-check is best-effort; the harness-level backstop is `BASH_MAX_OUTPUT_MS` (see Initial Setup) — a missed over-broad task fails fast instead of spinning.
+5. Dispatch Generator subagent with ONLY the current task's info (see Generator template — send description, constraints, deliverable, and related file paths only)
+6. Receive Generator output:
+   - Deliverable received → verify files exist at reported paths. If missing → treat as malformed output (apply Core Principle 5). If present → proceed to step 7
+   - Both deliverable and questions received → accept deliverable, log questions as non-blocking notes, proceed to step 7
+   - Questions received (no deliverable) → answer from context. If unable to answer → mark task blocked with reason "unresolvable generator question", goto step 11
    - Malformed/empty output or runtime error → apply Core Principle 5 (error recovery)
-6. Save task (mark status: evaluating)
-7. Dispatch Evaluator subagent with scoped context (see Evaluator template — send ONLY this task's criteria and deliverable, no history from other tasks)
-8. Receive Evaluator result:
-   - Evaluation result received → proceed to step 9
-   - Questions received → answer from context. If unable to answer → mark task blocked with reason "unresolvable evaluator question", goto step 10
+7. Save task (mark status: evaluating)
+8. Dispatch Evaluator subagent with scoped context (see Evaluator template — send ONLY this task's criteria and deliverable, no history from other tasks)
+9. Receive Evaluator result:
+   - Evaluation result received → proceed to step 10
+   - Questions received → answer from context. If unable to answer → mark task blocked with reason "unresolvable evaluator question", goto step 11
    - Malformed/empty output or runtime error → apply Core Principle 5 (error recovery)
-9. Make decision:
+10. Make decision:
    - ALL criteria PASS → mark task passed, advance to next task
    - Any FAIL, Current Round ≤ Max Retries → attach feedback using Shared Re-Dispatch Template, re-dispatch Generator (goto step 3)
    - Any FAIL, Current Round > Max Retries → mark task failed (see Project-Level Decisions)
-10. Save task (update Status. If Evaluator ran, also update Evaluation Result. Record blocked/failed reason if applicable.)
-11. Update progress file (write result to ./task-progress.json). Full details are preserved here and in the log file.
-12. Log to ./observe-logs/observe-{id}-{YYYYMMDD-HHmmss}.md: dispatch summary, subagent result, orchestrator decision. One line per event.
-13. Phase Boundary: if no eligible pending task remains in the current sub-document but other phases have pending tasks, return to the overview — re-read `./task-list.yaml` if it has been evicted (it is small). Determine the next incomplete phase: a phase is complete when every task in its range is `passed` (any task id not recorded as `passed` in the progress file counts as pending). Load that phase's sub-document, then goto step 1. If no phase has pending tasks → report completion.
+11. Save task (update Status. If Evaluator ran, also update Evaluation Result. Record blocked/failed reason if applicable.)
+12. Update progress file (write result to ./task-progress.json). Full details are preserved here and in the log file.
+13. Log to ./observe-logs/observe-{id}-{YYYYMMDD-HHmmss}.md: dispatch summary, subagent result, orchestrator decision. One line per event.
+14. Phase Boundary: if no eligible pending task remains in the current sub-document but other phases have pending tasks, return to the overview — re-read `./task-list.yaml` if it has been evicted (it is small). Determine the next incomplete phase: a phase is complete when every task in its range is `passed` (any task id not recorded as `passed` in the progress file counts as pending). Load that phase's sub-document, then goto step 1. If no phase has pending tasks → report completion.
 ```
 
 ### Project-Level Decisions
@@ -197,7 +204,7 @@ phases:
 
 - `range` uses inclusive bounds by `seq`: `"T-001 .. T-005"` covers every task whose `seq` falls between the endpoints' `seq`, inclusive (including any tasks inserted between them during re-plan).
 - `file` points to the sub-document holding that phase's task items. Only one sub-document is loaded at a time.
-- **The overview (`./task-list.yaml`) is the resident index**: it stays loaded for the entire session. Only sub-documents rotate in and out. If at any point the overview is not in context, re-read `./task-list.yaml` — it is small by design. This invariant is what makes the Phase Boundary handoff (Workflow step 13) work.
+- **The overview (`./task-list.yaml`) is the resident index**: it stays loaded for the entire session; only sub-documents rotate in and out. If the overview is ever not in context, re-read `./task-list.yaml` (it is small) — this invariant is what makes the Phase Boundary handoff (Workflow step 14) work.
 - If a phase has no `file`, its tasks live inline under the overview's `tasks:` key.
 - If no `phases` section exists → all tasks are under `tasks:` in the overview; run all of them.
 - State carries over between phases via the plan documents and `./task-progress.json` (no conversation history).
@@ -209,7 +216,7 @@ A JSON file that tracks task completion across sessions. Located at `./task-prog
 
 **Two stores, distinct roles:**
 - The **plan YAML** (`task-list.yaml` / `tasks-NN.yaml`) holds the AUTHORITATIVE runtime state: the orchestrator writes `status`, `current_round`, and `evaluation_result` back into each task item during execution (these three fields are orchestrator-owned per Core Principle 6).
-- `task-progress.json` holds a minimal **cross-session snapshot** — only what is needed to resume after a session restart. It mirrors status and round count (`rounds`, which mirrors `current_round`'s final value — the snapshot needs only the count, not the in-progress counter) so a fresh session can skip passed tasks without re-loading every sub-document.
+- `task-progress.json` holds a minimal **cross-session snapshot** — only what is needed to resume after a restart: status and `rounds` (the final value of `current_round`, not the in-progress counter), so a fresh session can skip passed tasks without re-loading every sub-document.
 
 ### Format
 
@@ -234,7 +241,7 @@ A JSON file that tracks task completion across sessions. Located at `./task-prog
 
 Every task uses the same field shape above (`status`, `rounds`, `files`, `completed_at`, `notes`) — only the values differ. A failed/blocked task typically has `files: []` and a `notes` reason (e.g. `"Max retries exhausted"`).
 
-Keys are the tasks' stable `id`. Because `id` is never renumbered by the planner, keys remain valid across re-plans — resume-from-checkpoint works without coordination.
+Keys are the tasks' stable `id`; since the planner never renumbers `id`, keys stay valid across re-plans and resume-from-checkpoint needs no coordination.
 
 ### Usage
 
