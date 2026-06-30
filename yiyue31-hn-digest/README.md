@@ -101,6 +101,11 @@ bun test
 
 ## Changelog
 
+- **0.0.8**（2026-06-30）：免责声明 + 时间戳改为程序注入
+  - 新增 `scripts/insert-header.ts`：在 `final-*.md` 生成后，于 H1 之后机械插入免责声明 + 讨论截至时间戳（时间戳格式 `YYYY-MM-DD HH:mm:ss`，本地时区；`latestCommentAt` 为 null 时只插免责声明；幂等）
+  - `article-v1.md` / `recommendation-v1.md` 删除 disclaimer/timestamp 占位行及相关注释，模板回归纯结构
+  - SKILL.md 删除 Step 8 的 disclaimer/timestamp 生成规则（原 Rule 5/6）；Step 11.3 改为调用脚本注入；`03-article.md` 不再承载这两行，评估链路保持干净
+  - `recommendation-*.md` 去除时间戳行
 - **0.0.7**（2026-06-25）：提示词文档精简（行为不变）
   - 删除 5 个评估 prompt 的 File Access Constraint 块（含过期的 `readFiles`/`writeFiles` 契约）
   - SKILL.md Step 8/12 timestamp 规则指向 asset 模板，去除 zh/en 格式串复述

@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Use when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID. Transforms a Hacker News discussion thread into a structured article with grouped viewpoints, controversies, and multi-style recommendation summaries.
-version: 0.0.7
+version: 0.0.8
 author: yiyue31
 ---
 
@@ -74,7 +74,7 @@ For each method: output "正在获取数据... (使用 {Method} 方式)". On suc
 
 **Jina normalization**: Parse markdown → extract title, author, comments → build unified JSON (each comment: `id`, `author`, `parentId: null`, `childIds: []`, `depth: 0`, `contentMarkdown`). Validate: `post.title` non-empty and `comments` array exists.
 
-**`latestCommentAt`**: The unified JSON top level carries `latestCommentAt` — the ISO 8601 UTC timestamp of the newest comment, set by the fetch scripts. Step 8 renders it in the article as the discussion snapshot time. (Jina path: leave it `null`; the article then omits the timestamp line.)
+**`latestCommentAt`**: newest comment's ISO 8601 UTC timestamp, set by fetch scripts (Jina path leaves it `null`).
 
 All methods exhausted → output "所有抓取方式均失败: {methods + reasons}" → terminate.
 
@@ -138,9 +138,7 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 2. **OP highlight** (critical): `isOP === true` → prefix `> **[OP]** `, placed first in group.
 3. **Background**: Use fetched original content if available; otherwise infer from title + comments.
 4. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
-5. **Disclaimer** (critical): Preserve the `<small>` disclaimer line exactly as-is. Do NOT reword, move, or remove.
-6. **Timestamp**: Immediately after the disclaimer `<small>` line, add the `<small>` snapshot-time line per `article-{templateVersion}.md` (value = `01-raw-data.json` top-level `latestCommentAt`; omit if null).
-7. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
+5. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
 
 ---
 
@@ -195,7 +193,8 @@ Cold readers — who see ONLY `03-article.md`, never the raw comments or grouped
 ### 11.3 Final Output
 
 1. Copy `03-article.md` to `{outputDir}/{postId}-{slug}/final-{slug}-{postId}.md` (overwrite if exists).
-2. Do NOT clean up intermediate files.
+2. Inject the disclaimer + timestamp into `final-*.md`: `bun {skill-dir}/scripts/insert-header.ts {outputDir}/{postId}-{slug}/final-{slug}-{postId}.md {outputDir}/{postId}-{slug}/01-raw-data.json {config.lang}`.
+3. Do NOT clean up intermediate files.
 
 ---
 
@@ -205,7 +204,7 @@ Read `{outputDir}/{postId}-{slug}/03-article.md` as sole content source. Read `{
 
 Generate 11 summaries (5 styles × 2 variants + 1 TL;DR): Technical, Viral, Lively, News, Podcast (each ~100字/words + ~200字/words), plus TL;DR (30–50字/words). No evaluation subagent.
 
-**Rules**: Output in `config.lang`. Character counts: zh = Chinese characters (excluding punctuation/spaces), en = English words. Each style must be genuinely distinct. Each summary self-contained. Stay within ±10% of target. Add the `<small>` timestamp line per `recommendation-{templateVersion}.md` (right after the H1; omit if null).
+**Rules**: Output in `config.lang`. Character counts: zh = Chinese characters (excluding punctuation/spaces), en = English words. Each style must be genuinely distinct. Each summary self-contained. Stay within ±10% of target.
 
 Write to `{outputDir}/{postId}-{slug}/recommendation-{slug}-{postId}.md`.
 
