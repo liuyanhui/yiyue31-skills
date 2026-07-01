@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Use when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID. Transforms a Hacker News discussion thread into a structured article with grouped viewpoints, controversies, and multi-style recommendation summaries.
-version: 0.0.8
+version: 0.0.9
 author: yiyue31
 ---
 
@@ -85,7 +85,7 @@ All methods exhausted → output "所有抓取方式均失败: {methods + reason
 1. Generate `{slug}` from `post.title`: lowercase, strip punctuation and stop words (articles, prepositions, auxiliary verbs, conjunctions, pronouns, negation), take first 4 remaining words, join with hyphens. Example: "Can the stockmarket swallow Anthropic, SpaceX and OpenAI?" → `stockmarket-swallow-anthropic-spacex`.
 2. Create `{outputDir}/{postId}-{slug}/` (fail → terminate silently).
 3. Write unified JSON to `{outputDir}/{postId}-{slug}/01-raw-data.json` (fail → terminate silently).
-4. If `config.fetchOriginalPost === true` and `post.url` exists: fetch via Jina (`https://r.jina.ai/{post.url}`, fallback `https://r.jinaai.cn/{post.url}`), extract first 3 paragraphs as background. On failure → output "原文抓取失败，将从评论推断背景".
+4. If `config.fetchOriginalPost === true` and `post.url` exists: fetch via Jina (`https://r.jina.ai/{post.url}`, fallback `https://r.jinaai.cn/{post.url}`). Extract (a) the first ~3 paragraphs as background, and (b) 1–2 core-argument paragraphs — the passages that carry the original's main claim or evidence — for use as in-body block quotes during generation. On failure → output "原文抓取失败，将从评论推断背景".
 5. If `comments` array is empty → output "该帖子暂无评论" → terminate.
 
 ---
@@ -134,11 +134,12 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 
 ### Generation Rules
 
-1. **Language**: Entire article in `config.lang`. H1 title must be `[Hacker News] {post.title}`.
-2. **OP highlight** (critical): `isOP === true` → prefix `> **[OP]** `, placed first in group.
-3. **Background**: Use fetched original content if available; otherwise infer from title + comments.
-4. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
-5. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
+1. **Thread type** (decide in round 1, carry into revisions): classify the thread from `post.title` + `02-grouped.json` into one of controversy / breakthrough / event-or-obituary / scattered-Q&A, and pick the matching skeleton in `assets/article-{templateVersion}.md`. The body structure and whether `## 争议点` appears depend on this type — do not force every thread into the same skeleton.
+2. **Language**: Entire article in `config.lang`. H1 title must be `[Hacker News] {post.title}`.
+3. **OP highlight** (critical): `isOP === true` → prefix `> **[OP]** `, placed first in group.
+4. **Background & original voice**: Use fetched original content if available; otherwise infer from title + comments. When the fetched original carries a substantive argument, quote its 1–2 core-argument paragraphs as block quotes inside the relevant body section.
+5. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
+6. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
 
 ---
 
