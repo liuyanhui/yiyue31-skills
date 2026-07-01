@@ -2,7 +2,7 @@
 
 > 本文档记录 `yiyue31-planner` skill 的原始需求场景、设计决策的来由、演进中暴露的问题，以及从中提炼的教训。目的：**防止后续在设计同类 skill 时重复踩坑**。
 >
-> 性质：设计背景与决策记录（非实现规范）。配套文档：`engineering/yiyue31-planner/subagent-reliability-improvement-plan.md`（方案）、`engineering/yiyue31-planner/subagent-reliability-task-record.md`（任务过程档案）。
+> 性质：设计背景与决策记录（非实现规范）。
 
 ## 1. 原始需求场景
 
@@ -76,20 +76,6 @@ orchestrator 的执行本身就是计划最强的评审（任务失败/依赖断
 
 9. **瘦身提示词时，"why"（目的/意图）不是噪音，必须区分对待。** 本次 planner 瘦身曾犯一个错：跟着"why 都是给人看的设计噪音"的判断，删了几处 why。后被纠正——**why 让模型理解意图，从而在规则没明确覆盖的边缘情况下仍能做出符合意图的选择**，是让规则泛化的载体。正确区分两类：**目标 why**（陈述某规则/步骤要达成什么目的，删了模型会在边缘情况违背意图）→ 必须保留；**动机 why**（解释历史设计选择，模型照做即可）→ 可删。判别标准：模型不知道这个 why，会在边缘情况做错吗？会→留。本次已恢复 planner 的两个目标 why（Step 1 强制检查点的 why、Step 2 分阶段阈值的 why），并把这条规则写入项目 `CLAUDE.md`。**教训**：提示词精简要砍的是"动机/重复/啰嗦"，不是"意图"——砍意图等于砍掉模型在边缘情况对齐目标的能力。
 
-## 5. 待确认事项（判据在作者实际使用经验）
+## 5. 结局
 
-在最终决定 planner 改造方向前，以下事实需要落实（只有作者能答）：
-- planner 实际使用频率？Reviewer 对抗评审**真的抓出过**不抓就会出问题的计划吗？还是大部分走过场最后 PASS？
-- 当初"卡住"的具体现象是什么（不响应/截断/质量差/纠结）？真实原因是否真是上下文超长？
-
-这两个问题的答案，分别决定：
-- 对抗评审该不该砍（反思 D）。
-- 子代理机制该不该保留（反思 A、B）。
-
-## 6. 相关文档
-
-| 文档 | 性质 | 位置 |
-| --- | --- | --- |
-| 本文档 | 设计背景与教训 | `docs/planner-design-background.md` |
-| 改进方案（三轮评估+实测迭代） | 方案 | `engineering/yiyue31-planner/subagent-reliability-improvement-plan.md` |
-| 任务过程档案 | 过程记录 | `engineering/yiyue31-planner/subagent-reliability-task-record.md` |
+上述反思已在 v0.4.0 落地：planner 改为线性流程，**移除 Generator/Reviewer 子代理与对抗评审**，改为直接产出 + 静态自校验（completeness / actionability / dependency + 格式），并加入规模门槛强制分阶段与 read-only 调查的读取约束（见教训 7、8）。反思 A–D 的判断（子代理净负债、对抗评审不适配主观判断、机制冗余）被采纳。
