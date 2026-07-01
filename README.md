@@ -36,6 +36,8 @@
 
 **示例：** [planner 设计背景与教训](docs/planner-design-background.md) —— 记录 `yiyue31-planner` 子代理机制的设计来由、暴露的复杂度失控问题，以及"遇到 AI 异常先验证根因归因，再设计机制""复杂度需匹配载体形态""子代理是可靠性负债"等教训。
 
+**示例：** [共享评估 prompt 的版本同步](docs/shared-evaluation-prompt-sync.md) —— translator、hn-digest 等共用的评估 prompt 如何用版本号防止漂移；附 ai-tone v2.x 演进与待办（summary 英文版、sibling prompt 表层化）。
+
 ## 安装
 
 将目标 skill 目录整体复制到 `~/.claude/skills/`（全局）或项目下 `.claude/skills/`，然后重启 Claude Code。
