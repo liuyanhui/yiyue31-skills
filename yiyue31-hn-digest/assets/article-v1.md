@@ -18,9 +18,13 @@ Jargon:
 - Explain financial/technical terms on first use with a brief parenthetical/appositive ("S&P 500（标普500指数）""401k（美国个人退休账户）"), or replace with plain language if meaning is preserved.
 
 Paragraph & background:
-- One idea per paragraph; split any paragraph over 5 sentences. Between subsections (###), add a transition sentence linking the next topic to the previous.
+- One idea per paragraph; split any paragraph over 5 sentences. Between subsections (###), add a transition sentence — but it must carry a SUBSTANTIVE logical link (how the next topic relates to the previous), not dramatize "the debate did X". "争论到此露出了底色""撞上反驳""分了叉" are NOT transitions — they narrate the discussion's action without adding a viewpoint.
 - Background: open with a reader-stakes hook ("如果你有退休金账户……"), then context. Length: as much as the thread needs to make the reader care (typically 3–5 sentences) — do NOT cap at ~100 words when the topic needs more. Give large numbers a reference point ("$965B 估值，接近瑞典全年 GDP").
 - Original-article voice: when the fetched original has a substantive argument (not just the comments), quote its 1–2 key paragraphs in full as a blockquote (with translation) inside the relevant section — the source's own words carry more weight than paraphrase. Skip if the original is thin or absent.
+
+Information density (anti-空话):
+- Every sentence should carry a viewpoint or a fact. Sentences that merely narrate THE DISCUSSION ITSELF — dramatizing the act of disagreement rather than what is disagreed about — are 空话: "争论从一开始就分了叉""措辞毫不客气""把杀伤力落到了实处""还有一种冷峻的判断""贯穿始终的，是一种被背叛感". Cut them, or recast into the substance they are decorating. Test: delete the sentence; if the reader loses no viewpoint or fact, it is 空话.
+- Section headings (###) must be nominal/declarative. "这究竟算不算'恶意软件'" is fine; "这究竟算不算'恶意软件'，定性本身就先吵了起来" is not — drop the dramatic action clause.
 
 Controversy (conditional):
 - If viewpoints oppose: identify the ROOT of the disagreement, not just "X says A, Y says B." ("分歧的本质在于：……"). If one-sided: state the consensus and note dissenting nuances.
