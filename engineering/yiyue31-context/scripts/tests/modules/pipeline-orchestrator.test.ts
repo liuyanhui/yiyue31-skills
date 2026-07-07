@@ -197,7 +197,11 @@ describe("Pipeline: markers incomplete (structural)", () => {
   it("records marker_issue and skips marker-dependent checks", () => {
     const config = makeConfig();
     const registry = createMockRegistry({
-      readFile: jest.fn().mockReturnValue("some content without markers"),
+      // Content includes the managed heading so this is NOT a hand-written
+      // file; the skill-managed file simply has broken/missing markers.
+      readFile: jest.fn().mockReturnValue(
+        "# AI Coding Auto Sections\nsome content without markers",
+      ),
       validatePairedMarkers: jest.fn().mockReturnValue({
         valid: false,
         issues: ["missing_start_marker", "missing_end_marker"],
@@ -329,6 +333,7 @@ describe("computePassed", () => {
         required_all_missing: [],
         forbidden_found: [],
       },
+      disallowed_sections: [],
       filesystem_mismatches: [],
       stale_entries: [],
     };
@@ -347,6 +352,7 @@ describe("computePassed", () => {
         required_all_missing: [],
         forbidden_found: [],
       },
+      disallowed_sections: [],
       filesystem_mismatches: [],
       stale_entries: [],
     };
@@ -365,6 +371,7 @@ describe("computePassed", () => {
         required_all_missing: [],
         forbidden_found: [],
       },
+      disallowed_sections: [],
       filesystem_mismatches: [],
       stale_entries: [],
     };
@@ -383,6 +390,7 @@ describe("computePassed", () => {
         required_all_missing: [],
         forbidden_found: [],
       },
+      disallowed_sections: [],
       filesystem_mismatches: [],
       stale_entries: [],
     };
@@ -401,6 +409,7 @@ describe("computePassed", () => {
         required_all_missing: [],
         forbidden_found: [],
       },
+      disallowed_sections: [],
       filesystem_mismatches: [],
       stale_entries: [],
     };
@@ -424,6 +433,7 @@ describe("computePassed", () => {
         required_all_missing: [],
         forbidden_found: [],
       },
+      disallowed_sections: [],
       filesystem_mismatches: [],
       stale_entries: [],
     };
@@ -566,6 +576,7 @@ describe("computeSummary", () => {
         required_all_missing: [],
         forbidden_found: [],
       },
+      disallowed_sections: [],
       filesystem_mismatches: [],
       stale_entries: [],
     };
@@ -884,5 +895,114 @@ describe("defaultReadFile", () => {
     const filePath = join(tmpDir, "test-read.txt");
     writeFileSync(filePath, "Hello, world!", "utf-8");
     expect(defaultReadFile(filePath)).toBe("Hello, world!");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: rewritten-skill behaviors (allowed sections + report-only hand-written)
+// ---------------------------------------------------------------------------
+import { validateAllowedSections } from "../../src/modules/allowed-section-validator.js";
+
+/** Build marker-block content with the full bilingual six-section set. */
+function sixSectionInner(): string {
+  return (
+    "## 目录职责 / Directory Purpose\n做X\n" +
+    "## 关键文件 / Key Files\n表\n" +
+    "## 设计要点与原因 / Design Notes & Why\n原因\n" +
+    "## 约定与陷阱 / Conventions & Traps\n约定\n" +
+    "## 依赖关系 / Dependencies\n依赖\n" +
+    "## 扩展指南 / Extension Guide\n指南\n"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test: hand-written file (no heading AND no markers) → report-only, non-failing
+// ---------------------------------------------------------------------------
+describe("Pipeline: hand-written file is report-only (non-failing)", () => {
+  it("passes and skips marker validation when the file has no heading and no markers", () => {
+    const config = makeConfig();
+    const pairedMarkers = jest.fn().mockReturnValue({
+      valid: true,
+      issues: [],
+      marker_count: 1,
+      extracted_content: "x",
+      content_issue: null,
+    });
+    const registry = createMockRegistry({
+      readFile: jest.fn().mockReturnValue(
+        "# Some Project\n\nHand-written notes.\n\n## Notes\n- a\n",
+      ),
+      validatePairedMarkers: pairedMarkers,
+    });
+
+    const result = runPipeline(config, undefined, registry);
+
+    // A hand-written CLAUDE.md must not fail the run on a missing-marker /
+    // missing-section error.
+    expect(result.directoryReports[0].file_report!.passed).toBe(true);
+    expect(result.directoryReports[0].file_report!.marker_count).toBe(0);
+    // Marker checks are skipped entirely for a hand-written file.
+    expect(pairedMarkers).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test: managed file with all six allowed sections → passes
+// ---------------------------------------------------------------------------
+describe("Pipeline: managed six-section file passes", () => {
+  it("passes when the marker block contains only allowed sections", () => {
+    const config = makeConfig();
+    const content = `# AI Coding Auto Sections\n${START_MARKER}\n${sixSectionInner()}\n${END_MARKER}\n`;
+    const registry = createMockRegistry({
+      readFile: jest.fn().mockReturnValue(content),
+      validateAllowedSections,
+    });
+
+    const result = runPipeline(config, undefined, registry);
+
+    expect(result.directoryReports[0].file_report!.passed).toBe(true);
+    expect(result.result.details.disallowed_sections).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test: managed file with an adaptive subset → still passes
+// ---------------------------------------------------------------------------
+describe("Pipeline: managed adaptive subset passes", () => {
+  it("passes when the marker block contains a subset of the allowed sections", () => {
+    const config = makeConfig();
+    const inner = "## 目录职责\n做X\n## 关键文件\n表\n";
+    const content = `# AI Coding Auto Sections\n${START_MARKER}\n${inner}\n${END_MARKER}\n`;
+    const registry = createMockRegistry({
+      readFile: jest.fn().mockReturnValue(content),
+      validateAllowedSections,
+    });
+
+    const result = runPipeline(config, undefined, registry);
+
+    expect(result.directoryReports[0].file_report!.passed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test: managed file with a disallowed section → fails and is reported
+// ---------------------------------------------------------------------------
+describe("Pipeline: disallowed section fails and is reported", () => {
+  it("fails and records a disallowed_sections entry when a section is outside the allowed set", () => {
+    const config = makeConfig();
+    const inner = "## 目录职责 / Directory Purpose\n做X\n## 非法段 / Illegal\nY\n";
+    const content = `# AI Coding Auto Sections\n${START_MARKER}\n${inner}\n${END_MARKER}\n`;
+    const registry = createMockRegistry({
+      readFile: jest.fn().mockReturnValue(content),
+      validateAllowedSections,
+    });
+
+    const result = runPipeline(config, undefined, registry);
+
+    expect(result.directoryReports[0].file_report!.passed).toBe(false);
+    expect(result.result.details.disallowed_sections).toHaveLength(1);
+    expect(result.result.details.disallowed_sections[0].headings).toContain(
+      "非法段 / Illegal",
+    );
   });
 });

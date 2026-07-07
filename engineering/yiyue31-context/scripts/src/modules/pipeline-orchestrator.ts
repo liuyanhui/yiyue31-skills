@@ -9,10 +9,13 @@
  * 1. File Existence → if missing: record MissingFileEntry, file_report=null, SKIP rest
  * 2. File Size → if oversized: record OversizedFileEntry, SKIP content checks
  * 3. Encoding → if mismatch: record EncodingIssueEntry, SKIP content parsing
- * 4. Paired Markers → if incomplete: record MarkerIssueEntry, SKIP marker-dependent checks
- * 5. Marker-dependent (only when markers complete):
+ * 4. Hand-written detection → if NO `# AI Coding Auto Sections` heading AND
+ *    NO markers: report-only (file_report.passed=true), SKIP marker checks.
+ * 5. Paired Markers → if incomplete: record MarkerIssueEntry, SKIP marker-dependent checks
+ * 6. Marker-dependent (only when markers complete):
  *    - Required patterns
  *    - Forbidden patterns
+ *    - Allowed sections (adaptive: flag managed headings outside the allowed set)
  *    - Content-disk consistency
  *    - File change detection
  *    - Marker position
@@ -45,6 +48,7 @@ import type {
   RequiredAllMissingEntry,
   ForbiddenFoundEntry,
   PatternIssues,
+  DisallowedSectionEntry,
   FilesystemMismatchEntry,
   StaleEntry,
   DepthBucket,
@@ -100,6 +104,17 @@ export interface ModuleRegistry {
     fileContent: string,
     forbiddenPatterns: string[],
   ) => ForbiddenFoundEntry[];
+  /**
+   * Adaptive allowed-section check. Optional: when omitted, the check is
+   * treated as a no-op (used by tests that do not exercise this path).
+   */
+  validateAllowedSections?: (
+    filePath: string,
+    fileContent: string,
+    startMarker: string,
+    endMarker: string,
+    allowedSectionNames: string[],
+  ) => DisallowedSectionEntry[];
   checkConsistency: (
     directoryPath: string,
     fileContent: string,
@@ -153,6 +168,38 @@ function hasStructuralMarkerIssues(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: hand-written file detection (report-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * H1 heading that marks a CLAUDE.md as skill-managed. Its presence signals
+ * that the yiyue31-context skill owns the marker block for this file.
+ * Sourced verbatim from the rewritten SKILL.md.
+ */
+const MANAGED_HEADING = "# AI Coding Auto Sections";
+
+/**
+ * Detect a hand-written CLAUDE.md that the skill deliberately does not manage.
+ *
+ * Per the rewritten SKILL.md's REPORT-ONLY rule, a file with NEITHER the
+ * `# AI Coding Auto Sections` heading NOR any marker is a legitimate state
+ * (a human-authored file). The checker must NOT flag such a file as a
+ * missing-marker / missing-section error. Files that carry the heading or
+ * any marker are still validated, so broken pairs (e.g. an open marker with
+ * no close marker) remain failing errors.
+ */
+function isHandWrittenFile(
+  fileContent: string,
+  startMarker: string,
+  endMarker: string,
+): boolean {
+  const hasHeading = fileContent.includes(MANAGED_HEADING);
+  const hasStart = fileContent.includes(startMarker);
+  const hasEnd = fileContent.includes(endMarker);
+  return !hasHeading && !hasStart && !hasEnd;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: read file content
 // ---------------------------------------------------------------------------
 
@@ -173,6 +220,7 @@ function createDefaultRegistry(): ModuleRegistry {
   const { validatePairedMarkers } = require("./paired-marker-validator.js");
   const { validateRequiredPatterns } = require("./required-pattern-validator.js");
   const { validateForbiddenPatterns } = require("./forbidden-pattern-validator.js");
+  const { validateAllowedSections } = require("./allowed-section-validator.js");
   const { checkConsistency } = require("./content-disk-consistency-checker.js");
   const { detectFileChanges } = require("./file-change-detector.js");
   const { analyzeMarkerPosition } = require("./marker-position-analyzer.js");
@@ -186,6 +234,7 @@ function createDefaultRegistry(): ModuleRegistry {
     validatePairedMarkers,
     validateRequiredPatterns,
     validateForbiddenPatterns,
+    validateAllowedSections,
     checkConsistency,
     detectFileChanges,
     analyzeMarkerPosition,
@@ -306,6 +355,7 @@ export function runPipeline(
   const requiredAnyMissing: RequiredAnyMissingEntry[] = [];
   const requiredAllMissing: RequiredAllMissingEntry[] = [];
   const forbiddenFound: ForbiddenFoundEntry[] = [];
+  const disallowedSections: DisallowedSectionEntry[] = [];
   const filesystemMismatches: FilesystemMismatchEntry[] = [];
   const staleEntries: StaleEntry[] = [];
 
@@ -427,7 +477,42 @@ export function runPipeline(
         return { directory: dirPath, depth, file_report: fileReport };
       }
 
-      // --- Gate 4: Paired markers ---
+      // --- Gate 4: Hand-written file (report-only, non-failing) ---
+      // A CLAUDE.md with no `# AI Coding Auto Sections` heading and no markers
+      // is a legitimate hand-written state. Per the rewritten skill's
+      // REPORT-ONLY rule, we skip marker validation entirely so the run does
+      // not fail on a missing-section / missing-marker error for this file.
+      // Files that carry the heading OR any marker still fall through to the
+      // normal paired-marker checks, so broken pairs remain failing.
+      if (
+        isHandWrittenFile(
+          fileContent,
+          config.markers.start,
+          config.markers.end,
+        )
+      ) {
+        const fileReport: FileReport = {
+          file: filePath,
+          directory: dirPath,
+          depth,
+          passed: true,
+          file_size: sizeResult.actual_size,
+          detected_encoding: encodingResult.detectedEncoding,
+          marker_count: 0,
+          marker_issues: [],
+          content_length: 0,
+          marker_position: null,
+          content_classification: "marker_only",
+          required_any_missing: [],
+          required_all_missing: [],
+          forbidden_found: [],
+          filesystem_mismatch: null,
+          stale_info: null,
+        };
+        return { directory: dirPath, depth, file_report: fileReport };
+      }
+
+      // --- Gate 5: Paired markers ---
       const markerResult = registry.validatePairedMarkers(
         fileContent,
         config.markers.start,
@@ -511,6 +596,20 @@ export function runPipeline(
       );
       forbiddenFound.push(...forbiddenResults);
 
+      // Allowed sections (adaptive): every `## ` heading inside the marker
+      // block must belong to the configured allowed set. Headings outside the
+      // markers are not examined. Optional registry hook → no-op when omitted.
+      const disallowedResults = registry.validateAllowedSections
+        ? registry.validateAllowedSections(
+            filePath,
+            fileContent,
+            config.markers.start,
+            config.markers.end,
+            config.allowed_section_names,
+          )
+        : [];
+      disallowedSections.push(...disallowedResults);
+
       // Content-disk consistency
       const fullDirPath = resolve(join(config.target, dirPath));
       const consistencyResult = registry.checkConsistency(
@@ -575,6 +674,7 @@ export function runPipeline(
         patternResult.required_any_missing.length === 0 &&
         patternResult.required_all_missing.length === 0 &&
         forbiddenResults.length === 0 &&
+        disallowedResults.length === 0 &&
         consistencyResult === null &&
         staleInfo === null;
 
@@ -617,6 +717,7 @@ export function runPipeline(
       required_all_missing: requiredAllMissing,
       forbidden_found: forbiddenFound,
     },
+    disallowed_sections: disallowedSections,
     filesystem_mismatches: filesystemMismatches,
     stale_entries: staleEntries,
   };

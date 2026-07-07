@@ -27,6 +27,7 @@ function makeConfig(overrides: Partial<CheckConfig> = {}): CheckConfig {
     required_any_patterns: [],
     required_all_patterns: [],
     forbidden_patterns: [],
+    allowed_section_names: [],
     min_content_length: 1,
     max_file_size: 51200,
     expected_encoding: "utf-8",

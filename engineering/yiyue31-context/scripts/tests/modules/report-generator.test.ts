@@ -40,6 +40,7 @@ function makeDetails(overrides: Partial<ReportDetails> = {}): ReportDetails {
       required_all_missing: [],
       forbidden_found: [],
     },
+    disallowed_sections: [],
     filesystem_mismatches: [],
     stale_entries: [],
     ...overrides,

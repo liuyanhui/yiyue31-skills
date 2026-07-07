@@ -1,12 +1,12 @@
 ---
 name: yiyue31-context
-description: Use when user asks to "generate CLAUDE.md","生成项目上下文","AI coding friendly","初始化AI上下文","project context", or wants to generate layered CLAUDE.md context files for directories in a project.
-version: 0.0.1
+description: Use when user asks to "generate CLAUDE.md","生成项目上下文","AI coding friendly","初始化AI上下文","project context", or wants to generate modification context for AI coding agents — what an agent needs to know to change code in a package without breaking things.
+version: 0.0.2
 ---
 
 # AI Context Generator
 
-Generate CLAUDE.md files for every directory in a project, providing layered context for AI coding agents (primarily Claude Code).
+Generate CLAUDE.md files for every directory in a project, providing modification context for AI coding agents: what an agent needs to know to change code in a package without breaking things. Humans are a secondary audience.
 
 ## Quick Start
 
@@ -22,7 +22,7 @@ Generate CLAUDE.md files for every directory in a project, providing layered con
 **Main agent + subagent** pattern. To prevent context overflow in large projects, the main agent handles decisions and dispatching, subagents handle execution in isolated contexts.
 
 - **Main agent**: scan directory structure, plan tasks, dispatch subagents to handle individual directories, track progress, generate final report.
-- **Subagent**: receive a single directory, analyze files, generate summaries, determine entry files, write CLAUDE.md content directly to disk.
+- **Subagent**: receive a single directory, run four analyses (dead-file, convention, sync-edit-point, dependency+purpose), produce the six auto-managed sections, write CLAUDE.md content directly to disk.
 
 Parent directories are processed before their children so that higher-level context is available before diving into subdirectories. Up to 5 subagents run concurrently.
 
@@ -41,11 +41,12 @@ Parent directories are processed before their children so that higher-level cont
 
 4. **Scan directory tree**: List all directories under the target path. Apply exclusion rules bidirectionally (excluded directories are neither scanned nor written to). Skip symlinks pointing outside the project root.
 
-5. **Generate plan**: List all directories that will receive CLAUDE.md files, indicating:
-   - **new**: no CLAUDE.md exists, or exists but has no `# AI Coding Auto Sections` heading
-   - **update**: CLAUDE.md exists and already contains `# AI Coding Auto Sections`
+5. **Generate plan**: Classify every directory that would receive a CLAUDE.md:
+   - **new**: no CLAUDE.md exists → create fresh (auto-managed block + 雷区 stub).
+   - **update**: CLAUDE.md exists and already contains `# AI Coding Auto Sections` → replace only the content between markers.
+   - **report-only**: CLAUDE.md exists but has NO `# AI Coding Auto Sections` heading → DO NOT write. Surface the file path to the user and let them decide.
 
-6. **Confirm with user**: Present the directory list and counts. Do NOT proceed without user confirmation.
+6. **Confirm with user**: Present the directory list and counts (including report-only files). Do NOT proceed without user confirmation.
 
 ### Step 2: Dispatch Subagents
 
@@ -54,46 +55,78 @@ For each directory (parent before children), dispatch a subagent with the follow
 ```text
 You are processing directory: {directory_path}
 Project language: {language}
-Task: Generate a CLAUDE.md section for this directory and write it to disk.
+Task: Generate the auto-managed CLAUDE.md section for this directory and write it to disk.
 
 Steps:
-1. List all direct children (directories first, then files) — only direct children, not recursive.
+1. List all direct children (directories first, then files) — only direct children, not recursive. Skip binary files. For large files (>500 lines), do not read the full file — extract key info only.
 
-2. For each subdirectory, write a one-line description based on the name. If unclear, skip the description.
+2. Run FOUR analyses:
+   a. Dead-file detection: for each file, search the module for references/imports of its name. Files with zero in-module references are marked 已废弃 (deprecated/dead).
+   b. Convention detection: scan method bodies for a shared lock object, uniform return types, error-handling style, and centralized constants.
+   c. Sync-edit-point detection: when several classes implement the same interface with near-identical method bodies, flag that they must be edited together.
+   d. Dependency + purpose inference: from imports and class shape, infer depends-on / depended-by and the one-line package purpose.
 
-3. For each file, generate a one-line summary of its purpose. Be extremely concise. Skip binary files. For large files (>500 lines), do not read the full file — extract key info only.
+3. Produce EXACTLY these six sections, in this order. SKIP any section that has no content — never output a heading with empty content behind it:
+   - 目录职责 / Directory Purpose — one line: what this package does as a unit.
+   - 关键文件 / Key Files — a table (file | role | notes). Role classifies the file (interface / impl / factory / util / data class / activity / etc.). A file with zero in-module references is marked 已废弃.
+   - 设计要点与原因 / Design Notes & Why — non-obvious structural choices and the reason they exist (this prevents over-refactoring things that exist for a purpose).
+   - 约定与陷阱 / Conventions & Traps — the detectable conventions from analysis (b). Human-known traps do NOT go here; they live in the 雷区 / Traps region outside the auto-managed markers.
+   - 依赖关系 / Dependencies — depends-on / depended-by from analysis (d).
+   - 扩展指南 / Extension Guide — the modification contract: how to add or change X without breaking things; which files must change together. Record sync-edit-point flags from analysis (c) here.
 
-4. Determine entry file based on common conventions for the project type and config file hints. If no clear entry file, skip.
+4. Section-heading language: match the detected project language. For a Chinese project use 目录职责, 关键文件, 设计要点与原因, 约定与陷阱, 依赖关系, 扩展指南. For an English project use Directory Purpose, Key Files, Design Notes & Why, Conventions & Traps, Dependencies, Extension Guide. The `# AI Coding Auto Sections` heading and all HTML comments always stay English.
 
-5. Format and write output (see Output Format below).
+5. Write the result to disk per the Output Format rules below.
 
-6. Respond with: {"directory":"...","status":"success|failed","files_processed":N,"file_path_written":"..."}
+6. Respond with: {"directory":"...","status":"success|failed","files_processed":N,"file_path_written":"...","report_only":false}
 ```
 
 **Output Format — write to `{directory_path}/CLAUDE.md`:**
 
-The content between `<!-- skill: yiyue31-context -->` and `<!-- /yiyue31-context -->` is managed exclusively by this skill. Never modify anything outside these markers.
+The content between `<!-- skill: yiyue31-context -->` and `<!-- /yiyue31-context -->` is managed exclusively by this skill. Never modify anything outside these markers — these markers protect user-written content so that regenerable auto-content does not clobber hand-written context.
 
-**If CLAUDE.md does not exist** — create with:
+**If CLAUDE.md does not exist** — create with (first generation writes the auto-managed block AND a stub for the human-maintained 雷区 region outside the markers):
 
 ```markdown
 # AI Coding Auto Sections
-<!-- skill: yiyue31-context | version: 0.0.1 | update_time: {date} -->
+<!-- skill: yiyue31-context | version: 0.0.2 | update_time: {date} -->
 
-## {目录结构 / Directory Structure}
-{directories first, then files, one line each}
+## 目录职责 / Directory Purpose
+{one line: what this package does as a unit}
 
-## {入口文件 / Entry File} (if any)
-- filename — description
+## 关键文件 / Key Files
+| 文件 / file | 角色 / role | 说明 / notes |
+|------|------|------|
+| ... | interface / impl / factory / util / data class / activity / ... | ... |
+
+A file with zero in-module references is marked 已废弃 (deprecated/dead).
+
+## 设计要点与原因 / Design Notes & Why
+{non-obvious structural choices and the reason they exist}
+
+## 约定与陷阱 / Conventions & Traps
+{detectable conventions: shared lock object, uniform return types, error-handling style, centralized constants}
+
+## 依赖关系 / Dependencies
+depends-on: ...
+depended-by: ...
+
+## 扩展指南 / Extension Guide
+{modification contract: how to add or change X without breaking things; which files must change together}
 
 <!-- /yiyue31-context -->
+
+## 雷区 / Traps (Human-Maintained)
+<!-- OUTSIDE the yiyue31-context auto-managed markers. The skill NEVER overwrites this region. It holds traps only a human knows. Add them below. -->
 ```
 
-**If CLAUDE.md exists with `# AI Coding Auto Sections` heading** — find the heading, replace everything from `<!-- skill: yiyue31-context ... -->` through `<!-- /yiyue31-context -->` (inclusive) with new content. If `<!-- /yiyue31-context -->` is missing, replace from `<!-- skill: yiyue31-context -->` to the next level-1 heading or EOF. Preserve all content before and after the section.
+Skip any of the six auto-managed sections that has no content — never output a heading with empty content behind it. The `## 雷区 / Traps (Human-Maintained)` region is NOT one of the six auto sections; it is a stub written once on first generation only.
 
-**If CLAUDE.md exists but has NO `# AI Coding Auto Sections` heading** — append to end of file.
+Section-heading language matches the detected project language (Chinese projects use the Chinese names above; English projects use the English names). The `# AI Coding Auto Sections` heading and all HTML comments always stay English.
 
-**Section heading language**: Match the detected project language. The `# AI Coding Auto Sections` heading and HTML comments always stay in English.
+**If CLAUDE.md exists with `# AI Coding Auto Sections` heading** — replace ONLY the content from `<!-- skill: yiyue31-context ... -->` through `<!-- /yiyue31-context -->` (inclusive) with the new auto-managed block. If `<!-- /yiyue31-context -->` is missing, replace from `<!-- skill: yiyue31-context -->` to the next level-1 heading or EOF. Preserve ALL content outside the markers, including any human-maintained 雷区 / Traps region — on re-runs only the content between markers is replaced, so the 雷区 region is preserved.
+
+**If CLAUDE.md exists but has NO `# AI Coding Auto Sections` heading** — REPORT-ONLY. Do NOT append, do NOT rewrite. Surface the file path to the user and let them decide whether and how to integrate it.
 
 ### Step 3: Track Progress & Handle Failures
 
@@ -103,7 +136,7 @@ The content between `<!-- skill: yiyue31-context -->` and `<!-- /yiyue31-context
 
 ### Step 4: Final Report
 
-Output a report to the user (in conversation, not to a file) covering: target path, project language, counts of processed/skipped/failed directories, CLAUDE.md created/updated counts, lists of processed and failed directories with reasons.
+Output a report to the user (in conversation, not to a file) covering: target path, project language, counts of processed/skipped/failed/report-only directories, CLAUDE.md created/updated counts, and lists of processed, failed, and report-only directories with reasons.
 
 ## Parameters
 
@@ -116,6 +149,10 @@ Output a report to the user (in conversation, not to a file) covering: target pa
 
 ## Rules
 
-- Never modify content outside `<!-- skill: yiyue31-context -->` ... `<!-- /yiyue31-context -->` markers. These markers protect user-written content from being overwritten — only the section between markers is managed by this skill.
-- The `# AI Coding Auto Sections` section is managed exclusively by this skill.
+- Never modify content outside `<!-- skill: yiyue31-context -->` ... `<!-- /yiyue31-context -->` markers. These markers protect user-written content so that regenerable auto-content does not clobber hand-written context.
+- The `# AI Coding Auto Sections` section (between the markers) is managed exclusively by this skill.
+- The `## 雷区 / Traps (Human-Maintained)` region sits OUTSIDE the markers. The skill NEVER overwrites it — it holds traps only a human knows. First generation writes a stub for it; re-runs only replace content between the auto markers, so this region is preserved.
+- Adaptive output: skip any auto-managed section that has no content. Never output a heading with empty content behind it.
+- Parent directories are processed before their children so that higher-level context is available before diving into subdirectories.
+- If CLAUDE.md exists but has NO `# AI Coding Auto Sections` heading: REPORT-ONLY. Do not append or rewrite; surface the file to the user and let them decide.
 - Confirm plan with user before writing files. This is a write-heavy operation that touches many files across the project — user awareness is essential.

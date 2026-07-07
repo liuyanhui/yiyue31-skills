@@ -1,6 +1,6 @@
 # AI Context Checker
 
-CLI 工具，用于扫描目录结构并验证目标文件（如 CLAUDE.md）的覆盖率、编码、标记配对、内容一致性等。
+CLI 工具，用于扫描目录结构并验证目标文件（如 CLAUDE.md）的覆盖率、编码、标记配对、段名白名单、内容一致性等。配套 yiyue31-context skill 使用。
 
 ## 快速开始
 
@@ -34,7 +34,7 @@ scripts/
 │   │   ├── enums.ts          #   MarkerIssueIdentifier 等
 │   │   ├── validation.ts     #   ValidationResult, PipelineResult 等 + 错误类
 │   │   └── index.ts          #   桶导出
-│   ├── modules/              # 17 个功能模块
+│   ├── modules/              # 18 个功能模块
 │   │   ├── cli-parser.ts             # CLI 参数解析
 │   │   ├── config-merger.ts          # 配置合并（CLI + 文件 + 默认值）
 │   │   ├── input-validator.ts        # 输入校验（10 项前置条件）
@@ -47,6 +47,7 @@ scripts/
 │   │   ├── marker-position-analyzer.ts   # 标记位置分析（head/middle/tail）
 │   │   ├── required-pattern-validator.ts # 必填模式校验
 │   │   ├── forbidden-pattern-validator.ts # 禁止模式校验
+│   │   ├── allowed-section-validator.ts  # 自适应段名校验（六段白名单，v0.0.2 新增）
 │   │   ├── content-disk-consistency-checker.ts # 内容-磁盘一致性
 │   │   ├── file-change-detector.ts   # 文件变更检测（mtime）
 │   │   ├── custom-content-analyzer.ts # 自定义内容分析
@@ -56,19 +57,13 @@ scripts/
 │       └── fs-wrapper.ts     # 可 mock 的文件系统包装
 ├── tests/
 │   ├── types/                # 类型编译测试
-│   ├── modules/              # 17 个模块单元测试
+│   ├── modules/              # 18 个模块单元测试
 │   ├── e2e/                  # 端到端集成测试
 │   ├── cli-entry.test.ts     # CLI 入口测试
 │   └── fixtures/             # 测试固件
 ├── docs/                     # 设计文档与规划
 │   ├── REQUIREMENTS.md       #   需求规格
-│   ├── section*.md           #   模块接口设计（17 个）
-│   ├── section4-*.md         #   核心数据结构设计
-│   ├── section5-*.md         #   验证流水线流程
-│   ├── task-list-impl.md     #   实施任务清单
-│   ├── work-plan-report.md   #   实施报告
-│   ├── observe-logs/         #   执行日志
-│   └── ...                   #   其他设计/交接文档
+│   └── DESIGN_DEFERRED.md    #   设计遗留疑问
 ├── package.json
 ├── tsconfig.json
 ├── jest.config.ts
@@ -81,8 +76,20 @@ scripts/
 每个目录依次执行以下检查，前一步失败则跳过后续：
 
 ```
-文件存在 → 文件大小 → 编码 → 标记配对 → 模式校验 / 一致性 / 变更检测 / 位置分析 / 自定义内容
+文件存在 → 文件大小 → 编码 → 手写文件判定(report-only) → 标记配对 → 模式校验 / 段名校验 / 一致性 / 变更检测 / 位置分析 / 自定义内容
 ```
+
+## v0.0.2 新增/变更校验
+
+随 yiyue31-context skill 改为"修改上下文"模板（六段自适应），checker 同步以下行为：
+
+- **手写文件 report-only**：既无 `# AI Coding Auto Sections` 标题、又无任何 marker 的 CLAUDE.md，视为人工维护文件，`passed=true` 且跳过标记校验（不报缺段/缺 marker 错误）。带标题或带任意 marker 的文件仍走正常配对校验，残缺配对仍判失败。
+- **段名白名单（自适应）**：marker 块内的每个 `## ` 段名必须属于 `allowed_section_names`（默认六段中英文名集合）。**自适应**：文件不必含全部六段，空段允许跳过；只标记"出现但不在白名单"的段名。marker 块之外的标题（如人工 `## 雷区` 段）不检查。空数组关闭该校验。
+- **新输出字段**：`details.disallowed_sections` 列出段名越界的文件及其标题。
+
+配置项 `allowed_section_names` 在 `DEFAULT_CONFIG` 中给出六段默认值，可通过 `--config` JSON 覆盖。
+
+> 已知问题：checker 默认 marker 为 `<!-- skill: yiyue31-context -->`，而 skill 实际写带 version 的 `<!-- skill: yiyue31-context | version: 0.0.2 | ... -->`。当前字面匹配会导致真实 skill 产出被判缺 marker。修复前用 `--config` 覆盖 markers，或待 marker 匹配改为前缀/正则。
 
 ## 命令
 
@@ -94,7 +101,7 @@ npm run lint     # ESLint 检查
 
 ## 输出
 
-- **JSON 报告**：完整 CheckResult 结构，含 meta、summary、depth_distribution、marker_position_stats、details
+- **JSON 报告**：完整 CheckResult 结构，含 meta、summary、depth_distribution、marker_position_stats、details（含 disallowed_sections 等）
 - **Markdown 报告**：人类可读，含汇总表、详细问题列表、mtime 可靠性警告
 
 ## 技术栈

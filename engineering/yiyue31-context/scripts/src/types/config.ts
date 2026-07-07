@@ -66,6 +66,19 @@ export interface CheckConfig {
    */
   forbidden_patterns: string[];
   /**
+   * Allowed names for `## `-level managed sections inside the marker block
+   * (e.g. `"目录职责"`, `"Directory Purpose"`).
+   *
+   * Adaptive validation: a file is valid when every `## ` heading found
+   * between the markers has at least one of its slash-separated parts in
+   * this set. A file need NOT contain all listed sections — empty/omitted
+   * sections are allowed. An empty array disables the check.
+   *
+   * Headings OUTSIDE the markers (e.g. the human-maintained `## 雷区 / Traps`
+   * region) are never checked here, because they are not skill-managed.
+   */
+  allowed_section_names: string[];
+  /**
    * Minimum number of characters that must appear between the start
    * and end markers to be considered valid content.
    */
@@ -125,6 +138,23 @@ export const DEFAULT_CONFIG: Omit<CheckConfig, "target"> = {
   required_any_patterns: [],
   required_all_patterns: [],
   forbidden_patterns: [],
+  // The six skill-managed section names (Chinese + English aliases) from the
+  // rewritten SKILL.md. Adaptive: a file need only avoid section names OUTSIDE
+  // this set; it is not required to contain all six.
+  allowed_section_names: [
+    "目录职责",
+    "Directory Purpose",
+    "关键文件",
+    "Key Files",
+    "设计要点与原因",
+    "Design Notes & Why",
+    "约定与陷阱",
+    "Conventions & Traps",
+    "依赖关系",
+    "Dependencies",
+    "扩展指南",
+    "Extension Guide",
+  ],
 };
 
 /**

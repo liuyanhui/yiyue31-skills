@@ -153,6 +153,7 @@ export function mergeConfig(
     "required_any_patterns",
     "required_all_patterns",
     "forbidden_patterns",
+    "allowed_section_names",
   ] as const;
 
   for (const key of arrayKeys) {

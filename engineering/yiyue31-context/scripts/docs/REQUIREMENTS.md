@@ -3,6 +3,8 @@
 > 版本: 1.1.0
 > 日期: 2026-06-11
 > 状态: 需求确认完成（已通过评审修正）
+>
+> 注（v0.0.2，2026-07-07）：随 yiyue31-context skill 改为"修改上下文"模板，段校验从 `required_any_patterns`（旧两段 目录结构/入口文件）改为自适应的 `allowed_section_names`（六段白名单：目录职责/关键文件/设计要点与原因/约定与陷阱/依赖关系/扩展指南）。本文中 §6.2「目录结构条目格式」、§2/§7 里用 目录结构/入口文件 举例的 required_*_patterns 片段为 v0.0.2 前内容；当前模板以 SKILL.md 和 checker `DEFAULT_CONFIG`（scripts/src/types/config.ts）为准；新增 `details.disallowed_sections` 输出字段。
 
 ## 1. 概述
 
@@ -56,9 +58,17 @@ npx yiyue31-context-check --config ./check-config.json
     "end": "<!-- /yiyue31-context -->",
     "update_time_field": "update_time"
   },
-  "required_any_patterns": ["## 目录结构", "## Directory Structure"],
+  "required_any_patterns": [],
   "required_all_patterns": [],
   "forbidden_patterns": ["TODO", "FIXME", "placeholder"],
+  "allowed_section_names": [
+    "目录职责", "Directory Purpose",
+    "关键文件", "Key Files",
+    "设计要点与原因", "Design Notes & Why",
+    "约定与陷阱", "Conventions & Traps",
+    "依赖关系", "Dependencies",
+    "扩展指南", "Extension Guide"
+  ],
   "min_content_length": 1,
   "max_file_size": 51200,
   "expected_encoding": "utf-8",

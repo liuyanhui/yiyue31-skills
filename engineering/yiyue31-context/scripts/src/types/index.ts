@@ -45,6 +45,7 @@ export type {
   RequiredAllMissingEntry,
   ForbiddenFoundEntry,
   PatternIssues,
+  DisallowedSectionEntry,
   FilesystemMismatchEntry,
   StaleEntry,
   ReportDetails,

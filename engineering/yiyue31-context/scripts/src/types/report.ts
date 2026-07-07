@@ -288,6 +288,23 @@ export interface ForbiddenFoundEntry {
 }
 
 /**
+ * A file whose marker block contains one or more `## `-level managed-section
+ * headings that are not in {@link CheckConfig.allowed_section_names}.
+ *
+ * Adaptive: only headings that are PRESENT and outside the allowed set are
+ * reported. Missing sections are never reported.
+ */
+export interface DisallowedSectionEntry {
+  /** File path. */
+  file: string;
+  /**
+   * Heading texts (without the leading `##`) found inside the marker block
+   * whose name is not in the allowed set.
+   */
+  headings: string[];
+}
+
+/**
  * Aggregated pattern validation issues across all scanned files.
  */
 export interface PatternIssues {
@@ -345,6 +362,11 @@ export interface ReportDetails {
   oversized_files: OversizedFileEntry[];
   /** Aggregated pattern validation issues. */
   pattern_issues: PatternIssues;
+  /**
+   * Files whose marker block contains `## `-level section headings outside
+   * the configured allowed set.
+   */
+  disallowed_sections: DisallowedSectionEntry[];
   /** Files with filesystem-disk consistency mismatches. */
   filesystem_mismatches: FilesystemMismatchEntry[];
   /** Files with stale update_time values. */
