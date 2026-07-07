@@ -6,6 +6,7 @@
  */
 
 import type { MarkerConfig, MarkerPositionClassification } from "../types/index.js";
+import { findMarkerIndex, matchedMarkerLength } from "./marker-matcher.js";
 
 /**
  * Analyze where the marker block is positioned within the file content.
@@ -39,9 +40,9 @@ export function analyzeMarkerPosition(
   const startMarker = markers.start;
   const endMarker = markers.end;
 
-  // Step 2: Find marker positions
-  const startPos = normalized.indexOf(startMarker);
-  const endPos = normalized.indexOf(endMarker);
+  // Step 2: Find marker positions (flexible: matches attributed markers too)
+  const startPos = findMarkerIndex(normalized, startMarker);
+  const endPos = findMarkerIndex(normalized, endMarker);
 
   // Step 3: No markers found → default 'middle'
   if (startPos === -1 || endPos === -1) {
@@ -49,7 +50,7 @@ export function analyzeMarkerPosition(
   }
 
   // Step 4: Compute marker block center
-  const center = (startPos + endPos + endMarker.length) / 2;
+  const center = (startPos + endPos + matchedMarkerLength(normalized, endMarker, endPos)) / 2;
 
   // Step 5: Classify based on thirds of total content length
   const totalLength = normalized.length;

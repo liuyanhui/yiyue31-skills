@@ -10,6 +10,7 @@ import type {
   MarkerConfig,
   CustomContentClassification,
 } from "../types/index.js";
+import { findMarkerIndex, matchedMarkerLength } from "./marker-matcher.js";
 
 /**
  * Analyze whether a file has custom content beyond the marker block.
@@ -30,8 +31,8 @@ export function analyzeCustomContent(
   fileContent: string,
   markers: MarkerConfig,
 ): CustomContentClassification {
-  const startPos = fileContent.indexOf(markers.start);
-  const endPos = fileContent.indexOf(markers.end);
+  const startPos = findMarkerIndex(fileContent, markers.start);
+  const endPos = findMarkerIndex(fileContent, markers.end);
 
   // Incomplete or missing markers → 'marker_only'
   if (startPos === -1 || endPos === -1 || endPos < startPos) {
@@ -39,7 +40,7 @@ export function analyzeCustomContent(
   }
 
   // Remove the first marker pair and all enclosed content
-  const afterEnd = endPos + markers.end.length;
+  const afterEnd = endPos + matchedMarkerLength(fileContent, markers.end, endPos);
   const remaining = fileContent.slice(0, startPos) + fileContent.slice(afterEnd);
 
   // Strip remaining whitespace (spaces, newlines, tabs)

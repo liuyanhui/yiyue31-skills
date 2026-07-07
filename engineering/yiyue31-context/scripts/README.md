@@ -34,7 +34,7 @@ scripts/
 │   │   ├── enums.ts          #   MarkerIssueIdentifier 等
 │   │   ├── validation.ts     #   ValidationResult, PipelineResult 等 + 错误类
 │   │   └── index.ts          #   桶导出
-│   ├── modules/              # 18 个功能模块
+│   ├── modules/              # 19 个功能模块
 │   │   ├── cli-parser.ts             # CLI 参数解析
 │   │   ├── config-merger.ts          # 配置合并（CLI + 文件 + 默认值）
 │   │   ├── input-validator.ts        # 输入校验（10 项前置条件）
@@ -45,6 +45,7 @@ scripts/
 │   │   ├── file-encoding-validator.ts # 编码校验（UTF-8）
 │   │   ├── paired-marker-validator.ts # 标记对校验（5 条规则）
 │   │   ├── marker-position-analyzer.ts   # 标记位置分析（head/middle/tail）
+│   │   ├── marker-matcher.ts     # marker 弹性匹配（前缀+属性，v0.0.2）
 │   │   ├── required-pattern-validator.ts # 必填模式校验
 │   │   ├── forbidden-pattern-validator.ts # 禁止模式校验
 │   │   ├── allowed-section-validator.ts  # 自适应段名校验（六段白名单，v0.0.2 新增）
@@ -57,7 +58,7 @@ scripts/
 │       └── fs-wrapper.ts     # 可 mock 的文件系统包装
 ├── tests/
 │   ├── types/                # 类型编译测试
-│   ├── modules/              # 18 个模块单元测试
+│   ├── modules/              # 19 个模块单元测试
 │   ├── e2e/                  # 端到端集成测试
 │   ├── cli-entry.test.ts     # CLI 入口测试
 │   └── fixtures/             # 测试固件
@@ -89,7 +90,7 @@ scripts/
 
 配置项 `allowed_section_names` 在 `DEFAULT_CONFIG` 中给出六段默认值，可通过 `--config` JSON 覆盖。
 
-> 已知问题：checker 默认 marker 为 `<!-- skill: yiyue31-context -->`，而 skill 实际写带 version 的 `<!-- skill: yiyue31-context | version: 0.0.2 | ... -->`。当前字面匹配会导致真实 skill 产出被判缺 marker。修复前用 `--config` 覆盖 markers，或待 marker 匹配改为前缀/正则。
+> marker 弹性匹配（v0.0.2）：checker 默认 marker 为简单形式 `<!-- skill: yiyue31-context -->`，但 skill 实际写带 version 的 `<!-- skill: yiyue31-context | version: 0.0.2 | ... -->`。`marker-matcher` 按稳定前缀 + 允许 `| 属性` + `-->` 匹配，两种形式都能识别（真实 skill 产出不再被判缺 marker；staleness 也能正确读取 `update_time`）。
 
 ## 命令
 

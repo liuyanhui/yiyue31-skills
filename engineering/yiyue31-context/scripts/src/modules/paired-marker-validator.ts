@@ -11,6 +11,7 @@ import type {
   PairedMarkerValidationResult,
   ContentIssueResult,
 } from "../types/index.js";
+import { findMarkerIndex, matchedMarkerLength } from "./marker-matcher.js";
 
 /**
  * Validate paired markers in a file's content.
@@ -40,26 +41,26 @@ export function validatePairedMarkers(
   let searchOffset = 0;
 
   while (searchOffset < fileContent.length) {
-    const idx = fileContent.indexOf(startMarker, searchOffset);
+    const idx = findMarkerIndex(fileContent, startMarker, searchOffset);
     if (idx === -1) break;
     startCount++;
-    searchOffset = idx + startMarker.length;
+    searchOffset = idx + matchedMarkerLength(fileContent, startMarker, idx);
   }
 
   searchOffset = 0;
   while (searchOffset < fileContent.length) {
-    const idx = fileContent.indexOf(endMarker, searchOffset);
+    const idx = findMarkerIndex(fileContent, endMarker, searchOffset);
     if (idx === -1) break;
     endCount++;
-    searchOffset = idx + endMarker.length;
+    searchOffset = idx + matchedMarkerLength(fileContent, endMarker, idx);
   }
 
   // marker_count = number of pairs (min of start and end counts)
   const marker_count = Math.min(startCount, endCount);
 
   // Find positions of first occurrences
-  const firstStartIdx = fileContent.indexOf(startMarker);
-  const firstEndIdx = fileContent.indexOf(endMarker);
+  const firstStartIdx = findMarkerIndex(fileContent, startMarker);
+  const firstEndIdx = findMarkerIndex(fileContent, endMarker);
 
   // Rule 1: Start marker must exist
   if (startCount === 0) {
@@ -89,7 +90,7 @@ export function validatePairedMarkers(
   let content_issue: ContentIssueResult | null = null;
 
   if (firstStartIdx !== -1 && firstEndIdx !== -1 && firstStartIdx < firstEndIdx) {
-    const contentStart = firstStartIdx + startMarker.length;
+    const contentStart = firstStartIdx + matchedMarkerLength(fileContent, startMarker, firstStartIdx);
     const contentEnd = firstEndIdx;
     extracted_content = fileContent.substring(contentStart, contentEnd);
 

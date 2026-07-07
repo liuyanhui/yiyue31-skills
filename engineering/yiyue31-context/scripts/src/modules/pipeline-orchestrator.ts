@@ -59,6 +59,7 @@ import type {
 } from "../types/index.js";
 import { readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { containsMarker, extractMarkerMatch } from "./marker-matcher.js";
 
 // ---------------------------------------------------------------------------
 // ModuleRegistry for dependency injection
@@ -194,8 +195,8 @@ function isHandWrittenFile(
   endMarker: string,
 ): boolean {
   const hasHeading = fileContent.includes(MANAGED_HEADING);
-  const hasStart = fileContent.includes(startMarker);
-  const hasEnd = fileContent.includes(endMarker);
+  const hasStart = containsMarker(fileContent, startMarker);
+  const hasEnd = containsMarker(fileContent, endMarker);
   return !hasHeading && !hasStart && !hasEnd;
 }
 
@@ -636,7 +637,7 @@ export function runPipeline(
       let staleInfo: FileReport["stale_info"] = null;
       const changeResult = registry.detectFileChanges(
         fullDirPath,
-        config.markers.start,
+        extractMarkerMatch(fileContent, config.markers.start) ?? config.markers.start,
         config.markers.update_time_field,
         new Date().toISOString(),
       );

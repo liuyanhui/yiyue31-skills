@@ -24,7 +24,7 @@
 SKILL.md 定义输出格式，checker 校验它。改 SKILL.md 的段名/marker/行为时，必须同步：
 - 段名集合：SKILL.md 的六段 == checker `DEFAULT_CONFIG.allowed_section_names`（scripts/src/types/config.ts）。
 - 行为：report-only、自适应段名等在 checker 的 pipeline-orchestrator.ts 里要有对应实现 + 测试。
-- ⚠️ marker 格式当前不一致（见已知问题 1），同步前先确认。
+- marker 由 `marker-matcher` 弹性匹配：简单形式与带 version 形式都识别；SKILL.md 改 marker 写法时确认仍能被匹配。
 
 ## 构建/测试 checker
 
@@ -36,8 +36,7 @@ cd scripts && npm run build && npm run test   # 串行，约 8s
 
 ## 已知问题
 
-1. **marker 格式不匹配**（高优先，预存在）：checker 默认 markers 是无 version 的简单形式 `<!-- skill: yiyue31-context -->`，skill 实际写带 version 的 `<!-- skill: yiyue31-context | version: 0.0.2 | update_time: ... -->`。字面 `includes()` 匹配会让真实 skill 产出被判缺 marker。修复方向：checker 改前缀/正则匹配，或默认 markers 含 version。修前可用 `--config` 覆盖 markers 规避。
-2. **subagent 派发卡顿**（历史，待修 orchestrator/planner）：见 stall-incident-analysis.md。
+1. **subagent 派发卡顿**（历史，待修 orchestrator/planner）：见 stall-incident-analysis.md。
 
 ## 改动约定
 

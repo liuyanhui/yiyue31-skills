@@ -17,6 +17,7 @@ import type {
   DiskEntry,
   MarkerConfig,
 } from "../types/index.js";
+import { findMarkerIndex, matchedMarkerLength } from "./marker-matcher.js";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -78,13 +79,13 @@ function extractMarkerContent(
   fileContent: string,
   markers: MarkerConfig,
 ): string | null {
-  const startIdx = fileContent.indexOf(markers.start);
+  const startIdx = findMarkerIndex(fileContent, markers.start);
   if (startIdx === -1) {
     return null;
   }
 
-  const contentStartIdx = startIdx + markers.start.length;
-  const endIdx = fileContent.indexOf(markers.end, contentStartIdx);
+  const contentStartIdx = startIdx + matchedMarkerLength(fileContent, markers.start, startIdx);
+  const endIdx = findMarkerIndex(fileContent, markers.end, contentStartIdx);
   if (endIdx === -1) {
     return null;
   }

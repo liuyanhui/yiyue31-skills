@@ -219,3 +219,33 @@ describe("validatePairedMarkers — marker_count scenarios", () => {
     expect(result.marker_count).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test: attributed/versioned start marker matches the configured simple form.
+// Regression: previously literal indexOf missed the versioned marker and
+// flagged missing_start_marker on real skill output.
+// ---------------------------------------------------------------------------
+describe("validatePairedMarkers — attributed start marker", () => {
+  const SIMPLE = "<!-- skill: yiyue31-context -->";
+  const END_MARKER = "<!-- /yiyue31-context -->";
+  const VERSIONED =
+    "<!-- skill: yiyue31-context | version: 0.0.2 | update_time: 2026-07-07 -->";
+
+  it("validates a file whose start marker carries version/update_time attributes", () => {
+    const content = `# AI Coding Auto Sections\n${VERSIONED}\nThis content is long enough to pass the minimum length check.\n${END_MARKER}\n`;
+    const result = validatePairedMarkers(content, SIMPLE, END_MARKER, 10, FILE_PATH);
+
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.marker_count).toBe(1);
+    expect(result.extracted_content).toContain("long enough");
+  });
+
+  it("excludes the full attributed marker from extracted content (correct length slicing)", () => {
+    const content = `${VERSIONED}body-text-here${END_MARKER}`;
+    const result = validatePairedMarkers(content, SIMPLE, END_MARKER, 1, FILE_PATH);
+    // The whole versioned marker must be excluded, not just the simple-form length.
+    expect(result.extracted_content).toBe("body-text-here");
+    expect(result.extracted_content).not.toContain("version");
+  });
+});

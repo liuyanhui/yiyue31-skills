@@ -17,6 +17,7 @@
  */
 
 import type { DisallowedSectionEntry } from "../types/index.js";
+import { findMarkerIndex, matchedMarkerLength } from "./marker-matcher.js";
 
 /**
  * Validate that every `## `-level heading inside the marker block is in the
@@ -46,15 +47,15 @@ export function validateAllowedSections(
     return [];
   }
 
-  const startIdx = fileContent.indexOf(startMarker);
-  const endIdx = fileContent.indexOf(endMarker);
+  const startIdx = findMarkerIndex(fileContent, startMarker);
+  const endIdx = findMarkerIndex(fileContent, endMarker);
   // No marker block, or markers reversed/identical → nothing to check.
   if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) {
     return [];
   }
 
   const blockContent = fileContent.substring(
-    startIdx + startMarker.length,
+    startIdx + matchedMarkerLength(fileContent, startMarker, startIdx),
     endIdx,
   );
 
