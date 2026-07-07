@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.4.0 (2026-07-07)
+
+### 注释体系重构：两阶段 + 机械校验（修复 evolve-harness 翻译暴露的设计问题）
+
+修复清单见 `yiyue31-translator-fix-plan.md`（T1–T7 落地；T8 待用户决策）。
+
+- **Step 4 重写为阶段A（翻译 + 内联打标）**：加优先级序列「准确 > 流畅地道 > 必要注释；冲突时流畅优先于注释」；落地注释保留标准 #1–#4；术语/机械分流——机械类内联原样保留，判断类在译文中内联插入 `«english»` 标记（不直接加括注、不产出清单）。
+- **Step 4.5 阶段B（注释把关）**：扫描残留 `«english»` 按 #1 裁定（保留→`中文（English）` / 删除→去标记）；句级 `**中文（English）**` 仅限 Step 3 精选清单（#2/#3）；#4 强调用加粗/短句不注释。
+- **Step 3 收紧连字符词组**：仅 coined/专名式（`build-not-buy`、作专名的 `agent-based`）保留英文；普通复合形容词（`hand-built`、`long-context` 等）直接译中文。
+- **新增 `scripts/verify-mechanical.js` + Step 4.6 强制关卡**：代码块/行内代码原文⊆译文（抓遗漏与误改）、SVG 字节一致、URL 原样、keep-list 未改写、`«»` 残留=0、`（英文）` 注释密度超阈值——任一不过打回，不得进质检。
+- **Step 2 结构化 keep-list**：输出 `keep-list-{title}.json`（`keep` / `properNouns` / `abbreviations`），供 `verify-mechanical.js` 消费；并判定本文受众喂给翻译/阶段B。
+- **新增 `scripts/consistency-checklist.js` + Step 11 全局一致性**：扫合并全文产出小清单（术语裸英文残留 / 注释密度离群 chunk / 格式一致性），决策 subagent 只读清单下结论——不读整篇（防 93KB 长文上下文溢出）。
+- **审校纪律（Step 5/6/7/9 共用）**：标注独立执行、不可压缩（合并稀释 rigor）；限流改串行不合并；审校尽量与翻译不同模型，不可控时补"注释滥用对抗检查" pass；偏离流程须先告知用户。
+- **translationese prompt 补"括号英文堆砌"**（头号毛病）：自包含删除规则——除 (a) 术语括注、(b) 加粗精选金句/修辞句外，其余括注必删。
+
 ## v2.3.6 (2026-06-18)
 
 ### inspector 清理

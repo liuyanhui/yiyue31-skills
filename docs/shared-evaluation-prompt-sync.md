@@ -27,4 +27,9 @@ translator、hn-digest 等 skill 都产出中文文本，各自带一份"AI 味�
 
 ## 待办
 
-- **跨 skill 漂移核查（优先级低）**：reader-audit（hn-digest ↔ summary）、translationese（translator ↔ hn-digest）是近似副本，需查是否已分化，再按同步规则处理。
+- **跨 skill 漂移核查（优先级低）**：reader-audit（hn-digest ↔ summary）是近似副本，需查是否已分化，再按同步规则处理。
+- **translationese（translator ↔ hn-digest）已核查（2026-07-07）**：两者是**不同语言**的独立文档——translator 版为中文「翻译腔检查」，hn-digest 版为英文「Translationese Evaluation Prompt」，结构与示例均不同。按"不同输出语言是独立文档、不绑版本号"规则，**不做内容同步**。translator 版于 v2.4.0 补了「双语并置 / 括号英文注释堆砌」一项（翻译专属，不传导到 hn-digest 英文版）。
+
+## ai-tone 漂移说明（2026-07-07）
+
+translator（v2.1）与 hn-digest（v2.2）的 ai-tone 已漂移：hn-digest 先行升到 v2.2。translator v2.4.0 **未**改动 ai-tone（评估后决定不把"括号英文堆砌"翻译专属规则塞进共享 prompt，避免破坏同内容不变量；该检测落在 translationese prompt + SKILL.md 注释滥用对抗 pass）。下次任一方改动 ai-tone 时，应先把 v2.1↔v2.2 的既有漂移对齐，再同步。
