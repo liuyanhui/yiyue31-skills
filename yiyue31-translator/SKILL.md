@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
-version: 2.4.0
+version: 2.4.1
 author: Yiyue31
 ---
 
@@ -144,7 +144,7 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-{NN}-xxx.md" "{title}/translation/translated-chunks/translated-chunk-{NN}.md" --keep-list "{title}/translation/keep-list-{title}.json"
 ```
 
-**脚本不过即打回重做，不得进入 Step 5+ 质检。** 校验项：代码块/行内代码原文⊆译文（抓遗漏与误改）、内联 SVG 字节一致、URL 原样、keep-list 条目未被改写、`«»` 残留 = 0、`（英文）` 注释密度 ≤ 阈值（默认 10，`--max-annotations` 可调）。退出码 0 = 通过，1 = 打回。详见 `scripts/verify-mechanical.js` 顶部说明。
+**脚本不过即打回重做，不得进入 Step 5+ 质检。** 硬判校验项（不过即打回）：代码块/行内代码原文⊆译文（抓遗漏与误改）、内联 SVG 字节一致、URL 原样、keep-list 条目未被改写、`«»` 残留 = 0。`（英文）` 括注密度超阈值仅 **WARN**——该计数无法区分金句原文/引用/专名括注与词级 spam，过注与否的硬判留给 Step 6 翻译腔语义检查（"括号英文堆砌"规则）。退出码 0 = 通过，1 = 打回。详见 `scripts/verify-mechanical.js` 顶部说明。
 
 ### 审校纪律（Step 5 / 6 / 7 / 9 共用）
 

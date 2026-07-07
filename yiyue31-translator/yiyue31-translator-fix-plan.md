@@ -166,6 +166,21 @@
 - **T1–T7 全部落地**（详见各任务 `[x]`）。改动文件：`SKILL.md`、`references/evaluate-translationese-prompt.md`、新增 `scripts/verify-mechanical.js`、新增 `scripts/consistency-checklist.js`。两个脚本已用临时样例自测通过（代码/URL/SVG/keep-list/«»/注释密度六项；术语表面形式/离群/格式三项）。
 - **T8 待用户决策**（见 T8 草案）。删文件的前置条件之一"重跑翻译验证"需消耗大量 subagent / 内存，未在本轮内联执行——交由用户在新会话中重跑后确认，再删本文件。
 
+### 4.1 重译验证（2026-07-07，evolve-the-harness 12KB 摘要）
+
+完成判据第 2 条「重跑翻译验证」**部分满足**（抽 1 个 chunk，非全量；详见 `refined-stock/evolve-the-harness/VERIFICATION.md`）：
+
+- ✅ 满屏括注消失：裸英文词级 spam ~12+ → **1**（`（scaffold）`）。
+- ✅ `«»` 残留 = 0。
+- ✅ `verify-mechanical.js` 硬判项全过（代码/URL/SVG/keep-list 无误碰）。
+- ✅ 跨 chunk 术语一致：单 chunk 无 ②；① 仅 `agent`/`verifier` 且都在金句/代码内，零真实不一致。
+
+**验证中发现并修复的脚本缺陷**（v2.4.1）：
+- `verify-mechanical.js` 注释密度：**硬 FAIL → WARN**。粗计数把金句原文括注/引用/专名算成 spam，误杀引用密集的干净译文。是对第 2 节「density 超阈值打回」的**有据偏离**——更贴合「脚本管机械、审校管语义」。硬判项保持硬 FAIL。
+- `consistency-checklist.js` ①：只对「应译纯中文」术语报残留（去 `harness×28` 噪声）；③：只查 `- * +` 混用（不报有序+无序并存）。
+
+**删文件前置**：仍需在新会话跑一次**全量**（89KB）重译确认；当前单 chunk 已证明注释体系修复生效。
+
 ### T8 草案（待确认，确认后写入 SKILL.md）
 
 PM 抽样验收 + 自动红旗检测的建议形式：

@@ -30,6 +30,15 @@ doc_segmenter 自动处理：小文件（< 40KB）直接作为单 chunk，大文
 
 `references/terms.md` — 只收录 LLM 会翻错的术语，翻译后自动维护。
 
+## 脚本
+
+| 脚本 | 作用 |
+|---|---|
+| `scripts/doc_segmenter/` | 文章分段（小文件单 chunk，大文件按章节切分）。 |
+| `scripts/verify-mechanical.js` | **Step 4.6 机械校验关卡**：代码/URL/SVG/keep-list 原样、`«»` 残留=0（硬判）；注释密度（WARN）。不过打回。 |
+| `scripts/consistency-checklist.js` | **Step 11 全局一致性**：扫合并全文产出小清单（术语裸英文残留 / 注释密度离群 / 格式），决策 subagent 只读清单下结论。 |
+| `scripts/word-counter.js` | Step 10 字数统计。 |
+
 ## 依赖
 
 - Node.js v16+

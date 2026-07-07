@@ -9,7 +9,8 @@
 //   3. URL：正则提取，原文每个 URL 必须在译文中原样出现。
 //   4. keep-list 存在性：原文 chunk 中出现的 keep-list 条目（[KEEP] 术语 / 专名 / 全大写缩写）必须在译文中原样保留，未被改写成中文。
 //   5. «» 标记残留 = 0：阶段B 必须把所有 «english» 标记裁定完毕，残留即 FAIL。
-//   6. 注释密度：译文（英文）括注计数，超阈值打回（默认 --max-annotations 10，可调）。
+//   6. 注释密度（仅 WARN）：译文（英文）括注计数，超阈值仅告警（计数含金句原文/引用/专名括注，
+//      无法机械区分词级 spam；过注硬判留给语义层）。默认 --max-annotations 10，可调。
 //
 // CLI: node verify-mechanical.js <original.md> <translated.md> [--keep-list <path>] [--max-annotations N] [--json]
 // Module: const verify = require('./verify-mechanical.js')
@@ -198,12 +199,15 @@ function verify(originalText, translatedText, opts = {}) {
   const residues = translatedText.match(markerRe) || [];
   for (const r of residues) fails.push({ check: "marker-residue", message: `阶段B 未裁定的 «» 标记残留：${r}`, detail: r });
 
-  // 6. 注释密度
+  // 6. 注释密度（仅 WARN，不硬判）
+  //    该计数无法区分"金句原文括注(#2/#3) / 引用 / 专名括注 / 数据列表"与真正的"词级 spam(#1)"。
+  //    能机械硬判的（代码/URL/SVG/keep-list/«»）已在上面的 FAIL；过注与否的硬判留给语义层
+  //    （Step 6 翻译腔检查的"括号英文堆砌"规则 + 阶段B + 注释滥用对抗 pass）。
   const annCount = countEnglishAnnotations(translatedText);
   if (annCount > maxAnnotations) {
-    fails.push({ check: "annotation-density", message: `（英文）注释密度超阈值：${annCount} > ${maxAnnotations}（--max-annotations 可调）`, detail: { annCount, maxAnnotations } });
+    warns.push(`（英文）括注数 ${annCount} > ${maxAnnotations}：含金句原文/引用/专名括注时正常，需语义层判定是否真过注（--max-annotations 可调阈值）`);
   } else if (annCount > maxAnnotations * 0.7) {
-    warns.push(`（英文）注释密度偏高：${annCount}/${maxAnnotations}，接近阈值`);
+    warns.push(`（英文）括注数偏高：${annCount}/${maxAnnotations}，接近阈值`);
   }
 
   return { passed: fails.length === 0, fails, warns, stats: { annotationCount: annCount, maxAnnotations } };
@@ -242,7 +246,7 @@ function printHelp() {
   3. URL：原文每个 URL 须在译文中原样出现
   4. keep-list：原文出现的条目须原样保留英文
   5. «» 标记残留 = 0
-  6. （英文）注释密度 ≤ 阈值（默认 10）
+  6. （英文）注释密度超阈值 → 仅 WARN（含金句原文/引用/专名括注时正常；过注硬判留给语义层）
 
 退出码: 0 = 通过, 1 = 打回重做`);
 }

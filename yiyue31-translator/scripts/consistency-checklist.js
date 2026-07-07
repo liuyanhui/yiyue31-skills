@@ -47,6 +47,9 @@ function checkTerms(mergedProse, glossaryEntries) {
   const flags = [];
   for (const e of glossaryEntries) {
     if (e.isKeep) continue;
+    // 只对"应译成纯中文"的术语报裸英文残留：glossary 译法本身含英文（如 "harness（脚手架）"、
+    // "LLM（大型语言模型）"）意味着该词本就要保留英文，正文出现裸英文是预期的，不算不一致。
+    if (/[a-zA-Z]/.test(e.translation)) continue;
     const term = e.english.trim();
     if (!term) continue;
     // 词边界（支持短语与含连字符的术语）；大小写不敏感以兼顾句首大写。
@@ -87,14 +90,14 @@ function annotationOutliers(chunksDir) {
 function checkFormat(text) {
   const lines = text.split(/\r?\n/);
   const headingLevels = [];
-  const listMarkers = new Set();
+  const unorderedMarkers = new Set(); // - * + 混用才算问题；有序(1.)与无序并存是正常结构
   let fenceBack = 0;
   let fenceTilde = 0;
   for (const line of lines) {
     const h = line.match(/^(#{1,6})\s/);
     if (h) headingLevels.push(h[1].length);
-    const li = line.match(/^\s*([-*+]|\d+\.)\s/);
-    if (li) listMarkers.add(li[1].replace(/\./, "1")); // 归一有序列表为 "1"
+    const li = line.match(/^\s*([-*+])\s/);
+    if (li) unorderedMarkers.add(li[1]);
     if (/^```/.test(line.trim())) fenceBack++;
     else if (/^~~~/.test(line.trim())) fenceTilde++;
   }
@@ -107,7 +110,7 @@ function checkFormat(text) {
   }
   return {
     headingSkips: skips,
-    listMarkersMixed: listMarkers.size > 1 ? [...listMarkers] : [],
+    listMarkersMixed: unorderedMarkers.size > 1 ? [...unorderedMarkers] : [],
     fenceMixed: fenceBack > 0 && fenceTilde > 0,
   };
 }

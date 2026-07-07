@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.4.1 (2026-07-07)
+
+### 验证驱动的脚本校准（重译 evolve-the-harness 摘要后修正）
+
+用修复后的 skill 重译 evolve-the-harness 12KB 摘要（详见 `refined-stock/evolve-the-harness/VERIFICATION.md`），真实数据暴露两处脚本校准问题：
+
+- **`verify-mechanical.js` 注释密度：硬 FAIL → WARN**。粗计数无法区分金句原文括注（#2/#3）、引用 `（Lee et al., 2026）`、专名 `（Opus 4.8）` 与真正的词级 spam，对引用密集的译文误杀（27 > 10 打回干净译文）。改为 WARN——过注硬判交给语义层（Step 6 翻译腔检查）。SKILL.md Step 4.6 措辞同步：硬判项（代码/URL/SVG/keep-list/«»）不过即打回，密度仅 WARN。
+- **`consistency-checklist.js` ① 去噪**：glossary 对 harness/scaffold/LLM/frontier 等本就「保留英文」，旧逻辑误报 `harness×28` 等噪声。改为只对「应译纯中文」的术语报裸英文残留（验证中只剩 agent/verifier，且都在金句/代码内，零真实不一致）。
+- **`consistency-checklist.js` ③ 修正**：把「有序+无序列表并存」误报为混用。改为只查无序标记 `- * +` 混用。
+
+### 验证结论
+
+裸英文词级注释 spam ~12+ → 1；`«»` 残留 = 0；机械校验全过；译文流畅、金句与代码/专名正确保留。fix-plan T1–T7 设计目标达成。density 改 WARN 是对 fix-plan「density 超阈值打回」的有据偏离（更贴合「脚本管机械、审校管语义」）。
+
 ## v2.4.0 (2026-07-07)
 
 ### 注释体系重构：两阶段 + 机械校验（修复 evolve-harness 翻译暴露的设计问题）
