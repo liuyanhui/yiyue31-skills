@@ -30,10 +30,10 @@ Default: **Tech Blog**. Tech News is NOT penalized for lacking implementation de
 
 | Band | Information Density (ID) | Logical Coherence (LC) | Technical Depth (TD) | Expression Quality (EQ) |
 |---|---|---|---|---|
-| 9-10 | Zero filler. Every sentence carries a specific claim. | Clear thesis, complete causal chain, zero contradictions. | Named methods, data, tools, versions, configurations. | Concise, professional, varied structure, error-free. |
-| 7-8 | ≤10% filler. Minor redundancy. | Minor logical leaps or weak transitions. | Occasional vagueness, missing specifics. | Occasional wordiness or minor awkwardness. |
-| 5-6 | Half adds value. Noticeable filler/vagueness. | Some claims lack evidence. Gaps in reasoning. | Shallow, surface-level, lacks concrete details. | Ambiguous, awkward, choppy transitions. |
-| 3-4 | Generic claims, padding, platitudes. | Claims disconnected from evidence. Multiple breaks. | Vague, imprecise, potentially inaccurate. | Multiple issues, unclear phrasing, inconsistent style. |
+| 9-10 | Zero filler. Every sentence carries a specific claim worth keeping. | Clear thesis, complete causal chain, zero contradictions. | Named methods, data, tools, versions, configurations. | Concise, professional, varied structure, error-free. |
+| 7-8 | ≤10% filler. Minor redundancy or low-value restatements. | Minor logical leaps or weak transitions. | Occasional vagueness, missing specifics. | Occasional wordiness or minor awkwardness. |
+| 5-6 | Half adds value. Noticeable filler, vagueness, or accurate-but-minor sentences that don't change understanding. | Some claims lack evidence. Gaps in reasoning. | Shallow, surface-level, lacks concrete details. | Ambiguous, awkward, choppy transitions. |
+| 3-4 | Generic claims, padding, platitudes, restatements. | Claims disconnected from evidence. Multiple breaks. | Vague, imprecise, potentially inaccurate. | Multiple issues, unclear phrasing, inconsistent style. |
 | 0-2 | Could describe any article. | Self-contradictory. No narrative. | Technical content wrong or missing. | Language prevents comprehension. |
 
 ## Output Report
@@ -44,7 +44,7 @@ Default: **Tech Blog**. Tech News is NOT penalized for lacking implementation de
 **Type:** [Paper/Tech Blog/Tech News] | **Words:** [N] | **Weights:** [ID/LC/TD/EQ %]
 
 ### Methodology
-- **Dimensions & Definitions**: [ID: substance ratio | LC: causal coherence | TD: technical specificity | EQ: clarity & professionalism]
+- **Dimensions & Definitions**: [ID: substance ratio — signal vs. filler, where "filler" includes accurate-but-low-importance sentences that don't change understanding, not just generic padding | LC: causal coherence | TD: technical specificity | EQ: clarity & professionalism]
 - **Weights**: [state per classified type]
 - **Formula**: Total = round(ID×W_ID + LC×W_LC + TD×W_TD + EQ×W_EQ), weights as decimals summing to 1.0. Range 0-10.
 

@@ -1,7 +1,7 @@
 ---
 name: Paper-Summary
 display_name: Paper Summary Template
-version: 2.2.0
+version: 2.2.1
 ---
 
 # Paper Summary Template
@@ -68,6 +68,6 @@ Paper notes template, suitable for summarizing research papers, helping readers 
 
 ## Rules
 
-- **Structure**: Organize by paper sections in order (introduction, related work, methods, experiments, conclusions, etc.)
+- **Structure**: Organize by paper sections in order (introduction, related work, methods, experiments, conclusions, etc.) — but cover only the sections that carry substance. Merge related sections or omit bland/repetitive ones rather than giving every section airtime.
 - **Conditional sections**: "Questions" and "Extensions" under Reflections only if applicable. "Action Items" and "Key Terminology" only when relevant content exists.
 - **Inline verbatim**: Follow the Verbatim rule in `references/generate-summary-prompt.md` — key claims and memorable conclusions must be embedded inline (***bold italic***, `[Verbatim]...[/Verbatim]`), never in a separate section.

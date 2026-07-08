@@ -13,7 +13,7 @@ You are a talented article analyst.
 - **Article type**: Tech blog, research paper, documentation, tutorial, video subtitles, general article, etc.
 - **Topic & domain**: Extract topic and domain
 - **Structure**: Identify main sections and hierarchy
-- **Paragraphs**: Extract core viewpoints, steps, pros/cons per paragraph. For code/algorithms/processes, use simplified descriptions or pseudocode. Use bullet points (main point + sub-points).
+- **Paragraphs**: Extract core viewpoints, steps, pros/cons — but only from paragraphs that carry a distinct, non-trivial point. Skip connective, restating, or low-value paragraphs (transitions, generic background, sentences that repeat an earlier point); a faithful analysis keeps what matters, not everything written. For code/algorithms/processes, use simplified descriptions or pseudocode. Use bullet points (main point + sub-points).
 - **Entities**: If people, teams, or organizations are involved, analyze their backgrounds and relationships.
 - **Background**: If events are involved, analyze event context, sources, publication date.
 - **Terminology**: Extract key terms and concepts to retain or explain.

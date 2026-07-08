@@ -17,7 +17,7 @@ A single markdown file following the selected template, written in English.
 
 ## Formatting rules
 
-- **Keep important content**: processes, concepts, technical details, etc.
+- **Keep vs. omit — summarizing is selection, not condensation**: Keep content that changes a reader's understanding: processes, concepts, technical details, results, and notable claims. Omit bland, connective, or restating sentences a reader could skip without losing the point (transitions, generic background, restatements of an earlier point). Covering every paragraph or section is NOT a goal — a faithful summary represents what matters, not everything written. Before keeping a sentence, ask: would removing it lose information a reader needs? If not, cut it.
 - **Highlight quotes and key terms** in blockquote `>` format as separate paragraphs.
 - **Verbatim content** (memorable quotes, slang, idioms, notable original phrasing) must appear **inline within the body text**, wrapped in `[Verbatim]...[/Verbatim]` markers and formatted as ***bold italic***. Do NOT place them in a separate section or as standalone blockquote paragraphs.
   - Example: The author argues that ***[Verbatim]the only way to go fast is to go well[/Verbatim]***, which challenges the common rush-to-ship mentality.
@@ -25,8 +25,8 @@ A single markdown file following the selected template, written in English.
 - **Punctuation**: Any non-heading sentence must end with punctuation. Incomplete sentences break readability and signal unfinished content.
 - **Code**: Keep key code/algorithm snippets as-is; simplify supporting code into descriptions or pseudocode. Full code bloats the summary; descriptions preserve the logic without the noise.
 - **Flow**: Organize content following the original article's flow (content/chronology/logic).
-- **Faithfulness**: Base the summary only on the provided article content. Do not fabricate or add external knowledge (except proper nouns such as company/person/product names). Readers rely on the summary to represent what the original article actually says; fabricated content undermines trust.
-- **Length**: Aim to keep the summary shorter than the original article. A summary longer than the original defeats the purpose of summarization. (Advisory — `word-counter.js` is run to display the count; there is no hard cap, because mixed Chinese/English/code counts are not directly comparable.)
+- **Faithfulness**: Base the summary only on the provided article content. Do not fabricate or add external knowledge (except proper nouns such as company/person/product names). Faithfulness means no invention and no distortion — it does NOT require covering every point. Readers rely on the summary to represent what the original article actually says; omitting low-value content is encouraged, not a faithfulness violation.
+- **Length**: Aim to keep the summary shorter than the original article; a summary longer than the original defeats the purpose. There is no hard cap (mixed Chinese/English/code counts aren't directly comparable; `word-counter.js` just displays the count), but apply the per-sentence relevance test above throughout — shorter comes from cutting low-value sentences, not from compressing wording.
 - **Tone**: Write naturally to avoid AI-generated tone artifacts. Vary punctuation: use commas, colons, parentheses, or separate sentences instead of em dashes (—) for mid-sentence additions. Avoid template openings and closings (e.g., "In today's rapidly evolving landscape").
 
 ## Revision behavior

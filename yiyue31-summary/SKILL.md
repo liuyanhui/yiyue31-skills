@@ -1,7 +1,7 @@
 ---
 name: yiyue31-summary
 description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization.
-version: 2.2.1
+version: 2.2.2
 ---
 
 # Tech Article Summarizer
