@@ -70,4 +70,4 @@ Default: **Tech Blog**. Tech News is NOT penalized for lacking implementation de
 3. Only flag problems clearly present. No speculation about the original article.
 4. Internal consistency checks only — do NOT verify claims against external sources.
 5. Severity: **High** (score-defining), **Medium** (notable), **Low** (minor).
-6. **Verbatim check**: `[Verbatim]...[/Verbatim]` tags are intentional (consumed by the Step 7 translator) — do NOT flag their presence. Flag (Medium TD/EQ) only: (a) verbatim content isolated in a separate "quotes" section instead of inline in body paragraphs, or (b) verbatim content missing its `***...***` bold-italic wrapping.
+6. **Verbatim check**: `[Verbatim]...[/Verbatim]` tags are intentional inline-highlight markers (also consumed by the separate translation step — see `references/translation-contract.md`) — do NOT flag their presence. Flag (Medium TD/EQ) only: (a) verbatim content isolated in a separate "quotes" section instead of inline in body paragraphs, or (b) verbatim content missing its `***...***` bold-italic wrapping.

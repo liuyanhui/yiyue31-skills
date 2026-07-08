@@ -44,8 +44,8 @@ digraph workflow {
     step4 [label="Step 4\nGenerate & Polish Summary\n(Generate-Evaluate Loop ×5)", fillcolor="#fff3e0"];
     step5 [label="Step 5\nAI Tone Check (×5)", fillcolor="#fff3e0"];
     step6 [label="Step 6\nReader Audit\n(3 cold readers + editor, ×5)", fillcolor="#fff3e0"];
-    step7 [label="Step 7\nTranslate to Chinese", fillcolor="#e8f5e9"];
-    done [label="Done → final-{title}.md\n+ translated-{title}-zh.md", shape=ellipse, fillcolor="#c8e6c9"];
+    step7 [label="Step 7\nEmit MANIFEST + Handoff", fillcolor="#e8f5e9"];
+    done [label="Done → final-{title}.md\n+ MANIFEST.md\n(translation: separate step)", shape=ellipse, fillcolor="#c8e6c9"];
 
     step1 -> step2;
     step2 -> step3;
@@ -102,7 +102,7 @@ digraph loop {
 | Step 5 | AI Tone | 5 | — | `tone-polished-{title}.md` |
 | Step 6 | Reader Audit | 5 | — | `final-{title}.md` |
 
-Steps 3 (template selection) and 7 (translation) are not loops.
+Steps 3 (template selection) and 7 (manifest + handoff) are not loops. Chinese translation is a **separate `yiyue31-translator` invocation** after summary completes — it is no longer a summary step (see Step 7).
 
 ## Output Files
 
@@ -119,9 +119,10 @@ Steps 3 (template selection) and 7 (translation) are not loops.
   ├── tone-polished-{title}.md                  # Tone-polished summary (Step 5 output)
   ├── evaluation-reader-audit-round{N}-{profile}-{title}.md # Cold-reader reports (Step 6)
   ├── final-{title}.md                          # Final summary (Step 6 output)
-  └── translation/                              # Chinese translation (Step 7)
-      └── translated-{title}-zh.md
+  └── MANIFEST.md                               # Output inventory + translation handoff (Step 7)
 ```
+
+> Chinese translation (when run) lives in the translator's own directory: `{title}/translation/translated-{title}-zh.md`. It is produced by a separate `yiyue31-translator` invocation reading `MANIFEST.md` and `references/translation-contract.md` — not by summary.
 
 ---
 

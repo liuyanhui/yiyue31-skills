@@ -1,7 +1,7 @@
 ---
 name: yiyue31-summary
 description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization.
-version: 2.2.2
+version: 2.3.0
 ---
 
 # Tech Article Summarizer
@@ -13,7 +13,7 @@ Article summary generator for summarizing technical articles, blog posts, resear
 ## Requirements
 - Except for direct human quotes, avoid overly colloquial language during summarization. Maintain a professional, clear, and concise style.
 - Summarize from the reader's perspective, not the author's. Readers want to quickly grasp key information, not reconstruct the author's writing process.
-- **Output language**: Generate the summary in English regardless of the source article's language. The Chinese version is produced in Step 7. (The Step 2 analysis may follow the source language; the summary itself stays English so the Steps 4-6 quality checks apply consistently.)
+- **Output language**: Generate the summary in English regardless of the source article's language. The Chinese version is produced by a **separate `yiyue31-translator` invocation after summary completes** (see Step 7 handoff) — it is no longer part of the summary pipeline. (The Step 2 analysis may follow the source language; the summary itself stays English so the Steps 4-6 quality checks apply consistently.)
 ---
 ## Directory
 
@@ -182,34 +182,36 @@ The final quality gate before translation. Cold readers — who see ONLY the sum
 
 **Note:** Like Step 5, fixes are applied to the working summary and carried across rounds; intermediate rounds are not saved as separate summary files. Only the final result is written to `final-{title}.md`. Each round's reader reports are still saved. Subagents are stateless, so every round is a genuinely fresh cold read — the convergence criterion is "any batch of new readers hits no blocking comprehension problem," not a fixed round count.
 
-### Step 7: Translate Summary to Chinese
+### Step 7: Emit Manifest and Hand Off to Translation
 
-Translate the final summary into Chinese.
-
-**Input:**
-- Summary: `{title}/summary/final-{title}.md`
-- Analysis: `{title}/summary/analysis-{title}.md` (from Step 2)
+The summary deliverable is the **English summary** (`final-{title}.md`). Chinese translation is now a **separate, optional step**: it runs as its own `yiyue31-translator` invocation after summary completes, driven by a file contract — summary does **not** run it inline. This keeps summary focused on summarization, lets translation run independently (or in a fresh session, which bounds memory on this heavy pipeline), and removes summary-specific translation logic from this skill.
 
 **Procedure:**
-1. Invoke a subagent with the `yiyue31-translator` skill, providing both the summary and the analysis as input. Use default options (free translation style) for all choices. Do not prompt the user for confirmation.
-2. After translation completes, copy the entire `{title}/translation/` directory to `{title}/summary/translation/`.
-3. **Verify verbatim preservation** on `{title}/summary/translation/translated-{title}-zh.md`:
-   - Zero literal `[Verbatim]`/`[/Verbatim]` tags remain (tags were stripped).
-   - Every `[Verbatim]...[/Verbatim]` item present in the English summary appears in the translation, with the English original preserved as the parenthetical half of each `***中文译文（English original）***` pair. Note: the summary typically uses a subset of the analysis Quotes table, so verify against the summary's actual verbatim markers, not the full Quotes table.
-   - If either fails → re-invoke the translator with the failures listed, or inform the user of the gap.
-4. Inform the user of both file paths:
-   - Original summary: see Input above
-   - Chinese translation: `{title}/summary/translation/translated-{title}-zh.md`
+1. **Produce the manifest.** Write `{title}/summary/MANIFEST.md` declaring this run's outputs and the translation handoff. Content (substitute `{title}`):
 
-**Verbatim handling** (include in subagent prompt):
-For each `[Verbatim]原文[/Verbatim]` in the English summary: keep the English original, prepend its Chinese translation, format the whole pair as ***bold italic***, and strip the `[Verbatim]`/`[/Verbatim]` tags. Result shape: `***中文译文（英文原文）***` (full-width parentheses). Surrounding non-verbatim text is translated normally.
-- Example: `***[Verbatim]the only way to go fast is to go well[/Verbatim]***` → `***欲速则不达（the only way to go fast is to go well）***`.
-- See the analysis Quotes table for each item's highlight context.
-- The Chinese translation must NOT contain any literal `[Verbatim]` or `[/Verbatim]` tags.
+   ````markdown
+   # Summary Outputs — {title}
+
+   ## Files (this run)
+   - `original-{title}.md` — source article, markdown-converted (Step 1).
+   - `analysis-{title}.md` — structured analysis incl. Quotes table with per-item verbatim highlight context (Step 2).
+   - `final-{title}.md` — **the English summary deliverable** (Steps 3–6). This is what gets translated.
+   - `MANIFEST.md` — this file.
+
+   ## Translation handoff (separate step — NOT run by summary)
+   - **Skill**: `yiyue31-translator`
+   - **Source to translate**: `final-{title}.md` (becomes the translator's `original-{title}.md`).
+   - **Supplementary context**: `analysis-{title}.md` — verbatim highlight meanings (reference only; the translator generates its own analysis/glossary).
+   - **Contract**: `{skill-dir}/references/translation-contract.md` — verbatim marker transformation, hard constraints, post-translation verification.
+   - **Expected output**: the translator produces `translated-{title}-zh.md` in its own output directory — locate that file after it finishes (the contract documents the translator's path convention and its layout caveat).
+   ````
+
+2. **Hand off.** Inform the user:
+   - English summary deliverable: `{title}/summary/final-{title}.md`.
+   - To produce the Chinese version, run `yiyue31-translator` on `final-{title}.md` per `MANIFEST.md` and `references/translation-contract.md`. This is a separate step — **do not auto-run the translator**. Suggest running it in a fresh session if memory-constrained.
 
 **Fallback:**
-- If `yiyue31-translator` is not found, check for any other installed translation skill and use it instead.
-- If no translation skill is installed, inform the user: "No translation skill found. Summary saved at Input path above. Install a translation skill to enable Chinese translation." → done.
+- If `yiyue31-translator` is not installed, inform the user: "No translation skill found. Summary saved at `{title}/summary/final-{title}.md`. Install a translation skill to enable Chinese translation." → done. (No fallback substitute skill is attempted automatically, since translation is now an explicit, separate user action.)
 
 ---
 
