@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
-version: 2.3.6
+version: 2.4.1
 author: Yiyue31
 ---
 
@@ -55,14 +55,20 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 ### Step 2: 文章分析 + 生成术语表
 
-1. 提取标题、h2/h3 标题、技术关键词和核心概念。
+1. 提取标题、h2/h3 标题、技术关键词和核心概念。**判定本文大致受众**（软上下文，如 "AI/ML 技术读者" / "普通技术读者" / "非技术读者"），写入 Basic Info，喂给 Step 4 翻译与 Step 4.5 阶段B——专业受众可减少注释，普通受众注释更详。
 2. 加载 `{skill-dir}/references/terms.md`，识别出现在本文中的术语。
 3. **语言检查**：如果文章主要是中文或非英文，提醒用户此 skill 设计用于英译中。
 4. 提取原文中的超链接。
 5. **生成 per-article 术语表**：只列出 LLM 可能处理不一致的词——纠正类、上下文相关译法、需统一处理的专有名词。不列 LLM 本来就能翻对的常见词。格式：`| English Term | Translation | Context |`（Translation 列用 `[KEEP]` 表示保留英文）。
-6. 保存分析到 `analysis-{title}.md`，术语表到 `glossary-{title}.md`。
+6. **结构化输出 keep-list**：把本篇须**原样保留英文**的元素（= `[KEEP]` 术语 + 专名/模型名 + 全大写缩写）写成独立 `keep-list-{title}.json`，供 Step 4.6 脚本校验消费。schema：
 
-分析文件包含：Basic Info（标题、语言、关键概念、terms.md 匹配数、glossary 条目数）、Heading Structure、Key Technical Vocabulary、Hyperlinks。
+   ```json
+   { "keep": ["...[KEEP] 术语"], "properNouns": ["...专名/模型名"], "abbreviations": ["...全大写缩写"] }
+   ```
+
+7. 保存分析到 `analysis-{title}.md`，术语表到 `glossary-{title}.md`。
+
+分析文件包含：Basic Info（标题、语言、关键概念、**本文受众**、terms.md 匹配数、glossary 条目数）、Heading Structure、Key Technical Vocabulary、Hyperlinks。
 
 ### Step 3: 特殊词句提取
 
@@ -71,22 +77,36 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 **提取类别：**
 
 1. **金句**：启发性、总结性、观点鲜明的句子。保留表现力，译文后附原文注释。
-2. **连字符技术词组**：如 "agent-based"、"build-not-buy"。保留原文，附原文注释。
+2. **连字符技术词组**：仅 coined / 专名式复合词（如 `build-not-buy`、作专名的 `agent-based`）保留英文原文并附注；普通复合形容词（如 `hand-built`、`multi-deliverable`、`long-context`、`post-solve`）直接译中文，**不留英文、不加注释**。
 3. **俚语和习语**：如 "hit the ground running"。根据上下文译为自然中文，附原文注释。
 
 **输出**：三个表格，列统一为 `| 原文位置 | 原文 | 中文翻译 | 亮点说明 |`。保存到 `special-phrases-{title}.md`。
 
-### Step 4: 翻译
+### Step 4: 翻译（阶段A：翻译 + 内联打标）
 
 每个 chunk 启用独立 subagent 进行翻译。
+
+**优先级序列（冲突时的取舍依据）**：准确 > 流畅地道 > 必要注释。三者冲突时，**流畅优先于注释**——宁可少一个括注，也不要读起来逐字打嗝的译文。这条序列在阶段A/阶段B 全程生效。
+
+**注释保留标准（4 类，决定是否加括注）**：
+
+- **#1 词级（主战场）**：读者**无法从上下文推断含义**的术语 → 走 `«english»` 标记管线（阶段A 打标、阶段B 裁定），保留格式 `中文（English）`。
+- **#2 / #3 句级**：金句 / 习语、**翻译无法传递的修辞效果**（双关 / 对仗 / 韵律；门槛要高，"写得好"不够）→ 走 Step 3 精选清单，格式 `**中文译文（English original）**`。
+- **#4 强调 / 重要性**：**不触发注释**，改用中文加粗 / 短句 / 独占一行传达。
+
+**术语 / 机械类元素分流（两类处理方式不同）**：
+
+- **机械类**（代码 / 行内代码 / URL / 内联 SVG / 模型名 / 全大写缩写 / [KEEP] 术语）：翻译时**内联原样保留**，事后由 Step 4.6 脚本校验。**不打标、不加括注**。
+- **判断类（注释候选）**：读者**可能无法从上下文推断含义**的词（术语、文化、领域知识），在译文中**内联插入 `«english»` 标记**（包英文原文，如 `迁移«transfer»`）。**不直接加括注、不产出独立清单**——是否注释留到阶段B 裁定。
 
 **通用翻译规则：**
 
 - **准确性优先**：事实、数据与逻辑必须与原文完全吻合。保留原文含义与意图，不增删、不主观篡改。
-- **术语规范**：使用标准译法；术语首次出现时在原文后添加中文注释（或术语表中对应的 Translation 列信息），用括号包围。如 `agent(智能体)`、`Prompt(提示词)`。
+- **术语规范**：使用标准译法；术语表 `[KEEP]` 项原样保留英文，其余按术语表统一译法。
 - **修辞处理**：隐喻、习语等修辞性表达，按实际意图翻译而非逐字直译。若源语言意在目标语言中内涵不同，替换为表意、情感效果一致的自然表达。
 - **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）。
-- **译者注释**：针对目标读者因术语、文化差异、领域知识难以理解的内容，在其后立即加简洁注释（括号内），用通俗语言释义而非仅标英文原文。格式：`中文译文（English original，必要时添加说明）`。注释深度适配读者：普通读者注释更详细，专业读者可简化。仅必要时注释，避免过度标注浅显词汇。
+- **注释（#1 词级，默认不注）**：注释是**例外**而非默认。只有"读者无法从上下文推断含义"的词才打标（见上"判断类"），裁定保留后格式统一为 `中文（English）`。**不给浅显词汇加注**——"默认不注"是基线。
+- **强调用加粗/短句，不用注释（#4）**：作者强调的结论、确定性、重要性，用**中文加粗 / 短句 / 独占一行**传达，**不触发括注**。
 - **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语加粗展示：`**{金句}**`。
 - **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` → `[译文](https://example.com)`。
 
@@ -99,7 +119,38 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 **直译风格**（仅用户指定时）：跳过上述"意译时的额外翻译规则"。逐字翻译，保留原文句式结构。
 
-**Subagent 输入**：原文、terms.md 匹配项、glossary、特殊词句表、翻译风格。
+**Subagent 输入**：原文、terms.md 匹配项、glossary、keep-list（见 Step 2）、特殊词句表、本文受众（见 Step 2）、翻译风格。
+
+### Step 4.5: 阶段B（注释把关）
+
+输入 = **带 `«english»` 标记的阶段A 译文**（非独立清单）。对每个 chunk 启用独立 subagent（与阶段A 同 chunk 串行）。
+
+**裁定每个残留 `«english»`（#1 词级标准）**：
+
+- **保留** → 替换为 `中文（english）`（仅当读者**确实无法**从上下文推断含义）。
+- **删除** → 连同 `«»` 标记一并去掉（浅显词、上下文已足够清晰的词）。
+
+**硬约束**：
+
+- 句级 `**中文（English）**` 加粗括注**仅限** Step 3 精选清单（#2 金句/习语、#3 修辞效果不可译），阶段B 不得新造。
+- 强调/重要性用加粗 / 短句，**不注释**（#4）。
+- 验收：`«»` 残留 = 0（正则 `«[^»]+»`，见 Step 4.6 脚本校验）。
+
+### Step 4.6: 机械校验关卡（脚本，质检前必过）
+
+对每个 chunk 译文强制运行（按 `manifest.md` 取原 chunk 文件名填入）：
+
+```bash
+node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-{NN}-xxx.md" "{title}/translation/translated-chunks/translated-chunk-{NN}.md" --keep-list "{title}/translation/keep-list-{title}.json"
+```
+
+**脚本不过即打回重做，不得进入 Step 5+ 质检。** 硬判校验项（不过即打回）：代码块/行内代码原文⊆译文（抓遗漏与误改）、内联 SVG 字节一致、URL 原样、keep-list 条目未被改写、`«»` 残留 = 0。`（英文）` 括注密度超阈值仅 **WARN**——该计数无法区分金句原文/引用/专名括注与词级 spam，过注与否的硬判留给 Step 6 翻译腔语义检查（"括号英文堆砌"规则）。退出码 0 = 通过，1 = 打回。详见 `scripts/verify-mechanical.js` 顶部说明。
+
+### 审校纪律（Step 5 / 6 / 7 / 9 共用）
+
+- **独立执行、不可压缩**：Step 5/6/7/9 各是一个独立 subagent、各自独立执行。**不得合并维度**——合并质检会稀释 rigor，深层问题（过注、翻译腔、AI 味）会被同一个盲区一起放过。即便为绕限流，也只能改**串行**（每次 1 个），**绝不能合并质检维度**。
+- **模型多样性**：审校 subagent 尽量**与翻译（Step 4 / 4.5）使用不同模型**——同模型自审共享盲区，会放过自己造成的深层问题。环境不可控时，补一个专门的**注释滥用对抗检查** pass：扫译文所有 `（...）` 括注，猎杀**非 #1（术语）/ #2-#3（金句/修辞）**的括注，并核对 `«»` 标记是否已被阶段B 全部裁定（残留应 = 0）。
+- **偏离须报备**：如需偏离下列任何流程，**必须先告知用户并取得同意**，不得自作主张（如擅自把多个质检 subagent 合并成一个）。
 
 ### Step 5: 翻译检查
 
@@ -157,6 +208,19 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 2. 拼接所有 chunk 译文（chunk 之间用空行分隔），写入 `translated-{title}-zh.md`（字数暂填 `TBD`）。
 3. 运行字数统计：`node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，将结果替换 `TBD`。
+
+### Step 11: 全局一致性
+
+分块并行翻译 → 跨 chunk 的术语 / 注释密度 / 格式可能不一致。**不采用"一个 subagent 读整篇"**（长文如 93KB 会上下文溢出），改为：
+
+1. 扫描清单：
+
+   ```bash
+   node {skill-dir}/scripts/consistency-checklist.js "{title}/translation/translated-{title}-zh.md" --glossary "{title}/translation/glossary-{title}.md" --chunks-dir "{title}/translation/translated-chunks/" --output "{title}/translation/consistency-{title}.md"
+   ```
+
+2. 启用一个决策 subagent，**只读 `consistency-{title}.md` 这份小清单**下结论（哪些术语须统一、哪些 chunk 过注、格式如何规整）。
+3. 按结论机械应用修复到 `translated-{title}-zh.md`。
 
 ---
 
