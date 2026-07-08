@@ -97,17 +97,14 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 **术语 / 机械类元素分流（两类处理方式不同）**：
 
 - **机械类**（代码 / 行内代码 / URL / 内联 SVG / 模型名 / 全大写缩写 / [KEEP] 术语）：翻译时**内联原样保留**，事后由 Step 4.6 脚本校验。**不打标、不加括注**。
-- **判断类（注释候选）**：读者**可能无法从上下文推断含义**的词（术语、文化、领域知识），在译文中**内联插入 `«english»` 标记**（包英文原文，如 `迁移«transfer»`）。**不直接加括注、不产出独立清单**——是否注释留到阶段B 裁定。
+- **判断类（注释候选）**：读者**可能无法从上下文推断含义**的词（术语、文化、领域知识），在译文中**内联插入 `«english»` 标记**（包英文原文，如 `迁移«transfer»`）。**硬禁止**在阶段A 直接写任何英文括注（`中文（英文）` 或 `english（中文）`）——所有注释意向必须走 `«»` 标记交阶段B 裁定。唯一例外：Step 3 精选清单的句级 `**中文（English）**`。不产出独立清单。
 
 **通用翻译规则：**
 
-- **准确性优先**：事实、数据与逻辑必须与原文完全吻合。保留原文含义与意图，不增删、不主观篡改。
 - **术语规范**：使用标准译法；术语表 `[KEEP]` 项原样保留英文，其余按术语表统一译法。
 - **修辞处理**：隐喻、习语等修辞性表达，按实际意图翻译而非逐字直译。若源语言意在目标语言中内涵不同，替换为表意、情感效果一致的自然表达。
 - **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）。
-- **注释（#1 词级，默认不注）**：注释是**例外**而非默认。只有"读者无法从上下文推断含义"的词才打标（见上"判断类"），裁定保留后格式统一为 `中文（English）`。**不给浅显词汇加注**——"默认不注"是基线。
-- **强调用加粗/短句，不用注释（#4）**：作者强调的结论、确定性、重要性，用**中文加粗 / 短句 / 独占一行**传达，**不触发括注**。
-- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语加粗展示：`**{金句}**`。
+- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语加粗展示：`**{金句}**`。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
 - **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` → `[译文](https://example.com)`。
 
 
@@ -127,14 +124,15 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 **裁定每个残留 `«english»`（#1 词级标准）**：
 
-- **保留** → 替换为 `中文（english）`（仅当读者**确实无法**从上下文推断含义）。
+- **保留** → 替换为 `中文（English）`（仅当读者**确实无法**从上下文推断含义）。
 - **删除** → 连同 `«»` 标记一并去掉（浅显词、上下文已足够清晰的词）。
 
 **硬约束**：
 
-- 句级 `**中文（English）**` 加粗括注**仅限** Step 3 精选清单（#2 金句/习语、#3 修辞效果不可译），阶段B 不得新造。
-- 强调/重要性用加粗 / 短句，**不注释**（#4）。
+- **按 Step 4 注释保留标准裁定**：#1 词级保留为 `中文（English）`；句级 `**中文（English）**` 仅限 Step 3 精选清单（#2/#3），阶段B 不得新造；#4 强调/重要性用加粗 / 短句，不注释。
 - 验收：`«»` 残留 = 0（正则 `«[^»]+»`，见 Step 4.6 脚本校验）。
+
+**直接括注兜底扫描**：阶段A 若违反"硬禁止直接括注"（见 Step 4 判断类），译文中会残留绕过 `«»` 的 `english（中文）` / `中文（英文）`。阶段B 额外扫描这类直接括注，按 #1/#2-#3/#4 同标准裁定——该删的删（恢复纯中文或纯英文），合理保留的不动（图表图例、引用年份、模型限定、代码标识符）。
 
 ### Step 4.6: 机械校验关卡（脚本，质检前必过）
 
@@ -146,23 +144,21 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-
 
 **脚本不过即打回重做，不得进入 Step 5+ 质检。** 硬判校验项（不过即打回）：代码块/行内代码原文⊆译文（抓遗漏与误改）、内联 SVG 字节一致、URL 原样、keep-list 条目未被改写、`«»` 残留 = 0。`（英文）` 括注密度超阈值仅 **WARN**——该计数无法区分金句原文/引用/专名括注与词级 spam，过注与否的硬判留给 Step 6 翻译腔语义检查（"括号英文堆砌"规则）。退出码 0 = 通过，1 = 打回。详见 `scripts/verify-mechanical.js` 顶部说明。
 
-### 审校纪律（Step 5 / 6 / 7 / 9 共用）
+### 审校循环（Step 5–7：准确性 / 翻译腔 / AI 味）
+
+**审校纪律（本节及 Step 9 共用）**：
 
 - **独立执行、不可压缩**：Step 5/6/7/9 各是一个独立 subagent、各自独立执行。**不得合并维度**——合并质检会稀释 rigor，深层问题（过注、翻译腔、AI 味）会被同一个盲区一起放过。即便为绕限流，也只能改**串行**（每次 1 个），**绝不能合并质检维度**。
 - **模型多样性**：审校 subagent 尽量**与翻译（Step 4 / 4.5）使用不同模型**——同模型自审共享盲区，会放过自己造成的深层问题。环境不可控时，补一个专门的**注释滥用对抗检查** pass：扫译文所有 `（...）` 括注，猎杀**非 #1（术语）/ #2-#3（金句/修辞）**的括注，并核对 `«»` 标记是否已被阶段B 全部裁定（残留应 = 0）。
 - **偏离须报备**：如需偏离下列任何流程，**必须先告知用户并取得同意**，不得自作主张（如擅自把多个质检 subagent 合并成一个）。
 
-### Step 5: 翻译检查
+每个维度：**每 chunk 一个独立 subagent**；按报告修复对应译文文件。
 
-每个 chunk 一个独立 subagent。检查指令：`{skill-dir}/references/evaluate-translation-prompt.md`；输入：原文 + 译文 + terms.md 匹配项 + glossary + 特殊词句表。报告见 Step 1.5 路径约定 → 按报告修复译文。
-
-### Step 6: 翻译腔检查
-
-每个 chunk 一个独立 subagent。检查指令：`{skill-dir}/references/evaluate-translationese-prompt.md`；输入：原文 + 译文。报告见 Step 1.5 路径约定 → 按报告修复译文。
-
-### Step 7: AI 味检查
-
-每个 chunk 一个独立 subagent。检查指令：`{skill-dir}/references/evaluate-ai-tone-prompt.md`；输入：原文 + 译文。报告见 Step 1.5 路径约定 → 按报告修复译文。
+| 维度 | 检查指令 | 输入 | 报告路径 |
+|---|---|---|---|
+| 准确性（Step 5） | `{skill-dir}/references/evaluate-translation-prompt.md` | 原文 + 译文 + terms.md 匹配项 + glossary + 特殊词句表 | `review-translation-chunk-{NN}.md` |
+| 翻译腔（Step 6） | `{skill-dir}/references/evaluate-translationese-prompt.md` | 原文 + 译文 | `review-translationese-chunk-{NN}.md` |
+| AI 味（Step 7） | `{skill-dir}/references/evaluate-ai-tone-prompt.md` | 原文 + 译文 | `review-ai-tone-chunk-{NN}.md` |
 
 ### Step 8: 术语维护
 
@@ -179,13 +175,7 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-
 
 ### Step 9: 可读性检查
 
-对每个 chunk 的译文分别执行可读性检查（各一个 subagent）。审阅报告路径见 Step 1.5 路径约定。
-
-**检查指令**：`{skill-dir}/references/evaluate-readability-prompt.md`
-
-**Subagent 输入**：对应的 chunk 译文。
-
-**处理检查结果**：根据报告修改对应的译文文件。
+审校纪律同上"审校循环"。**每 chunk 一个独立 subagent**；检查指令 `{skill-dir}/references/evaluate-readability-prompt.md`；输入：**单个 chunk 的中文译文**；报告 `review-readability-chunk-{NN}.md`；按报告修复对应译文文件。
 
 ### Step 10: 合并译文
 
@@ -221,6 +211,24 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-
 
 2. 启用一个决策 subagent，**只读 `consistency-{title}.md` 这份小清单**下结论（哪些术语须统一、哪些 chunk 过注、格式如何规整）。
 3. 按结论机械应用修复到 `translated-{title}-zh.md`。
+
+### Step 12: PM 验收（交付前强制关卡）
+
+PM（执行本 skill 的主 agent）亲自验收最终产物。这是修"PM 转发报告、自己没看"的根因——PM 必须亲自看，**样本通读不得外包给 subagent**（大文章可额外派冷读者 subagent 做更广覆盖，但 PM 的样本通读不可委托）。
+
+**① 自动红旗复核**（PM 看脚本产出，不重跑）：
+
+- `verify-mechanical.js` 全 chunk exit 0？
+- `consistency-{title}.md` 有无致命术语冲突？
+- `«»` 残留 = 0？
+- 注释密度 WARN 的 chunk → 列为下方人工通读候选。
+
+**② 风险定向抽样通读**：PM 以读者视角读 N 个 chunk，N = `max(2, ⌈总 chunk 数 × 10%⌉)`。抽样须**包含所有红旗 chunk**（密度 WARN / 一致性离群 / 最大 chunk），不足则随机补足。判断范围：clutter 消除、流畅、跨 chunk 连贯、顺眼可见的明显错（错数字/明显误译）。**不系统重校每个数据点**——那是 Step 5 的活。
+
+**③ 留痕 + 裁定**：把验收记录写到 `pm-review-{title}.md`（读了哪些 chunk、红旗摘要、裁定、发现的问题）。
+
+- **pass** → 交付 `translated-{title}-zh.md`。
+- **rework** → 把问题打回对应步骤（clutter→Step 6、准确性→Step 5、一致性→Step 11），修完重跑本步。
 
 ---
 
