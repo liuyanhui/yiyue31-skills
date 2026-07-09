@@ -44,8 +44,8 @@ digraph workflow {
     step4 [label="Step 4\nGenerate & Polish Summary\n(Generate-Evaluate Loop ×5)", fillcolor="#fff3e0"];
     step5 [label="Step 5\nAI Tone Check (×5)", fillcolor="#fff3e0"];
     step6 [label="Step 6\nReader Audit\n(3 cold readers + editor, ×5)", fillcolor="#fff3e0"];
-    step7 [label="Step 7\nEmit MANIFEST + Handoff", fillcolor="#e8f5e9"];
-    done [label="Done → final-{title}.md\n+ MANIFEST.md\n(translation: separate step)", shape=ellipse, fillcolor="#c8e6c9"];
+    step7 [label="Step 7\nEmit Translation Handoff", fillcolor="#e8f5e9"];
+    done [label="Done → summary-{title}.md\n+ translation-handoff.md\n+ translation-contract.md (copied)\n(translation → summary-{title}-zh.md: separate step)", shape=ellipse, fillcolor="#c8e6c9"];
 
     step1 -> step2;
     step2 -> step3;
@@ -75,8 +75,8 @@ digraph loop {
     check [label="Score ≥ 8.0?", shape=diamond, style=filled, fillcolor="#fce4ec"];
     track [label="Track best candidate", shape=box, style=filled, fillcolor="#f5f5f5"];
     more [label="More rounds?", shape=diamond, style=filled, fillcolor="#fce4ec"];
-    exit_pass [label="Copy best round →\n{type}-{title}.md\n(or final-{title}.md)", shape=box, style=filled, fillcolor="#c8e6c9"];
-    exit_exhaust [label="Copy best-scoring round →\n{type}-{title}.md\n(or final-{title}.md)", shape=box, style=filled, fillcolor="#c8e6c9"];
+    exit_pass [label="Copy best round →\n{type}-{title}.md\n(or summary-{title}.md)", shape=box, style=filled, fillcolor="#c8e6c9"];
+    exit_exhaust [label="Copy best-scoring round →\n{type}-{title}.md\n(or summary-{title}.md)", shape=box, style=filled, fillcolor="#c8e6c9"];
 
     start -> generate;
     generate -> save_round;
@@ -98,11 +98,11 @@ digraph loop {
 | Step | Type | Max Rounds | Timeout | Output |
 | ----- | ----- | ---------- | ------- | ------ |
 | Step 2 | Analysis | 3 | — | `analysis-{title}.md` |
-| Step 4 | Summary | 5 | 30 min | `summary-{title}.md` |
+| Step 4 | Summary | 5 | 30 min | `summary-draft-{title}.md` |
 | Step 5 | AI Tone | 5 | — | `tone-polished-{title}.md` |
-| Step 6 | Reader Audit | 5 | — | `final-{title}.md` |
+| Step 6 | Reader Audit | 5 | — | `summary-{title}.md` |
 
-Steps 3 (template selection) and 7 (manifest + handoff) are not loops. Chinese translation is a **separate `yiyue31-translator` invocation** after summary completes — it is no longer a summary step (see Step 7).
+Steps 3 (template selection) and 7 (translation handoff) are not loops. Chinese translation is a **separate `yiyue31-translator` invocation** after summary completes — it is no longer a summary step (see Step 7).
 
 ## Output Files
 
@@ -114,15 +114,17 @@ Steps 3 (template selection) and 7 (manifest + handoff) are not loops. Chinese t
   ├── analysis-{title}.md                       # Best analysis (Step 2 output)
   ├── summary-round{N}-{title}.md               # Summary drafts (Step 4)
   ├── evaluation-round{N}-{title}.md            # Summary eval reports (Step 4)
-  ├── summary-{title}.md                        # Best summary (Step 4 output)
+  ├── summary-draft-{title}.md                 # Best summary draft (Step 4 output)
   ├── evaluation-ai-tone-round{N}-{title}.md    # AI tone reports (Step 5)
   ├── tone-polished-{title}.md                  # Tone-polished summary (Step 5 output)
   ├── evaluation-reader-audit-round{N}-{profile}-{title}.md # Cold-reader reports (Step 6)
-  ├── final-{title}.md                          # Final summary (Step 6 output)
-  └── MANIFEST.md                               # Output inventory + translation handoff (Step 7)
+  ├── summary-{title}.md                        # Final English summary — the deliverable (Step 6 output)
+  ├── translation-contract.md                   # Translation rules (Step 7 copies from references/)
+  ├── translation-handoff.md                    # Translation handoff for yiyue31-translator (Step 7)
+  └── summary-{title}-zh.md                     # Chinese translation (separate translator step; copied here, named = deliverable + `-zh`)
 ```
 
-> Chinese translation (when run) lives in the translator's own directory: `{title}/translation/translated-{title}-zh.md`. It is produced by a separate `yiyue31-translator` invocation reading `MANIFEST.md` and `references/translation-contract.md` — not by summary.
+> Chinese translation (when run) is produced by a separate `yiyue31-translator` invocation (workspace `{title}/translation/`), then copied into `{title}/summary/summary-{title}-zh.md` per the contract. The co-located pair is `summary-{title}.md` (EN) + `summary-{title}-zh.md` (ZH) — not produced by summary.
 
 ---
 

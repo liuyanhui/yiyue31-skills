@@ -1,7 +1,7 @@
 ---
 name: yiyue31-summary
 description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization.
-version: 2.3.0
+version: 2.3.1
 ---
 
 # Tech Article Summarizer
@@ -11,8 +11,12 @@ version: 2.3.0
 Article summary generator for summarizing technical articles, blog posts, research papers, documentation, and other content. Supports multiple summary templates to meet different needs. Analyzes article content, extracts key points and highlights, and generates structured, easy-to-read summaries.
 
 ## Requirements
+- **Audience** (drives depth, jargon, and emphasis): `general` (default, applied automatically — no user input needed) | `technical` | `mixed`. The user may override; otherwise `general`. See Step 1.
+- **Reader's perspective, not the author's.** Readers want to grasp key information, not reconstruct the author's writing process. Two concrete forms:
+  - **Idea as subject, not the author.** Avoid the "author + verb of speaking/thinking" pattern (`X argues / claims / advises / stresses / recounts / notes / points out / opens by / closes that`). Such verbs replay the author's writing process and force the author's name into the subject slot of most sentences. Put the claim, concept, or evidence in the subject slot. Attribute only when it carries weight: a contested opinion, a direct quote, or distinguishing who holds a view.
+  - **Lead the Overview with the reader's payoff** — what the reader walks away with — not a topic-level restatement.
+- **Evidence strength is visible**: distinguish what is data-backed from what is anecdote or speculation.
 - Except for direct human quotes, avoid overly colloquial language during summarization. Maintain a professional, clear, and concise style.
-- Summarize from the reader's perspective, not the author's. Readers want to quickly grasp key information, not reconstruct the author's writing process.
 - **Output language**: Generate the summary in English regardless of the source article's language. The Chinese version is produced by a **separate `yiyue31-translator` invocation after summary completes** (see Step 7 handoff) — it is no longer part of the summary pipeline. (The Step 2 analysis may follow the source language; the summary itself stays English so the Steps 4-6 quality checks apply consistently.)
 ---
 ## Directory
@@ -97,6 +101,12 @@ If original content is not in markdown format, convert it to markdown format.
    - output: markdown content.
 - Save to: `{title}/summary/original-{title}.md`.
 
+**Audience determination** (consumed by Steps 4–6; Steps 2–3 are audience-neutral):
+- Default `general` — apply automatically, no user input required.
+- Use `technical` only if the user explicitly asks for a technical/expert-level summary.
+- Use `mixed` only if the user explicitly asks for one summary serving both general and technical readers.
+Record the chosen audience; it drives depth, jargon handling, and emphasis in Steps 4–6.
+
 ### Step 2: Analyze Article (Generate-Evaluate Loop)
 
 **Loop parameters:** max 3 rounds, passing threshold score ≥ 8.0.
@@ -131,15 +141,17 @@ Generate and polish the summary in a single scored loop. Polishing is folded in 
 Run a **Generate-Evaluate Loop** with these parameters:
 
 - `{generate-prompt}`: `{skill-dir}/references/generate-summary-prompt.md`
-- `{generate-inputs}`: analysis `{title}/summary/analysis-{title}.md` + selected template (Step 3) + original article `{title}/summary/original-{title}.md`; from round 2, also the previous round draft and its evaluation as improvement advice
+- `{generate-inputs}`: analysis `{title}/summary/analysis-{title}.md` + selected template (Step 3) + original article `{title}/summary/original-{title}.md` + **the audience from Step 1**; from round 2, also the previous round draft and its evaluation as improvement advice
 - `{eval-prompt}`: `{skill-dir}/references/evaluate-prompt.md`
 - `{round-file}`: `{title}/summary/summary-round{N}-{title}.md`
 - `{eval-file}`: `{title}/summary/evaluation-round{N}-{title}.md`
-- `{best-file}`: `{title}/summary/summary-{title}.md`
+- `{best-file}`: `{title}/summary/summary-draft-{title}.md`
 - `{max-rounds}`: 5
 - `{threshold}`: 8.0
 
 Each round, also run `node {skill-dir}/scripts/word-counter.js {title}/summary/summary-round{N}-{title}.md` to display word count (advisory).
+
+**Pass the audience (Step 1) to both the generator and the evaluator.** The generator flexes depth/jargon/emphasis by audience; the evaluator scores Technical Depth against the audience's bar. When calling the evaluate subagent, include the audience value in the input.
 
 On PASS or rounds-exhausted → proceed to Step 5.
 
@@ -147,7 +159,7 @@ On PASS or rounds-exhausted → proceed to Step 5.
 
 Detect and fix AI-generated tone artifacts in the summary. Each round checks tone on the current summary and applies the suggested fixes; the loop ends when the tone report comes back clean.
 
-**Input:** `{title}/summary/summary-{title}.md` (from Step 4). **Output:** `{title}/summary/tone-polished-{title}.md`.
+**Input:** `{title}/summary/summary-draft-{title}.md` (from Step 4). **Output:** `{title}/summary/tone-polished-{title}.md`.
 
 **Loop procedure:**
 1. **Each round N (1..5)**:
@@ -162,11 +174,11 @@ Detect and fix AI-generated tone artifacts in the summary. Each round checks ton
 
 The final quality gate before translation. Cold readers — who see ONLY the summary, never the original article — read it sentence by sentence and report where they get stuck. They report **phenomena only, never fixes**: a real reader knows where they are confused, not how to rewrite the text. A full-context editor then resolves every reported phenomenon. The loop repeats with a fresh batch of cold readers each round until none reports a **blocking comprehension problem**.
 
-**Blocking vs. look-up-able (important for dense/technical summaries):** readers distinguish *blocking* comprehension problems from *look-up-able* domain vocabulary (see `evaluate-reader-audit-prompt.md` for the full taxonomy). Only blocking problems converge the loop; look-up-able terms are expected in a specialist summary and are listed for completeness, not fixed.
+**Blocking vs. look-up-able (important for dense/technical summaries):** readers distinguish *blocking* comprehension problems from *look-up-able* domain vocabulary (see `evaluate-reader-audit-prompt.md` for the full taxonomy). Only blocking problems converge the loop; look-up-able terms are expected in a specialist summary and are listed for completeness, not fixed. **The line between blocking and look-up-able moves with the audience (Step 1):** `general` → more terms are blocking (jargon must be grounded on first use); `technical` → most domain terms are look-up-able. Pass the audience to each reader subagent.
 
 **Why summary-only readers:** a real reader of the summary has no original article. Giving readers the original lets them fill gaps from memory and miss the gaps a real reader hits. The editor, by contrast, gets full context (original + analysis) so it can fix correctly. This reader/editor asymmetry is the core of the step: the reader is deliberately limited to surface real blind spots; the editor is fully informed to fix them well.
 
-**Input:** `{title}/summary/tone-polished-{title}.md` (from Step 5). **Output:** `{title}/summary/final-{title}.md`.
+**Input:** `{title}/summary/tone-polished-{title}.md` (from Step 5). **Output:** `{title}/summary/summary-{title}.md`.
 
 **Loop procedure:**
 1. **Each round N (1..5)**:
@@ -176,42 +188,46 @@ The final quality gate before translation. Cold readers — who see ONLY the sum
      - `non-native` — non-native English reader with limited vocabulary; flags idioms, complex grammar, ambiguous references.
    - Save each reader's report to `{title}/summary/evaluation-reader-audit-round{N}-{profile}-{title}.md`.
    - **Aggregate:** collect and dedupe all **blocking** phenomena across the 3 reports.
-   - If no reader reports a blocking comprehension problem → copy current summary to `{title}/summary/final-{title}.md` → Step 7.
+   - If no reader reports a blocking comprehension problem → copy current summary to `{title}/summary/summary-{title}.md` → Step 7.
    - Otherwise: act as **editor**. For each blocking phenomenon, decide and apply a fix using the full context — current summary + original article `{title}/summary/original-{title}.md` + analysis `{title}/summary/analysis-{title}.md`. Apply all fixes to the working summary. Next round.
-2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/final-{title}.md`, inform user that some reader-experience issues may remain → Step 7.
+2. **Rounds exhausted (5 rounds)**: copy current summary to `{title}/summary/summary-{title}.md`, inform user that some reader-experience issues may remain → Step 7.
 
-**Note:** Like Step 5, fixes are applied to the working summary and carried across rounds; intermediate rounds are not saved as separate summary files. Only the final result is written to `final-{title}.md`. Each round's reader reports are still saved. Subagents are stateless, so every round is a genuinely fresh cold read — the convergence criterion is "any batch of new readers hits no blocking comprehension problem," not a fixed round count.
+**Note:** Like Step 5, fixes are applied to the working summary and carried across rounds; intermediate rounds are not saved as separate summary files. Only the final result is written to `summary-{title}.md`. Each round's reader reports are still saved. Subagents are stateless, so every round is a genuinely fresh cold read — the convergence criterion is "any batch of new readers hits no blocking comprehension problem," not a fixed round count.
 
-### Step 7: Emit Manifest and Hand Off to Translation
+### Step 7: Emit Translation Handoff
 
-The summary deliverable is the **English summary** (`final-{title}.md`). Chinese translation is now a **separate, optional step**: it runs as its own `yiyue31-translator` invocation after summary completes, driven by a file contract — summary does **not** run it inline. This keeps summary focused on summarization, lets translation run independently (or in a fresh session, which bounds memory on this heavy pipeline), and removes summary-specific translation logic from this skill.
+The summary deliverable is the **English summary** (`summary-{title}.md`). Chinese translation is now a **separate, optional step**: it runs as its own `yiyue31-translator` invocation after summary completes, driven by a file contract — summary does **not** run it inline. This keeps summary focused on summarization, lets translation run independently (or in a fresh session, which bounds memory on this heavy pipeline), and removes summary-specific translation logic from this skill.
 
 **Procedure:**
-1. **Produce the manifest.** Write `{title}/summary/MANIFEST.md` declaring this run's outputs and the translation handoff. Content (substitute `{title}`):
+1. **Make the result directory self-contained.** Copy `{skill-dir}/references/translation-contract.md` to `{title}/summary/translation-contract.md` (verbatim). **Why:** the handoff must reference only files inside `{title}/summary/`; the skill-dir path is not portable to a fresh session, so the contract is co-located with this run's outputs. (The skill-dir file remains the canonical source; the copy is a point-in-time snapshot of the rules that governed this run.)
+2. **Produce the handoff doc.** Write `{title}/summary/translation-handoff.md` declaring this run's outputs and the translation handoff. Content (substitute `{title}`):
 
    ````markdown
-   # Summary Outputs — {title}
+   # Translation Handoff — {title}
+
+   This file is the entry point for the `yiyue31-translator` skill: it says what to translate and where the rules live. Run the translator on `summary-{title}.md` as a separate step.
 
    ## Files (this run)
    - `original-{title}.md` — source article, markdown-converted (Step 1).
    - `analysis-{title}.md` — structured analysis incl. Quotes table with per-item verbatim highlight context (Step 2).
-   - `final-{title}.md` — **the English summary deliverable** (Steps 3–6). This is what gets translated.
-   - `MANIFEST.md` — this file.
+   - `summary-{title}.md` — **the English summary deliverable** (Steps 3–6). This is what gets translated.
+   - `translation-contract.md` — verbatim marker transformation, hard constraints, post-translation verification.
+   - `translation-handoff.md` — this file.
 
    ## Translation handoff (separate step — NOT run by summary)
    - **Skill**: `yiyue31-translator`
-   - **Source to translate**: `final-{title}.md` (becomes the translator's `original-{title}.md`).
+   - **Source to translate**: `summary-{title}.md` (becomes the translator's `original-{title}.md`).
    - **Supplementary context**: `analysis-{title}.md` — verbatim highlight meanings (reference only; the translator generates its own analysis/glossary).
-   - **Contract**: `{skill-dir}/references/translation-contract.md` — verbatim marker transformation, hard constraints, post-translation verification.
-   - **Expected output**: the translator produces `translated-{title}-zh.md` in its own output directory — locate that file after it finishes (the contract documents the translator's path convention and its layout caveat).
+   - **Contract**: `translation-contract.md` (in this directory) — verbatim marker transformation, hard constraints, post-translation verification.
+   - **Expected output & co-location**: the translator writes `translated-{title}-zh.md` into `{title}/translation/`. After it finishes, **copy** that file to `{title}/summary/summary-{title}-zh.md` (naming rule: the Chinese version = English deliverable name + `-zh` before `.md`, so `summary-{title}.md` → `summary-{title}-zh.md`). Keep the translator's original in `{title}/translation/`. The co-located pair is then `summary-{title}.md` (EN) + `summary-{title}-zh.md` (ZH).
    ````
 
-2. **Hand off.** Inform the user:
-   - English summary deliverable: `{title}/summary/final-{title}.md`.
-   - To produce the Chinese version, run `yiyue31-translator` on `final-{title}.md` per `MANIFEST.md` and `references/translation-contract.md`. This is a separate step — **do not auto-run the translator**. Suggest running it in a fresh session if memory-constrained.
+3. **Hand off.** Inform the user:
+   - English summary deliverable: `{title}/summary/summary-{title}.md`.
+   - To produce the Chinese version, run `yiyue31-translator` on `summary-{title}.md` per `translation-handoff.md` and `translation-contract.md` (both in `{title}/summary/`). This is a separate step — **do not auto-run the translator**. Suggest running it in a fresh session if memory-constrained.
 
 **Fallback:**
-- If `yiyue31-translator` is not installed, inform the user: "No translation skill found. Summary saved at `{title}/summary/final-{title}.md`. Install a translation skill to enable Chinese translation." → done. (No fallback substitute skill is attempted automatically, since translation is now an explicit, separate user action.)
+- If `yiyue31-translator` is not installed, inform the user: "No translation skill found. Summary saved at `{title}/summary/summary-{title}.md`. Install a translation skill to enable Chinese translation." → done. (No fallback substitute skill is attempted automatically, since translation is now an explicit, separate user action.)
 
 ---
 
