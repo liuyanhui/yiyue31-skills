@@ -27,9 +27,19 @@ translator、hn-digest 等 skill 都产出中文文本，各自带一份"AI 味�
 
 ## 待办
 
-- **跨 skill 漂移核查（优先级低）**：reader-audit（hn-digest ↔ summary）是近似副本，需查是否已分化，再按同步规则处理。
+- **reader-audit（hn-digest ↔ summary）已核查（2026-07-09）**：两者已分化为独立文档，不做同步。详见下方"reader-audit 分化核查（2026-07-09）"。
 - **translationese（translator ↔ hn-digest）已核查（2026-07-07）**：两者是**不同语言**的独立文档——translator 版为中文「翻译腔检查」，hn-digest 版为英文「Translationese Evaluation Prompt」，结构与示例均不同。按"不同输出语言是独立文档、不绑版本号"规则，**不做内容同步**。translator 版于 v2.4.0 补了「双语并置 / 括号英文注释堆砌」一项（翻译专属，不传导到 hn-digest 英文版）。
 
 ## ai-tone 漂移说明（2026-07-07）
 
 translator（v2.1）与 hn-digest（v2.2）的 ai-tone 已漂移：hn-digest 先行升到 v2.2。translator v2.4.0 **未**改动 ai-tone（评估后决定不把"括号英文堆砌"翻译专属规则塞进共享 prompt，避免破坏同内容不变量；该检测落在 translationese prompt + SKILL.md 注释滥用对抗 pass）。下次任一方改动 ai-tone 时，应先把 v2.1↔v2.2 的既有漂移对齐，再同步。
+
+## reader-audit 分化核查（2026-07-09）
+
+summary 与 hn-digest 各有一份 `evaluate-reader-audit-prompt.md`，原列为"近似副本、待查是否分化"。核查结论：**已分化为独立文档，按"不同输出语言 / 不同范式是独立文档"规则不做同步**。差异：
+
+- 语言与适用对象：summary 版为英文、面向 summary 产物；hn-digest 版中英混合、面向 article/digest 产物。
+- reader profile 集合不同：summary 版为 non-expert / skim-reader / non-native；hn-digest 版为 casual-reader / skim-reader / outsider / non-native（且 profile 随文章语言切换）。
+- 上下文引用不同：summary 版引用 Step 序号与 original article；hn-digest 版引用 comment thread 与 Step 9。
+
+2026-07-09 summary 版新增 **audience** 输入（general/technical/mixed，blocking vs look-up-able 阈值随受众移动），属 summary 专属逻辑，不传导到 hn-digest 版。

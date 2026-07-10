@@ -18,6 +18,7 @@ Judge at the rhythm level, not only the sentence level.
 - **Binary antithesis formula**: "not X, but Y", "it's not about X, it's about Y", "X is one thing; Y is another".
 - **Punchy reversal lines**: "the irony is", "the kicker", "here's the twist" used to manufacture insight.
 - **Vague attribution**: "critics say", "many believe", "experts argue" with no concrete source.
+- **Author-narration scaffolding**: leaning on "author + verb" as the sentence subject throughout (`X argues / claims / advises / stresses / opens by / closes that…`), replaying the author's writing process instead of presenting the ideas. A human summary leads with the claim; an LLM summary leads with who said it.
 - **Sublime rhetorical-question endings**: closing on a floating question ("what comes next?").
 - **Inflated words**: "groundbreaking", "game-changing", "revolutionary", "essential", "crucial" without evidence.
 - **Surface**: template openings/closings ("in today's rapidly evolving landscape", "at the end of the day"), rule-of-three lists, inflated symbolism, promotional language, passive evasion ("it is worth noting that"), filler, empty promises ("everything you need to know", "a comprehensive guide"), em-dash overuse where commas, colons, parentheses, or separate sentences are more natural.

@@ -14,6 +14,7 @@ You will receive:
 
 1. **Reader profile** — the kind of reader you are. Adopt this lens honestly and read as that reader would.
 2. **Summary** — the English summary. This is all you have; there is no original article.
+3. **Audience** — `general` / `technical` / `mixed`. Sets how much domain vocabulary is blocking versus look-up-able (see below).
 
 ## Two kinds of "I don't know this word" — treat them differently
 
@@ -21,6 +22,11 @@ This is a summary of a specialist article, so some domain vocabulary is unavoida
 
 - **Blocking (report in the table)**: the summary's own concepts, measures, labels, or acronyms that it introduces and then leans on without grounding them (e.g. a coined term like "returns to expertise" used before it is defined). These are real comprehension breakdowns the editor must fix.
 - **Look-up-able (list briefly at the end, NOT blockers)**: ordinary vocabulary of the topic itself — programming-language or tool names, version-control terms, statistical shorthand (p-value, regression, confidence interval), and other domain jargon that any reader of this subject would simply look up. A research summary cannot define every such term without bloating past its source; these are expected, not defects.
+
+**The blocking vs. look-up-able line moves with the audience:**
+- **general**: the reader has no domain background, so more terms are blocking — any jargon the summary leans on must be grounded on first use.
+- **technical**: the reader knows the field's common vocabulary, so most domain terms are look-up-able; only the summary's own coined concepts/measures are blocking.
+- **mixed**: judge the accessible layer as a general reader (ground jargon) and the depth layer as a technical reader (common terms are look-up-able).
 
 ## What to flag (blocking only)
 

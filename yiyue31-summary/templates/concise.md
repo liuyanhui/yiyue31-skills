@@ -1,7 +1,7 @@
 ---
 name: Concise
 display_name: Concise Notes
-version: 2.2.0
+version: 2.2.1
 target_length: 800-1500
 target_reading_time: 3-5 minutes
 sections:
@@ -60,6 +60,7 @@ Tech learning notes template, suitable for engineers or students to quickly revi
 
 ## Rules
 
+- **Audience**: depth, jargon, and emphasis flex by audience (`general` default / `technical` / `mixed`) per `references/generate-summary-prompt.md` (Reader and audience). The template is the skeleton; audience adjusts what fills it.
 - **Highlight Key Points**: Innovations, practical value, technical comparisons
 - **Target length**: 800-1500 words (aspirational). Aim to stay shorter than the original article. Word count is advisory (no hard cap — mixed Chinese/English/code counts are not directly comparable). See `generate-summary-prompt.md`.
 - **Conditional items**: "Disadvantages & Limitations" only if the article mentions them. "Key Glossary" only if non-trivial terminology exists.

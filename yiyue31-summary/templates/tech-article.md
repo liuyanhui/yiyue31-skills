@@ -1,7 +1,7 @@
 ---
 name: Tech-Article-Summary
 display_name: Tech Article Summary Template
-version: 2.2.1
+version: 2.2.2
 ---
 
 # Tech Article Summary Template
@@ -68,6 +68,7 @@ Tech learning notes template (enhanced version), suitable for students or engine
 
 ## Rules
 
+- **Audience**: depth, jargon, and emphasis flex by audience (`general` default / `technical` / `mixed`) per `references/generate-summary-prompt.md` (Reader and audience). The template is the skeleton; audience adjusts what fills it.
 - **Structure**: Organize by article sections in order (introduction, background, methods, implementation, conclusions, etc.) — but cover only the sections that carry substance. Merge related sections or omit bland/repetitive ones rather than giving every section airtime.
 - **Conditional sections**: Sections 5 and 6 are only generated when the article contains relevant content.
 - **Accuracy**: Preserve technical accuracy; explain complex concepts in understandable language.

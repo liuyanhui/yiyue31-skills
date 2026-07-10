@@ -16,6 +16,14 @@ Default to critical. "Not bad" = 5, not 7. Follow the rubric strictly.
 2. < 3 sentences → note "Insufficient length for granular analysis." Scoring proceeds, ID and LC approximate.
 3. No prose (list/table only) → note "EQ and LC scores are approximate."
 
+## Audience
+
+The summary targets a stated audience (`general` / `technical` / `mixed`). Score **Technical Depth** against that audience's bar; the other dimensions are audience-neutral.
+
+- **general**: TD is met when concepts and their significance are clear. Specifics (versions, configs, mechanics) are not required, and excessive detail counts as filler (lowers ID/EQ), not as depth.
+- **technical**: TD requires specifics — methods, tools, versions, data, results. Vagueness is a TD deduction.
+- **mixed**: judge TD on whether the technical layer carries specifics, without penalizing the accessible top layer.
+
 ## Classify type and select weights
 
 | Type | Signals | ID | LC | TD | EQ |
@@ -41,7 +49,7 @@ Default: **Tech Blog**. Tech News is NOT penalized for lacking implementation de
 ```markdown
 ## Summary Evaluation Report
 
-**Type:** [Paper/Tech Blog/Tech News] | **Words:** [N] | **Weights:** [ID/LC/TD/EQ %]
+**Type:** [Paper/Tech Blog/Tech News] | **Audience:** [general/technical/mixed] | **Words:** [N] | **Weights:** [ID/LC/TD/EQ %]
 
 ### Methodology
 - **Dimensions & Definitions**: [ID: substance ratio — signal vs. filler, where "filler" includes accurate-but-low-importance sentences that don't change understanding, not just generic padding | LC: causal coherence | TD: technical specificity | EQ: clarity & professionalism]
@@ -71,3 +79,5 @@ Default: **Tech Blog**. Tech News is NOT penalized for lacking implementation de
 4. Internal consistency checks only — do NOT verify claims against external sources.
 5. Severity: **High** (score-defining), **Medium** (notable), **Low** (minor).
 6. **Verbatim check**: `[Verbatim]...[/Verbatim]` tags are intentional inline-highlight markers (also consumed by the separate translation step — see `references/translation-contract.md`) — do NOT flag their presence. Flag (Medium TD/EQ) only: (a) verbatim content isolated in a separate "quotes" section instead of inline in body paragraphs, or (b) verbatim content missing its `***...***` bold-italic wrapping.
+7. **Expression Quality — author-narration**: repeated "author + verb of speaking/thinking" as sentence subjects (`X argues / advises / notes / opens by / closes that…`) is an EQ defect — the summary replays the author's writing process instead of presenting the ideas. Flag with an idea-as-subject rewrite. Occasional attribution for a contested claim or direct quote is fine.
+8. **Overview payoff**: if the Overview restates the topic without giving the reader a concrete takeaway, flag it (EQ) with a payoff-led rewrite.
