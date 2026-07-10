@@ -50,7 +50,7 @@ function validateArticleMd(content: string): { valid: boolean; errors: string[] 
 
 /**
  * Validate that article markdown content contains at least one OP highlight.
- * Expected pattern: > **[OP]**
+ * Expected pattern: > **[楼主]** (zh) or > **[OP]** (en)
  */
 function validateArticleHasOPHighlight(content: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -59,10 +59,10 @@ function validateArticleHasOPHighlight(content: string): { valid: boolean; error
     return { valid: false, errors: ["Article content is empty or not a string"] };
   }
 
-  const opPattern = />\s*\*\*\[OP\]\*\*/;
+  const opPattern = />\s*\*\*\[(OP|楼主)\]\*\*/;
   if (!opPattern.test(content)) {
     errors.push(
-      "Missing OP highlight pattern: expected '> **[OP]**' (blockquote with OP marker) to appear at least once"
+      "Missing OP highlight pattern: expected '> **[楼主]**' (zh) or '> **[OP]**' (en) blockquote to appear at least once"
     );
   }
 
@@ -168,7 +168,7 @@ In summary, TypeScript continues to improve.
 
 Some discussion here.
 
-> **[OP]** Thanks for the feedback, we are working on it.
+> **[楼主]** Thanks for the feedback, we are working on it.
 
 More content.
 `;
@@ -190,7 +190,7 @@ More content.
       const content = `## 核心观点\n\nJust regular content without any OP markers.\n`;
       const result = validateArticleHasOPHighlight(content);
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes("[OP]"))).toBe(true);
+      expect(result.errors.some((e) => e.includes("OP highlight"))).toBe(true);
     });
 
     test("rejects empty string", () => {
@@ -338,7 +338,7 @@ TypeScript has evolved significantly over the years. This post discusses perform
 - Performance has improved in recent versions
 - Build tooling like esbuild helps
 
-> **[OP]** Thanks for the feedback, we are working on incremental compilation.
+> **[楼主]** Thanks for the feedback, we are working on incremental compilation.
 
 ## 总结
 

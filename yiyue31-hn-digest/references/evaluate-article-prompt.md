@@ -40,7 +40,7 @@ Conditional:
 - Controversies section (zh: `## 争议点`, en: `## Controversies`) is MANDATORY for the controversy type. For every other type, include it ONLY if a real split surfaces. A fabricated or empty 争议点 is a formula tell — deduct for it, do not reward it.
 
 OP marker check:
-- Every OP comment must be prefixed with `> **[OP]** ` and placed first within its group/section.
+- Every OP comment must be prefixed with the OP marker and placed first within its group/section. The marker follows the article language: zh `> **[楼主]** `, en `> **[OP]** `. A zh article carrying the untranslated `> **[OP]** ` is a defect.
 
 Citation format check:
 - No commenter usernames as primary attribution ("augstein 认为……" → use "有评论者认为……" instead).

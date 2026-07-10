@@ -136,7 +136,7 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 
 1. **Thread type** (decide in round 1, carry into revisions): classify the thread from `post.title` + `02-grouped.json` into one of controversy / breakthrough / event-or-obituary / scattered-Q&A, and pick the matching skeleton in `assets/article-{templateVersion}.md`. The body structure and whether `## 争议点` appears depend on this type — do not force every thread into the same skeleton.
 2. **Language**: Entire article in `config.lang`. H1 title must be `[Hacker News] {post.title}`.
-3. **OP highlight** (critical): `isOP === true` → prefix `> **[OP]** `, placed first in group.
+3. **OP highlight** (critical): `isOP === true` → prefix the OP marker (`zh`: `> **[楼主]** `, `en`: `> **[OP]** `), placed first in group. The marker follows `config.lang` so a zh article never ships an untranslated `[OP]`.
 4. **Background & original voice**: Use fetched original content if available; otherwise infer from title + comments. When the fetched original carries a substantive argument, quote its 1–2 core-argument paragraphs as block quotes inside the relevant body section.
 5. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
 6. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
