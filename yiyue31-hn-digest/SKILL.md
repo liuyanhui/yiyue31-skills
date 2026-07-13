@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Use when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID. Transforms a Hacker News discussion thread into a structured article with grouped viewpoints, controversies, and multi-style recommendation summaries.
-version: 0.0.9
+version: 0.0.10
 author: yiyue31
 ---
 
@@ -52,24 +52,18 @@ CLI args > config.json > defaults. CLI flags map to config fields by name, excep
 
 ---
 
-## Step 3: Check Cache
+## Step 3: Fetch Data
 
-Path: `{homedir}/.hn-digest/cache/{postId}.json`. Valid hit → read, output "从缓存加载 postId: {postId}", skip to Step 5. Corrupted → output "缓存文件损坏，重新抓取", delete file, proceed to Step 4. Miss → proceed to Step 4.
-
----
-
-## Step 4: Fetch & Cache Data
-
-Try methods in order: Algolia → Firebase → Jina.
+Try methods in order: Algolia → Firebase → Jina. Every run fetches fresh — there is no cache.
 
 **Retries**: `maxFetchRetries` per method. 429 → wait 2s, retry same method. Empty comments = valid result. All methods 404 → output "帖子不存在或已被删除" → terminate.
 
-For each method: output "正在获取数据... (使用 {Method} 方式)". On success → save to `{homedir}/.hn-digest/cache/{postId}.json` (create dir if missing), proceed to Step 5. On failure → output "抓取失败: {Method} - {reason}", try next.
+For each method: output "正在获取数据... (使用 {Method} 方式)". On success → proceed to Step 4. On failure → output "抓取失败: {Method} - {reason}", try next.
 
 | Method | Script | Notes |
 |--------|--------|-------|
 | Algolia | `bun {skill-dir}/scripts/algolia.ts {postId}` | Output is unified JSON. |
-| Firebase | `bun {skill-dir}/scripts/firebase.ts {postId}` | Fetches to depth 5; filtering in Step 6. |
+| Firebase | `bun {skill-dir}/scripts/firebase.ts {postId}` | Fetches to depth 5; filtering in Step 5. |
 | Jina | `bun {skill-dir}/scripts/jina.ts {postId}` | Output is raw markdown; normalize manually (see below). |
 
 **Jina normalization**: Parse markdown → extract title, author, comments → build unified JSON (each comment: `id`, `author`, `parentId: null`, `childIds: []`, `depth: 0`, `contentMarkdown`). Validate: `post.title` non-empty and `comments` array exists.
@@ -80,7 +74,7 @@ All methods exhausted → output "所有抓取方式均失败: {methods + reason
 
 ---
 
-## Step 5: Prepare Output & Validate
+## Step 4: Prepare Output & Validate
 
 1. Generate `{slug}` from `post.title`: lowercase, strip punctuation and stop words (articles, prepositions, auxiliary verbs, conjunctions, pronouns, negation), take first 4 remaining words, join with hyphens. Example: "Can the stockmarket swallow Anthropic, SpaceX and OpenAI?" → `stockmarket-swallow-anthropic-spacex`.
 2. Create `{outputDir}/{postId}-{slug}/` (fail → terminate silently).
@@ -90,7 +84,7 @@ All methods exhausted → output "所有抓取方式均失败: {methods + reason
 
 ---
 
-## Step 6: Comment Filtering Pipeline
+## Step 5: Comment Filtering Pipeline
 
 Apply in order:
 
@@ -99,11 +93,11 @@ Apply in order:
 3. **Quantity**: Sort by `childIds.length` desc, take top `config.maxComments`.
 4. **OP**: Set `isOP: true` where `comment.author === post.author`, else `false`.
 
-If 0 comments remain → output "过滤后无符合条件的评论" → terminate. Otherwise pass the filtered array to Step 7 (AI groups inline, no subagent).
+If 0 comments remain → output "过滤后无符合条件的评论" → terminate. Otherwise pass the filtered array to Step 6 (AI groups inline, no subagent).
 
 ---
 
-## Step 7: Comment Grouping → 02-grouped.json
+## Step 6: Comment Grouping → 02-grouped.json
 
 Read `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for output structure (fallback to highest version if missing). Section names follow `config.lang`.
 
@@ -117,7 +111,7 @@ Write to `{outputDir}/{postId}-{slug}/02-grouped.json`.
 
 ---
 
-## Step 8: Article Generation (Generate-Evaluate Loop)
+## Step 7: Article Generation (Generate-Evaluate Loop)
 
 Max 3 rounds. Passing threshold: Overall Score >= 8.0.
 
@@ -128,7 +122,7 @@ Each round:
 1. Generate (round 1) or revise (rounds 2-3) the article using template from `{skill-dir}/assets/article-{templateVersion}.md`, grouped data, post metadata, filtered comments, and original post content (if fetched).
 2. Write to `{outputDir}/{postId}-{slug}/article-draft-round{N}.md`.
 3. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-article-prompt.md`. Subagent reads: draft + `01-raw-data.json` + `02-grouped.json`. Writes: `evaluation-article-round{N}.md`.
-4. Overall Score >= 8.0 → PASS → copy draft to `03-article.md` → Step 9. Score < 8.0 → track as best candidate → next round.
+4. Overall Score >= 8.0 → PASS → copy draft to `03-article.md` → Step 8. Score < 8.0 → track as best candidate → next round.
 
 All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文章质量评分: {bestScore}/10".
 
@@ -143,36 +137,36 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 
 ---
 
-## Step 9: AI Tone Check
+## Step 8: AI Tone Check
 
 Max 5 rounds. Pass condition: no AI tone issues remain.
 
 1. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-ai-tone-prompt.md`. Reads `03-article.md`, writes `evaluation-ai-tone-round{N}.md`.
-2. Verdict "NO ISSUES REMAIN" → PASS → Step 10. "ISSUES FOUND" → apply fixes, overwrite `03-article.md`, next round.
+2. Verdict "NO ISSUES REMAIN" → PASS → Step 9. "ISSUES FOUND" → apply fixes, overwrite `03-article.md`, next round.
 
 All 5 rounds exhausted → keep article, output "部分AI语气问题可能残留".
 
 ---
 
-## Step 10: Translationese Check (Conditional)
+## Step 9: Translationese Check (Conditional)
 
 **Skip** when article language matches source comment language (sample first 10 filtered comments to determine). Otherwise execute single pass:
 
 1. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-translationese-prompt.md`. Reads `03-article.md`, writes `evaluation-translationese.md`.
 2. If issues found → apply fixes, overwrite `03-article.md`.
 
-Proceed to Step 11 regardless.
+Proceed to Step 10 regardless.
 
 ---
 
-## Step 11: Readability Check + Reader Audit + Final Output
+## Step 10: Readability Check + Reader Audit + Final Output
 
-### 11.1 Readability Check
+### 10.1 Readability Check
 
 1. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-readability-prompt.md`. Reads `03-article.md`, writes `evaluation-readability.md`.
 2. If issues found → apply fixes, overwrite `03-article.md`.
 
-### 11.2 Reader Audit (max 3 rounds)
+### 10.2 Reader Audit (max 3 rounds)
 
 Cold readers — who see ONLY `03-article.md`, never the raw comments or grouped data — read it sentence by sentence and report where they get stuck. They report **phenomena only, never fixes**. You then act as editor with full context to resolve every **blocking** comprehension problem. The loop ends when no reader reports a blocking problem.
 
@@ -187,11 +181,11 @@ Cold readers — who see ONLY `03-article.md`, never the raw comments or grouped
      - en: `casual-reader` / `skim-reader` / `non-native`
    - Save each report to `{outputDir}/{postId}-{slug}/evaluation-reader-audit-round{N}-{profile}.md`.
    - **Aggregate:** collect and dedupe all **blocking** phenomena across the 3 reports (ignore look-up-able domain terms).
-   - No reader reports a blocking problem → **PASS** → proceed to 11.3.
+   - No reader reports a blocking problem → **PASS** → proceed to 10.3.
    - Otherwise: act as **editor**. For each blocking phenomenon, decide and apply a fix using full context — current `03-article.md` + `01-raw-data.json` + `02-grouped.json`. Overwrite `03-article.md`. Next round.
 2. **Rounds exhausted (3 rounds)**: keep `03-article.md`, output "部分读者体验问题可能残留".
 
-### 11.3 Final Output
+### 10.3 Final Output
 
 1. Copy `03-article.md` to `{outputDir}/{postId}-{slug}/final-{slug}-{postId}.md` (overwrite if exists).
 2. Inject the disclaimer + timestamp into `final-*.md`: `bun {skill-dir}/scripts/insert-header.ts {outputDir}/{postId}-{slug}/final-{slug}-{postId}.md {outputDir}/{postId}-{slug}/01-raw-data.json {config.lang}`.
@@ -199,7 +193,7 @@ Cold readers — who see ONLY `03-article.md`, never the raw comments or grouped
 
 ---
 
-## Step 12: Recommendation Summaries
+## Step 11: Recommendation Summaries
 
 Read `{outputDir}/{postId}-{slug}/03-article.md` as sole content source. Read `{skill-dir}/assets/recommendation-{config.templateVersion}.md` for style definitions (fallback to highest version if missing).
 

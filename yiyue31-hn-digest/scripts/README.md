@@ -27,7 +27,7 @@ bun scripts/jina.ts <postId>
 
 ## 统一 JSON 结构
 
-`algolia.ts` 和 `firebase.ts` 输出此结构。`jina.ts` 输出原始 Markdown，由 SKILL.md Step 4 Method 3 描述的 AI 正规化流程转换为这个结构。
+`algolia.ts` 和 `firebase.ts` 输出此结构。`jina.ts` 输出原始 Markdown，由 SKILL.md Step 3 Method 3 描述的 AI 正规化流程转换为这个结构。
 
 ```typescript
 {
@@ -75,7 +75,7 @@ bun scripts/jina.ts <postId>
 
 ## 错误处理
 
-每个脚本失败时退出码为 1，stderr 包含错误描述。SKILL.md 的 Step 4 描述了上层（Claude）如何根据错误类型决定 retry / fallback / terminate。
+每个脚本失败时退出码为 1，stderr 包含错误描述。SKILL.md 的 Step 3 描述了上层（Claude）如何根据错误类型决定 retry / fallback / terminate。
 
 常见错误：
 - `Post not found: <id>` → 404
@@ -93,7 +93,7 @@ bun scripts/jina.ts <postId>
 | `jina-integration.test.ts` | Jina 特定集成测试（需网络，默认 skip） |
 | `utils.test.ts` | `lib/utils.ts` 的单元测试（40 个 pass） |
 | `error-scenarios.test.ts` | fetcher 在错误场景下的行为（部分需网络） |
-| `filter.test.ts` | 过滤管道的镜像实现测试（与 SKILL.md Step 6 对齐） |
+| `filter.test.ts` | 过滤管道的镜像实现测试（与 SKILL.md Step 5 对齐） |
 | `grouped-schema.test.ts` | 分组输出 schema 校验 |
 | `e2e-output.test.ts` | 端到端输出测试 |
 

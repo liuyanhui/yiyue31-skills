@@ -287,17 +287,16 @@ More content.
 describe.skip("E2E manual execution steps", () => {
   /**
    * These tests are skipped because they depend on an actual AI generation run
-   * against cached data, which cannot be fully automated in CI.
+   * against live HN data, which cannot be fully automated in CI.
    *
    * Manual execution procedure:
    *
-   * Step 1 — Pre-populate cache with mock data:
-   *   Place mock-unified-structure.json content into the skill's cache directory
-   *   so the AI generation step has data to work with.
+   * Step 1 — Validate the mock fixture data:
+   *   Load mock-unified-structure.json and confirm it passes validateRawData().
    *
-   * Step 2 — Run the skill prompt against cached data:
-   *   Execute the hn-digest skill with the cached mock data. This triggers the
-   *   AI to produce grouped JSON and article markdown outputs.
+   * Step 2 — Run the skill against a real small HN post:
+   *   Execute the hn-digest skill with a post ID that has a few comments.
+   *   The skill fetches fresh every run (no cache), then generates outputs.
    *
    * Step 3 — Verify all output files exist and pass validators:
    *   - Read the generated unified JSON file and run validateRawData()
@@ -306,8 +305,8 @@ describe.skip("E2E manual execution steps", () => {
    *   - Run validateArticleHasOPHighlight() to confirm OP contributions are surfaced
    */
 
-  test("Step 1: Pre-populate cache with mock data", () => {
-    // Manual: copy mock-unified-structure.json to cache directory
+  test("Step 1: Validate mock fixture data", () => {
+    // Manual: prepare a mock unified-structure fixture
     // Automated placeholder:
     const data = loadFixture("mock-unified-structure.json");
     expect(data).toBeDefined();
@@ -315,7 +314,7 @@ describe.skip("E2E manual execution steps", () => {
     expect(validation.valid).toBe(true);
   });
 
-  test("Step 2: Run the skill prompt against cached data", () => {
+  test("Step 2: Run the skill prompt against fetched data", () => {
     // This step invokes AI generation and cannot run unattended.
     // Verify manually by running the skill and checking outputs.
     expect(true).toBe(true);

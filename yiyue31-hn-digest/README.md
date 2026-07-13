@@ -29,7 +29,7 @@ summarize what HN is saying in this post
 
 ## 工作流程
 
-1. 解析输入 → 2. 加载配置 → 3. 检查缓存 → 4. 抓取并缓存数据 → 5. 准备输出并校验 → 6. 过滤评论 → 7. 分组 → 8. 生成文章（最多 3 轮 generate-evaluate）→ 9. AI 语气检查 → 10. 翻译腔检查（条件）→ 11. 可读性检查 + 读者审计 + 最终输出 → 12. 推荐摘要 → `03-article.md` + `recommendation-*.md`
+1. 解析输入 → 2. 加载配置 → 3. 抓取数据 → 4. 准备输出并校验 → 5. 过滤评论 → 6. 分组 → 7. 生成文章（最多 3 轮 generate-evaluate）→ 8. AI 语气检查 → 9. 翻译腔检查（条件）→ 10. 可读性检查 + 读者审计 + 最终输出 → 11. 推荐摘要 → `03-article.md` + `recommendation-*.md`
 
 主流程见 [SKILL.md](./SKILL.md)。
 
@@ -75,9 +75,7 @@ hn-digest/
 
 # 运行时数据（不在 skill 目录里）
 ~/.hn-digest/
-├── config.json               # 首次运行自动生成
-└── cache/
-    └── {postId}.json         # 抓取缓存
+└── config.json               # 首次运行自动生成
 ```
 
 ## 依赖
@@ -92,7 +90,7 @@ hn-digest/
 bun test
 ```
 
-当前规模：7 个测试文件，95 个 pass / 9 个 skip（需网络的集成测试） / 0 个 fail。
+当前规模：8 个测试文件，100 个 pass / 9 个 skip（需网络的集成测试） / 0 个 fail。
 
 ## 设计决策
 
@@ -101,6 +99,14 @@ bun test
 
 ## Changelog
 
+- **0.0.10**（2026-07-13）：移除抓取缓存，每次运行重新抓取
+  - 删除 SKILL.md Step 3（Check Cache），原 Step 4-12 重编号为 3-11；主流程不再读写 `~/.hn-digest/cache/`（抓取脚本本就只往 stdout 输出，未改动）
+  - 原因：缓存与"反复迭代生成"工作流冲突，增量合并在兜底抓取方式上也不省力；改为每次全量抓取，新鲜度优先，代价是每次联网（已确认接受）
+  - 测试：删除 error-scenarios Scenario 3（缓存损坏校验），其余场景重编号；e2e `.skip` 块去掉 cache 措辞
+  - README 目录树与流程图同步去掉 cache/；`.gitignore` 删除 `cache/`
+- **0.0.9**（2026-07-10）：zh 文章的 OP 标记由 [OP] 改为 [楼主]
+  - SKILL.md Generation Rule：zh 用 `> **[楼主]** `，en 仍用 `> **[OP]** `，marker 跟随 `config.lang`，避免 zh 文章里出现未翻译的 [OP]
+  - `evaluate-article-prompt.md` 与 `e2e-output.test.ts` 的 OP 高亮校验同步覆盖 [楼主]/[OP]
 - **0.0.8**（2026-06-30）：免责声明 + 时间戳改为程序注入
   - 新增 `scripts/insert-header.ts`：在 `final-*.md` 生成后，于 H1 之后机械插入免责声明 + 讨论截至时间戳（时间戳格式 `YYYY-MM-DD HH:mm:ss`，本地时区；`latestCommentAt` 为 null 时只插免责声明；幂等）
   - `article-v1.md` / `recommendation-v1.md` 删除 disclaimer/timestamp 占位行及相关注释，模板回归纯结构
