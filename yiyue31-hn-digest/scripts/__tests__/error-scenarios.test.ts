@@ -149,42 +149,9 @@ describe("Error Scenario 2: Post with 0 comments (graceful handling)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scenario 3: Corrupted cache file — validate skill prompt rule
+// Scenario 3: Malformed config.json — validate skill prompt rule
 // ---------------------------------------------------------------------------
-describe("Error Scenario 3: Corrupted cache file rule in SKILL.md", () => {
-  const SKILL_MD_PATH = resolvePath(__dirname, "../../SKILL.md");
-
-  test("SKILL.md describes corrupted cache detection behavior", () => {
-    const skillContent = readFileSync(SKILL_MD_PATH, "utf-8");
-
-    // Rule: corrupted cache detection must be described (current wording: "Corrupted")
-    expect(skillContent).toContain("Corrupted");
-
-    // Rule: corrupted cache triggers re-fetch
-    expect(
-      skillContent.includes("重新抓取") || skillContent.includes("re-fetch")
-    ).toBe(true);
-
-    // Rule: corrupted cache file should be deleted
-    expect(
-      skillContent.includes("Delete the corrupted cache file") ||
-        skillContent.includes("删除") ||
-        skillContent.includes("删除损坏")
-    ).toBe(true);
-  });
-
-  test("SKILL.md describes the cache hit with invalid JSON output message", () => {
-    const skillContent = readFileSync(SKILL_MD_PATH, "utf-8");
-
-    // The skill prompt should output a specific message for corrupted cache
-    expect(skillContent).toContain("缓存文件损坏");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Scenario 4: Malformed config.json — validate skill prompt rule
-// ---------------------------------------------------------------------------
-describe("Error Scenario 4: Malformed config.json rule in SKILL.md", () => {
+describe("Error Scenario 3: Malformed config.json rule in SKILL.md", () => {
   const SKILL_MD_PATH = resolvePath(__dirname, "../../SKILL.md");
 
   test("SKILL.md describes using defaults for malformed config", () => {
@@ -219,9 +186,9 @@ describe("Error Scenario 4: Malformed config.json rule in SKILL.md", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scenario 5: Output directory does not exist — ensureDir works
+// Scenario 4: Output directory does not exist — ensureDir works
 // ---------------------------------------------------------------------------
-describe("Error Scenario 5: ensureDir creates missing directories", () => {
+describe("Error Scenario 4: ensureDir creates missing directories", () => {
   afterAll(() => {
     // Cleanup
     if (existsSync(TMP_DIR)) {
@@ -252,9 +219,9 @@ describe("Error Scenario 5: ensureDir creates missing directories", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scenario 6: Existing output files — writeJSON overwrite behavior
+// Scenario 5: Existing output files — writeJSON overwrite behavior
 // ---------------------------------------------------------------------------
-describe("Error Scenario 6: writeJSON overwrites existing files", () => {
+describe("Error Scenario 5: writeJSON overwrites existing files", () => {
   const testDir = join(TMP_DIR, "overwrite-test");
   const testFile = join(testDir, "data.json");
 
@@ -295,9 +262,9 @@ describe("Error Scenario 6: writeJSON overwrites existing files", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scenario 7: All fetch methods exhausted
+// Scenario 6: All fetch methods exhausted
 // ---------------------------------------------------------------------------
-describe("Error Scenario 7: All fetch methods fail for invalid postId", () => {
+describe("Error Scenario 6: All fetch methods fail for invalid postId", () => {
   // A postId that is syntactically valid (numeric) but does not correspond to
   // any real HN post, ensuring all fetchers fail.
   const INVALID_POST_ID = "999999999";
@@ -329,7 +296,7 @@ describe("Error Scenario 7: All fetch methods fail for invalid postId", () => {
     async () => {
       // Jina Reader acts as a proxy and returns whatever HN renders, so even
       // non-existent posts yield output (exit code 0). The skill prompt
-      // normalizes and validates the Jina output later (Step 4).
+      // normalizes and validates the Jina output later (Step 3).
       const result = await runFetcher("scripts/jina.ts", INVALID_POST_ID);
 
       // Jina may succeed (0) or fail (1) depending on network conditions.
