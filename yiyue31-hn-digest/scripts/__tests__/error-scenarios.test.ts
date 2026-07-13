@@ -207,7 +207,7 @@ describe("Error Scenario 4: Malformed config.json rule in SKILL.md", () => {
     expect(skillContent).toContain("| 3 |");
     expect(skillContent).toContain("| 30 |");
     expect(skillContent).toContain('| `"zh"`');
-    expect(skillContent).toContain('| `"."`');
+    expect(skillContent).toContain('| `"hn-digest/"`');
   });
 
   test("SKILL.md describes config merge priority", () => {

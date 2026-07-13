@@ -31,7 +31,7 @@ Extract the post ID from user input — either a full URL (`https://news.ycombin
 | `minReplies` | integer | 0–100 | 3 |
 | `maxComments` | integer | 5–100 | 30 |
 | `lang` | enum | `"zh"` / `"en"` | `"zh"` |
-| `outputDir` | string | valid directory path | `"."` |
+| `outputDir` | string | valid directory path | `"hn-digest/"` |
 | `fetchOriginalPost` | boolean | — | false |
 | `maxFetchRetries` | integer | 1–5 | 3 |
 | `groupBy` | string[] | `"topic"`, `"stance"` | `["topic","stance"]` |
