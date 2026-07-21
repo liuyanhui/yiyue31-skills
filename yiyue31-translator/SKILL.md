@@ -104,7 +104,7 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 - **术语规范**：使用标准译法；术语表 `[KEEP]` 项原样保留英文，其余按术语表统一译法。
 - **修辞处理**：隐喻、习语等修辞性表达，按实际意图翻译而非逐字直译。若源语言意在目标语言中内涵不同，替换为表意、情感效果一致的自然表达。
 - **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）。
-- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语加粗展示：`**{金句}**`。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
+- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语使用临时标记：`**{golden quote}**` 和 `**{slang/idiom}**`。**重要**：这些是临时处理标记，必须在 Step 10 合并译文时清理为纯加粗格式。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
 - **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` → `[译文](https://example.com)`。
 
 
@@ -196,8 +196,14 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-
 ---
 ```
 
-2. 拼接所有 chunk 译文（chunk 之间用空行分隔），写入 `translated-{title}-zh.md`（字数暂填 `TBD`）。
-3. 运行字数统计：`node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，将结果替换 `TBD`。
+2. **清理临时标记**（重要）：移除翻译阶段使用的临时处理标记
+   - 移除所有 `**{golden quote}**` 标记，保留加粗格式
+   - 移除所有 `**{slang/idiom}**` 标记，保留加粗格式
+   - 最终交付的译文中不应包含任何花括号标记
+
+3. 拼接所有 chunk 译文（chunk 之间用空行分隔），写入 `translated-{title}-zh.md`（字数暂填 `TBD`）。
+
+4. 运行字数统计：`node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，将结果替换 `TBD`。
 
 ### Step 11: 全局一致性
 
