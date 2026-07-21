@@ -14,8 +14,8 @@ translator、hn-digest 等 skill 都产出中文文本，各自带一份"AI 味�
 
 ## 现状
 
-- **中文版（v2.1）**：translator、hn-digest，内容一致、版本同步。
-- **英文版（summary）**：独立文档，结构与中文版对齐（两副面孔、节奏层、正向锚点），但例子与词表英文化，不绑版本号、不做内容同步。
+- **中文版**：hn-digest（v2.2）、talk（v2.2）内容一致、版本同步；translator 仍 v2.1，与 v2.2 漂移（见下方漂移说明），待对齐。
+- **英文版（summary）**：独立文档，结构与中文版对齐（三副面孔、节奏层、正向锚点），但例子与词表英文化，不绑版本号、不做内容同步。
 
 ## sibling prompt 处理记录
 
@@ -43,3 +43,12 @@ summary 与 hn-digest 各有一份 `evaluate-reader-audit-prompt.md`，原列为
 - 上下文引用不同：summary 版引用 Step 序号与 original article；hn-digest 版引用 comment thread 与 Step 9。
 
 2026-07-09 summary 版新增 **audience** 输入（general/technical/mixed，blocking vs look-up-able 阈值随受众移动），属 summary 专属逻辑，不传导到 hn-digest 版。
+
+## talk 加入记录（2026-07-21）
+
+- talk（yiyue31-talk）新增中文心得稿输出，复用 ai-tone：co-locate hn-digest v2.2 原文，talk 版本 v2.2，与 hn-digest 同步。
+- translator 仍 v2.1，与 v2.2 的既有漂移本轮未处理（超出 talk 改动范围），保留待办：下次改 ai-tone 时先对齐 translator ↔ hn-digest/talk。
+- talk 另建三份独立审查 prompt，**不参与同步**（体裁不同，类比 summary 英文版独立）：
+  - `evaluate-translationese-prompt.md` v1.0：脱胎自 translator 中文翻译腔检查，改为面向"中文原创心得稿"（无译文/原文配对、去翻译专属括注规则）。
+  - `evaluate-readability-prompt.md` v1.0：脱胎自 translator 中文可读性检查，改为通用中文文本。
+  - `evaluate-faithfulness-prompt.md` v1.0：talk 专属（dump 模式 D4 忠实度检查），无对应兄弟。

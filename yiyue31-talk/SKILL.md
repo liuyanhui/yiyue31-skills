@@ -1,32 +1,47 @@
 ---
 name: yiyue31-talk
-description: 当用户要求"提取观点"、"生成心得"、"记录我的理解"、"写收获"、"我的想法"、"我对这篇文章的看法"时使用。用于生成用户观点文档，通过交互式讨论收集用户的理解、观点和收获。
+description: 当用户要求"提取观点"、"生成心得"、"记录我的理解"、"写收获"、"我的想法"、"我对这篇文章的看法"、"分享我的看法"、"写个推荐"时使用。读到好文章（技术/新闻）后，快速产出可分享的中文心得成品，含总结与两版推荐语。dump 与策展两条路径，由用户实时选择。
+version: 0.0.1
 ---
 
-# User Viewpoints Extraction Skill
+# 用户心得分享 Skill
 
-通过交互式讨论生成用户观点文档，记录用户对文章的理解、观点和收获。
+读到好文章后，快速产出**可分享的中文心得成品**。AI 不盘问、不替用户下判断，只呈现原文内容、整理用户的话。
+
+**为什么是这个形态**：访谈/讨论式（AI 提问、用户回答）被验证既累又跑题——全程用户被动答题，AI 还常问出与用户想法大相径庭的问题。本 skill 反转模式：用户始终在作者位（选材、批注或一次性写看法），AI 在辅助位（提取、整合、排版、组装），不发问、不编造。
+
+## 两条路径
+
+- **dump 模式**（心得已成形）：用户一次性写下所有看法，AI 整合成稿。
+- **策展模式**（心得未成形）：AI 摆出原文的"点"，用户挑几个、加批注，AI 组装。
+
+由用户实时选择，不预设、不自动跳过。
+
+---
+
+## 目录约定
+
+`{skill-dir}` = 本 SKILL.md 所在目录路径。
 
 ## Reusable Sub-workflows
 
 ### Evaluate Once
 
-Single-shot evaluation: call subagent, get report, pass or fail.
+单次审查：调 subagent，出报告，通过或不通过。审查 prompt 自身定义"通过"条件（通常为"无问题"）。
 
-**Parameters (caller provides):**
-- `{eval-criteria}`: Checklist items for the subagent to evaluate
-- `{input-files}`: File(s) to evaluate
-- `{output-file}`: Where to save the evaluation report
-- `{extra-output}`: Additional output fields beyond the default format (optional)
+**参数（调用方提供）：**
+- `{eval-prompt}`：审查 prompt 文件路径
+- `{input-files}`：待审文件（可为多个）
+- `{output-file}`：审查报告保存位置
+- `{max-rounds}`：复审上限
 
-**Procedure:**
-1. Call subagent with `{eval-criteria}` as evaluation standard, providing `{input-files}` content as input.
-2. Subagent outputs: 总体评估(通过/不通过) + 问题列表 + 改进建议 + `{extra-output}`(if specified).
-3. Save the evaluation report to `{output-file}`.
-4. Not passed → adjust based on suggestions and re-evaluate. Max 3 rounds.
-5. 3 rounds still not passed → show current version and report to user, let user decide.
+**流程：**
+1. 以 `{eval-prompt}` 为标准，把 `{input-files}` 内容作为输入调 subagent。
+2. 保存报告到 `{output-file}`。
+3. 报告无问题 → 通过。有问题 → 按建议修正，复审。最多 `{max-rounds}` 轮。
+4. 轮次用尽仍有问题 → 展示当前版本与剩余问题，由用户决定。
 
-**Returns:** PASS/FAIL + evaluation report path.
+**返回：** PASS/FAIL + 报告路径。
 
 ---
 
@@ -36,17 +51,19 @@ Single-shot evaluation: call subagent, get report, pass or fail.
 
 ## 恢复逻辑
 
-检查 `{title}/takeaways/` 下已有文件判断进度：
+检查 `{title}/talk/` 下已有文件判断模式与进度：
 
-| 文件 | 完成步骤 |
-|------|---------|
-| `raw-{title}.md` | Step 1 |
-| `analysis-raw-{title}.md` | Step 2 |
-| `entities-{title}.md` 或 `entities-skipped-{title}.md` | Step 3 |
-| `qa-{title}.md`（含讨论记录） | Step 4 |
-| `output-detail-{title}.md` | Step 5 |
-| `viewpoint-mapping-{title}.md` | Step 6 |
-| `user-viewpoints-{title}.md` | Step 7 |
+| 已有文件 | 模式 / 完成步骤 |
+|---------|---------------|
+| `raw-{title}.md` | Step 0 完成 |
+| `user-dump-{title}.md` | dump，D1 完成 |
+| `integrated-draft-{title}.md` | dump，D2 完成 |
+| `review-faithfulness-{title}.md` | dump，D4 完成 |
+| `article-points-{title}.md` | 策展，C1 完成 |
+| `selected-points-{title}.md` | 策展，C2 完成 |
+| `annotations-{title}.md` | 策展，C3 完成 |
+| `share-{title}.md` | 组装完成 |
+| `review-quality-{title}.md` | 质量审查完成 |
 
 存在未完成工作 → 询问用户：继续 / 重新开始 / 跳转步骤。
 
@@ -54,90 +71,115 @@ Single-shot evaluation: call subagent, get report, pass or fail.
 
 ## Workflow
 
-### Step 1: 格式化输入
+### Step 0: 输入格式化
 
-将用户输入转为 Markdown。输入来源：URL（优先用本地 skills 下载） / 文件路径 / 粘贴内容。title 安全化后保存。
+将用户输入转为 Markdown。来源：URL（优先用本地 skill 下载）/ 文件路径 / 粘贴内容。title 安全化后保存。
 
-保存：`{title}/takeaways/raw-{title}.md`
+保存：`{title}/talk/raw-{title}.md`
 
-### Step 2: 分析原文
+### 路由
 
-提取核心主题、文章类型与复杂度。按章节分析：关键观点、出彩表达（完整句子）、实体/术语、不可改写内容（数据/人名/公司名等）、讨论价值等级。
+**始终**用 AskUserQuestion 询问（即使用户触发语已带看法，也由用户实时选，不自动跳过）：
 
-讨论价值：**高**=争议观点/深层概念/实践方法论；**中**=辅助论据/案例分析；**低**=引言/过渡/总结。
+- "你已经想好要说什么了吗？"
+  - 想好 → **dump 模式**
+  - 没想好 → **策展模式**
 
-保存：`{title}/takeaways/analysis-raw-{title}.md`
+---
 
-**审查**（same pattern as **Evaluate Once**）：
-- `{eval-criteria}`：核心主题准确无遗漏；章节划分完整，关键观点/出彩表达/实体/不可改写内容均已提取；讨论价值分级合理，高价值未被标低
-- `{input-files}`：分析结果文件
-- `{output-file}`：`{title}/takeaways/review-step2-analysis-{title}.md`
+### dump 模式
 
-### Step 3: 实体关系图（可选）
+#### D1: 用户一次性输入看法
 
-AI 判断复杂度：技术架构/系统设计 → 建议生成；个人心得/经验分享 → 可跳过。询问用户选择。
+用户自由写下所有看法（可乱序、可口语）。原样保存：`{title}/talk/user-dump-{title}.md`
 
-支持：思维导图 / ER 图 / 流程图（Mermaid）。保存到 `{title}/takeaways/entities-{title}.md`（跳过则创建 `entities-skipped-{title}.md`）。
+#### D2: AI 整合成稿
 
-生成后请用户确认实体准确、关系完整。
+读 `user-dump` + `raw`，产出结构化初稿：
 
-### Step 4: 交互式讨论
+- 按主题或原文章节归并用户观点。
+- 明确标注原文 vs 我的话。
+- 补足让没读过原文的读者也能看懂的上下文（仅必要）。
+- 顺可读性。
 
-仅对"高""中"价值章节提炼话题：高价值 3-5 话题（各 3 引导问题），中价值 1-2 话题（各 2-3 问题），总上限 20。问题须具启发性和深度。
+**护栏（强制）**：严格按"原文 + 用户输入"成稿，禁止 AI 自行发挥。可重组、补必要原文上下文、顺可读性，但不得添加原文与用户输入之外的任何观点、论据或修饰。**用户说得少，稿子就短——不能为丰满而编造。**
 
-**话题保存到 `{title}/takeaways/qa-{title}.md`。**
+保存：`{title}/talk/integrated-draft-{title}.md`
 
-**流程**：
-1. 展示话题列表（AskUserQuestion 多选），用户选择
-2. 逐话题深入讨论（自由文本对话，不用预设选项）：
-   - AI 先用自己理解引入话题，再邀请用户评价或补充
-   - 每话题至少 3 轮往复
-   - AI 可挑战用户观点，对每个观点提正反追问
-   - 每话题结束后 AI 总结用户观点、偏好、侧重点、对应原文段落
-   - **切换话题必须用户确认**（AskUserQuestion：继续下一个 / 深入当前 / 跳过剩余进下一步）
-3. **退出讨论必须用户确认**，AI 不得自行跳过
+#### D3: 缺口提示（可选）
 
-讨论记录追加到 `{title}/takeaways/qa-{title}.md`，格式：话题 → AI 引导 → 用户原话 → AI 总结 → 对应段落 → 追问 → 用户原话 → AI 总结 → ...
+AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"）。内容锚定、非猜问题。用户决定补/不补；补则并入 D2 重出初稿。
 
-### Step 5: 输出详细程度
+#### D4: faithfulness 检查（Evaluate Once）
 
-AskUserQuestion：简洁版（观点概览+总结）/ 详细版（+逐话题详情+对话记录）。
+核对 `integrated-draft`：每条"我的"观点都能在 `user-dump` 找到来源，且无原文与用户输入之外的内容（禁止 AI 发挥）。
 
-保存选择到 `{title}/takeaways/output-detail-{title}.md`
+- `{eval-prompt}`：`{skill-dir}/references/evaluate-faithfulness-prompt.md`
+- `{input-files}`：`integrated-draft` + `user-dump` + `raw`
+- `{output-file}`：`{title}/talk/review-faithfulness-{title}.md`
+- `{max-rounds}`：2
 
-### Step 6: 观点映射
+不通过 → 按 D2 护栏修正，复审。
 
-从 qa 记录提取所有用户观点，生成映射表（保存到 `{title}/takeaways/viewpoint-mapping-{title}.md`）：
+**→ 进入"共用组装"。**
 
-| 观点ID | 用户观点摘要 | 对应原文段落 | 来源话题 | 目标章节 | 放置方式 | 优先级 |
-|-------|------------|------------|---------|---------|---------|-------|
+---
 
-放置方式：独立段落 / 融入正文 / 对比展示。
+### 策展模式
 
-**审查**（same pattern as **Evaluate Once**）：
-- `{eval-criteria}`：所有用户观点均已提取，摘要准确；映射章节合理，放置方式恰当，优先级正确；未映射观点已记录；遗漏率 > 0% 则不通过
-- `{input-files}`：讨论记录 + 映射表
-- `{output-file}`：`{title}/takeaways/review-step6-mapping-{title}.md`
-- `{extra-output}`：观点覆盖验证(总数/已映射/遗漏数/遗漏率)
+#### C1: AI 提取原文点
 
-用户确认映射表后进入 Step 7。
+单遍分析 `raw`，抽取"点"：关键论断 + 出彩句 + 争议点。总数 ≤ 10，按讨论价值排序（高优先）。不做多轮 generate-evaluate。
 
-### Step 7: 生成观点文档
+保存：`{title}/talk/article-points-{title}.md`
 
-**强制要求**：映射表每条观点均须体现；保留原文位置；数据/名称保持原值；明确区分"原文内容"与"我的观点"。
+#### C2: 用户多选收敛
 
-**生成内容**（根据 Step 5 选择）：
-- 观点概览：核心关注 / 我的理解 / 我的异议
-- 观点详情（详细版）：按话题组织，含原文位置、原文观点、用户观点、对话记录
-- 总结：关键启示 / 实践建议 / 适用边界
-- 附录：原文结构概览
+AskUserQuestion 多选：哪些点保留。用户可补 AI 漏的。一次完成即收敛。
 
-保存到 `{title}/takeaways/user-viewpoints-{title}.md`
+记录：`{title}/talk/selected-points-{title}.md`
 
-**审查**（same pattern as **Evaluate Once**）：
-- `{eval-criteria}`：观点覆盖率 100%（零容忍遗漏）；原文与用户观点明确区分，无混淆；原文核心观点/数据/章节均已覆盖；可读性通顺、逻辑连贯；相比直接总结有个性化价值，否则不通过
-- `{input-files}`：生成文档 + 映射表 + 讨论记录
-- `{output-file}`：`{title}/takeaways/review-step7-quality-{title}.md`
-- `{extra-output}`：观点体现情况(总数/已体现/遗漏/体现率) + 可读性评分(1-10) + 发布准备度 + 按严重程度(严重/中等/轻微)排列的问题
+**为什么是"点"不是"问题"**：AI 生成的问题是猜的，常与用户不在一个频道；呈现原文的点，让用户反应的是内容本身。收敛就是一次多选，秒级。
 
-用户确认后，任务完成。
+#### C3: 用户选择性加批注
+
+仅在保留点上写"我的理解"（1-2 句）。想写的写，不想写的留摘录。AI 不主动提问；用户卡壳时可要求 AI 代拟一句、再改。
+
+保存：`{title}/talk/annotations-{title}.md`
+
+**→ 进入"共用组装"。** 策展模式无 faithfulness 检查——内容是用户自己选、自己写的，用户即质量门。
+
+---
+
+### 共用组装：分享稿
+
+**输出语言固定为中文。**
+
+结构（四块）：
+
+1. **引言**：这篇讲什么、为什么分享（1-2 句）。
+2. **心得正文**：
+   - dump → D2 整合稿。
+   - 策展 → 重点摘录 + 我的批注（按保留点组织）。
+3. **总结**：关键启示（无指定长度）。
+4. **推荐语**：两版——**≤100 汉字**（社交动态）+ **≤200 汉字**（博客前言），文稿内标注用途。
+
+通则：全文区分原文 vs 我的话；数据/名称保持原值。
+
+保存：`{title}/talk/share-{title}.md`
+
+### 质量审查（共用，分享稿必经）
+
+对 `share-{title}.md` 跑三道检查（并行 subagent），任一有问题则统一修正后复审，最多 2 轮：
+
+1. **翻译味儿审查**：`{skill-dir}/references/evaluate-translationese-prompt.md`——欧化句式、"的"字堆叠、被动滥用、生硬连接词等翻译腔。
+2. **可读性审查**：`{skill-dir}/references/evaluate-readability-prompt.md`——语义断裂、逻辑跳跃、术语堆砌、指代不清等阻断理解的问题。
+3. **AI 味儿审查**：`{skill-dir}/references/evaluate-ai-tone-prompt.md`——套路化、口语化、空话等 AI 写作痕迹。
+
+报告：`{title}/talk/review-quality-{title}.md`（三道合并一份）。
+
+**审查范围（重要）**：只审 AI 生成的成稿文字（引言、总结、推荐语、dump 整合正文、策展中的过渡与组织），**不改原文摘录与用户原话批注**——那是原文与用户的声音，不是 AI 要修的对象。三道检查只润色表达，不得改变含义或增删内容（内容忠实度由 dump 的 D4 把关）。
+
+每道用 **Evaluate Once**，`{max-rounds}`：2，三道并行。
+
+用户确认 `share-{title}.md` 后，任务完成。
