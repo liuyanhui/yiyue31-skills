@@ -164,10 +164,10 @@
 
 **累的根因诊断**: 访谈累在用户处于"被动答题"模式，没有主导输出。解法不是换问法，而是翻转模式：用户回到作者模式（选材 + 批注），AI 退到辅助位（提取候选、排版、组装），不再盘问。操作量从"答几十问"降到"挑几个重点 + 写几句注"。
 
-**与现有 skill 的边界确认**（已读 yiyue31-summary、yiyue31-notes）:
+**与现有 skill 的边界确认**（已读 yiyue31-summary、yiyue31-merge）:
 - yiyue31-summary: 替读者总结原文，无用户声音。
 - yiyue31-talk（现状）: 重交互讨论，即疲劳来源。
-- yiyue31-notes: 合并 summary + talk 产物，依赖前置。
+- yiyue31-merge: 合并 summary + talk 产物，依赖前置。
 - 用户要的是第四种"摘录 + 批注 → 分享"，目前无 skill 覆盖，是真实空缺。
 
 **建议的轻量流程（草案）**:
@@ -447,5 +447,5 @@
 
 ### 剩余事项（未处理，已标记）
 
-1. **translator ai-tone 漂移**：translator 仍 v2.1，与 hn-digest/talk 的 v2.2 漂移。本轮未对齐（超出 talk 改动范围）。已写入 sync 文档待办：下次改 ai-tone 时先对齐。
-2. **yiyue31-notes 下游断裂**：notes Step 0 依赖旧产物 `{title}/talk/user-viewpoints-{title}.md`，新 talk 产出为 `{title}/takeaways/share-{title}.md`，且 talk 定位已从"用户观点文档"变为"可分享心得"。notes 需单独更新或重新定义与 talk 的关系。本轮按 scope-control 仅标记、未改 notes。
+1. **translator ai-tone 漂移**：translator 仍 v2.1，与 hn-digest/talk 的 v2.2 漂移。本轮未对齐（超出 talk 改动范围）。已写入 sync 文档待办：下次改 ai-tone 时先对齐。**→ 已于 2026-07-22 对齐至 v2.2，见 `docs/shared-evaluation-prompt-sync.md`。**
+2. **yiyue31-notes 下游断裂**：notes Step 0 依赖旧产物 `{title}/talk/user-viewpoints-{title}.md`，新 talk 产出为 `{title}/takeaways/share-{title}.md`，且 talk 定位已从"用户观点文档"变为"可分享心得"。notes 需单独更新或重新定义与 talk 的关系。本轮按 scope-control 仅标记、未改 notes。**→ 已于 2026-07-22 处理：notes Step 0 改读 `summary-{title}.md` + `talk-{title}.md`（talk 最终文件已改名 `talk-{title}.md`），skill 同步重命名为 `yiyue31-merge`。**

@@ -1,5 +1,7 @@
 # Readability Evaluation Prompt
 
+> Last updated: 2026-07-01 16:37:48
+
 You are checking and improving the readability of a generated article. Target: an article that reads easily in one pass — paragraphs digestible, rhythm varied, numbers grounded. The checks below are deviations from that target.
 
 ## Check Dimensions

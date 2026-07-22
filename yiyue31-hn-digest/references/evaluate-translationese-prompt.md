@@ -1,5 +1,7 @@
 # Translationese Evaluation Prompt
 
+> Last updated: 2026-06-25 11:11:55
+
 You are detecting "translationese" — unnatural language patterns that result from translating sentence-by-sentence rather than expressing ideas natively in the target language.
 
 This check only applies when the article language differs from the dominant language of the source comments.

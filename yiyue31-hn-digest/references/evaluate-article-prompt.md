@@ -1,5 +1,7 @@
 # Article Evaluation Prompt
 
+> Last updated: 2026-07-10 15:45:25
+
 You are evaluating a generated article against the original source comments. Assess the article on the following five dimensions.
 
 ## Scoring Dimensions

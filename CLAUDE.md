@@ -9,7 +9,7 @@
 
 ## Shared evaluation prompts (cross-skill sync)
 Evaluation prompts like `evaluate-ai-tone-prompt.md` are duplicated across skills (translator, hn-digest) because each skill must self-contain its references. **Why:** fixes don't auto-propagate across copies, so they drift and regress silently.
-- Identical content carries an identical version number in the file header.
-- When you change one copy's content, bump the version and update every sibling copy to match.
-- Detect drift by comparing version headers across skills.
-- Different output languages are independent documents, not version-coupled (e.g. summary's English ai-tone prompt). See `docs/shared-evaluation-prompt-sync.md`.
+- Identical content carries an identical `Last updated: YYYY-MM-DD HH:MM:SS` timestamp in the file header.
+- When you change one copy's content, update its timestamp and cp the file to every sibling copy (sync by file copy so the timestamp travels verbatim).
+- Detect drift by running `node scripts/check-prompt-sync.js` (compares content hash + timestamp consistency across copies).
+- Different output languages are independent documents, not timestamp-coupled (e.g. summary's English ai-tone prompt). See `docs/shared-evaluation-prompt-sync.md`.

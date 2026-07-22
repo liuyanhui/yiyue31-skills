@@ -62,7 +62,7 @@ version: 0.0.1
 | `article-points-{title}.md` | 策展，C1 完成 |
 | `selected-points-{title}.md` | 策展，C2 完成 |
 | `annotations-{title}.md` | 策展，C3 完成 |
-| `share-{title}.md` | 组装完成 |
+| `talk-{title}.md` | 组装完成 |
 | `review-quality-{title}.md` | 质量审查完成 |
 
 存在未完成工作 → 询问用户：继续 / 重新开始 / 跳转步骤。
@@ -166,11 +166,11 @@ AskUserQuestion 多选：哪些点保留。用户可补 AI 漏的。一次完成
 
 通则：全文区分原文 vs 我的话；数据/名称保持原值。
 
-保存：`{title}/talk/share-{title}.md`
+保存：`{title}/talk/talk-{title}.md`
 
 ### 质量审查（共用，分享稿必经）
 
-对 `share-{title}.md` 跑三道检查（并行 subagent），任一有问题则统一修正后复审，最多 2 轮：
+对 `talk-{title}.md` 跑三道检查（并行 subagent），任一有问题则统一修正后复审，最多 2 轮：
 
 1. **翻译味儿审查**：`{skill-dir}/references/evaluate-translationese-prompt.md`——欧化句式、"的"字堆叠、被动滥用、生硬连接词等翻译腔。
 2. **可读性审查**：`{skill-dir}/references/evaluate-readability-prompt.md`——语义断裂、逻辑跳跃、术语堆砌、指代不清等阻断理解的问题。
@@ -182,4 +182,4 @@ AskUserQuestion 多选：哪些点保留。用户可补 AI 漏的。一次完成
 
 每道用 **Evaluate Once**，`{max-rounds}`：2，三道并行。
 
-用户确认 `share-{title}.md` 后，任务完成。
+用户确认 `talk-{title}.md` 后，任务完成。

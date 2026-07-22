@@ -1,0 +1,13 @@
+{
+  "groups": [
+    {
+      "name": "ai-tone (中文)",
+      "sourceOfTruth": "yiyue31-hn-digest/references/evaluate-ai-tone-prompt.md",
+      "copies": [
+        "yiyue31-hn-digest/references/evaluate-ai-tone-prompt.md",
+        "yiyue31-talk/references/evaluate-ai-tone-prompt.md",
+        "yiyue31-translator/references/evaluate-ai-tone-prompt.md"
+      ]
+    }
+  ]
+}

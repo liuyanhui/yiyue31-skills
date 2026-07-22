@@ -1,14 +1,16 @@
 ---
-name: yiyue31-notes
-description: Merge outputs from yiyue31-summary (article summary) and yiyue31-talk (user viewpoints) into unified learning notes. Use when user has completed both prerequisite skills and requests merging, or asks to "merge notes", "combine summary and viewpoints".
+name: yiyue31-merge
+description: 合并 yiyue31-summary 与 yiyue31-talk 的产出为统一学习笔记。手动触发：当 `{title}/summary/summary-{title}.md`（文章总结）与 `{title}/talk/talk-{title}.md`（用户心得）都已生成，需要把两者合为一篇学习笔记时使用。提供观点前置/后置/交替三种排版。
 disable-model-invocation: true
-version: 1.0.0
+version: 1.1.0
 author: Yiyue31
 ---
 
 # 学习笔记合并
 
-合并文章总结（summary）和用户观点（talk）为统一学习笔记。
+合并文章总结（summary）和用户心得（talk）为统一学习笔记。
+
+**为什么是手动触发**：本 skill 依赖两个前置 skill 的产物，且合并方式需用户当场选择，不适合模型自动触发；只在用户明确要求合并时调用。
 
 ---
 
@@ -17,14 +19,14 @@ author: Yiyue31
 ### Step 0：检查前置文件
 
 **必需文件**:
-- `{title}/summary/final-summary-{title}.md`
-- `{title}/talk/user-viewpoints-{title}.md`
+- `{title}/summary/summary-{title}.md`
+- `{title}/talk/talk-{title}.md`
 
 **检查逻辑**: 若缺失，询问用户提供替代路径；无效则终止任务。
 
 ### Step 1：识别标题
 
-从 `final-summary-{title}.md` 或目录名称提取标题。
+从 `summary-{title}.md` 或目录名称提取标题。
 
 ### Step 2：选择合并方式
 
@@ -38,13 +40,13 @@ author: Yiyue31
 
 ### Step 3：读取输入文件
 
-读取 `final-summary` 和 `user-viewpoints`。
+读取 `summary-{title}.md` 和 `talk-{title}.md`。
 
 ### Step 4：生成合并文档
 
 **合并原则**: 不修改输入原文内容，可以增加承上启下的过渡文字
 
-**输出路径**: `{title}/notes/notes-{title}.md`
+**输出路径**: `{title}/merge/merge-{title}.md`
 
 
 #### Talk前置
@@ -59,7 +61,7 @@ author: Yiyue31
 [summary 核心亮点/概述部分]
 
 ## 我的观点
-[user-viewpoints 完整内容]
+[talk 完整内容]
 
 ## 核心内容
 [summary 章节总结部分]
@@ -77,10 +79,10 @@ author: Yiyue31
 - 原文、来源、阅读时间
 
 ## 文章总结
-[final-summary 完整内容]
+[summary 完整内容]
 
 ## 我的观点
-[user-viewpoints 完整内容]
+[talk 完整内容]
 
 ## 收获与启发
 [合并双方]
@@ -120,7 +122,7 @@ author: Yiyue31
 - **可读性**: 结构是否清晰，过渡是否自然
 - 校验失败必须重新生成
 
-**输出位置**: `{title}/notes/validation-report-{title}.md`
+**输出位置**: `{title}/merge/validation-report-{title}.md`
 
 ---
 

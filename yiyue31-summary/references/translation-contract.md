@@ -1,5 +1,7 @@
 # Translation Contract (summary → translator)
 
+> Last updated: 2026-07-10 14:21:05
+
 Rules for transforming a summary's `[Verbatim]` highlight markers when translating the English summary to Chinese.
 
 ## Input

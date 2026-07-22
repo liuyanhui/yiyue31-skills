@@ -24,13 +24,13 @@
 
 ### yiyue31-talk
 
-通过交互式讨论，提取用户对一篇文章的理解、观点和收获，生成用户观点文档。
+读到好文章后产出可分享的中文心得成品。两条路径：心得已成形走 dump（一次性写、AI 整合），未成形走策展（AI 摆原文点、你挑、你批注）。
 
 **示例：** `帮我整理一下我对这篇文章的看法`
 
-### yiyue31-notes
+### yiyue31-merge
 
-把 `yiyue31-summary`（文章总结）和 `yiyue31-talk`（用户观点）的产出合并成统一的学习笔记。
+把 `yiyue31-summary`（文章总结）和 `yiyue31-talk`（用户心得）的产出合并成统一的学习笔记。手动触发。
 
 **示例：** `把刚才的总结和我的心得合并成笔记`
 
@@ -60,6 +60,20 @@
 - **yiyue31-orchestrator** — 按计划文档逐任务执行。
 - **yiyue31-context** — 为项目各目录生成分层 `CLAUDE.md` 上下文。
 
+## 全局脚本（scripts/）
+
+`scripts/` 是跨 skill 的协调工具，不归属任何单个 skill，服务于整个 skill 集合的一致性。与 `engineering/` 的区别：`engineering/` 下是被分发的 skill 本身，`scripts/` 是管理这些 skill 的工具脚本。
+
+- **check-prompt-sync.js** — 检查共享 prompt 跨 skill 副本是否同步。归一化行尾后比对内容 hash，校验"同内容同时间戳"（副本统一用 `> Last updated: YYYY-MM-DD HH:MM:SS` 标记，秒级，同步方式为 cp）。不同步退出码 1，可作提交前检查。
+
+  ```bash
+  node scripts/check-prompt-sync.js
+  ```
+
+- **prompt-sync-manifest.json** — 登记共享 prompt 组的 `sourceOfTruth` 与全部副本路径。新增共享组时在此登记。
+
+规则与背景见 `CLAUDE.md` 的 "Shared evaluation prompts (cross-skill sync)" 与 [docs/shared-evaluation-prompt-sync.md](docs/shared-evaluation-prompt-sync.md)。修复流程：改 `sourceOfTruth` → 更新其 `Last updated` 时间戳 → cp 到所有副本 → 重跑脚本。
+
 ## 设计记录
 
 重要的需求背景、设计决策、踩坑教训应记录到 `docs/` 目录并纳入 git 版本管理，防止后续重复踩同样的坑。
@@ -68,7 +82,7 @@
 
 **示例：** [planner 设计背景与教训](docs/planner-design-background.md) —— 记录 `yiyue31-planner` 子代理机制的设计来由、暴露的复杂度失控问题，以及"遇到 AI 异常先验证根因归因，再设计机制""复杂度需匹配载体形态""子代理是可靠性负债"等教训。
 
-**示例：** [共享评估 prompt 的版本同步](docs/shared-evaluation-prompt-sync.md) —— translator、hn-digest 等共用的评估 prompt 如何用版本号防止漂移；附 ai-tone v2.x 演进与待办（summary 英文版、sibling prompt 表层化）。
+**示例：** [共享评估 prompt 的同步](docs/shared-evaluation-prompt-sync.md) —— translator、hn-digest 等共用的评估 prompt 如何用时间戳防止漂移；附 ai-tone v2.x 演进（历史版本号，现用时间戳）与待办（summary 英文版、sibling prompt 表层化）。
 
 ## 安装
 

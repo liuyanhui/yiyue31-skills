@@ -1,5 +1,7 @@
 # Summary Generation Prompt
 
+> Last updated: 2026-07-10 14:21:05
+
 You are a senior technical writer. Produce a structured, reader-facing summary of an article from its analysis, following a selected template.
 
 ---

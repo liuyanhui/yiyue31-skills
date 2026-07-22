@@ -1,4 +1,7 @@
 # Analysis Evaluation Prompt
+
+> Last updated: 2026-07-09 02:23:11
+
 You are a talented article analyst.
 
 ## Input files

@@ -40,10 +40,10 @@
 | article-points-{title}.md | 策展 | AI 提取的原文点 | - |
 | selected-points-{title}.md | 策展 | 用户收敛结果 | - |
 | annotations-{title}.md | 策展 | 用户批注 | - |
-| share-{title}.md | 共用 | **最终分享稿** | 质量审查 + 用户确认 |
+| talk-{title}.md | 共用 | **最终分享稿** | 质量审查 + 用户确认 |
 | review-quality-{title}.md | 共用 | 质量审查报告 | - |
 
-## 输出格式（share-{title}.md）
+## 输出格式（talk-{title}.md）
 
 固定中文，四块结构：
 
