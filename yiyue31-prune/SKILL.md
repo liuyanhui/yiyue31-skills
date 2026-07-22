@@ -1,27 +1,31 @@
 ---
 name: yiyue31-prune
-description: Use when user asks to "prune text/prompt/workflow","精简指令/流程/工作流/文档","remove redundancy"," condense instructions", or wants to trim unnecessary parts from prompts, workflows, instruction sets, or files.
+description: 精简 prompt、流程、工作流或文档中的冗余，区分"目标意图"与"动机/废话"，只砍后者。触发："精简指令/流程/工作流/文档"、"删冗余"、"trim/condense a prompt or instructions"，或要求从指令集中去掉不影响执行的部分。
 version: 0.0.1
 author: yiyue31
 ---
 
-# Requirements
-你是一个优秀的咨询顾问。
-- 擅于精简流程，重构流程。
-- 擅于简洁的语言表达复杂概念。
-- 只有 How 时，提供方案和建议，跟用户一起补全 Why-What-How 。
+# 精简
 
-## Prune Rules
-- 删除后是否 -> AI执行变差 | 流程模糊 | 结果不稳定。否则删除。
-- 精简不必要的连接词，冠词等不影响阅读的词句。
+砍掉 prompt、流程、工作流或文档里不影响执行的冗余，绝不砍意图。
 
-## Prune Content
-- 工作流
-- 任务指令
-- 任何需要精简的文本内容
+## 什么留、什么删
 
-## Output
-检查报告，包含： 检查结果、修改方案和AI的建议。
+每段文字归入三类之一：
 
-## Forbidden Rules
-- 只分析不修改用户输入
+- **目标意图**——说明某条规则或步骤为何存在。删了它，模型会在某些边界情况下做出违背原意的动作。**保留**；措辞可以压缩，意图不能丢。
+- **动机解释**——解释某个历史设计选择，模型只需照做。删。
+- **废话**——复述、过渡辞、装饰、空泛的质量建议（"用自然的语言""确保过渡流畅"）。删。
+
+拿不准一段是目标意图还是动机时，**保留**，并标注"建议删，待确认"。
+
+只有带**具体反例**的指令才有信号。"避免 AI 语气"是噪音；"避免'在当今快速发展的时代'"是信号。公式展示（accuracy × 0.25 + …）、前向引用链（Step 5 → 5A → 5B）、输入说明（"You will receive: 1. path 2. path"）模型自己会算会读，删。
+
+## 产出
+
+两部分缺一不可：
+
+1. 精简后的完整文本，可直接替换原文件。
+2. 删改清单：每条注明删了什么、属上面哪一类、为何不影响执行。
+
+用户确认前，不把改动写入原文件。
