@@ -1,6 +1,6 @@
 ---
 name: yiyue31-translator
-description: 当用户输入"翻译"，"translate"，"translate article"，"translate to Chinese"，"改成中文"，"convert to Chinese"等指令时启用。当用户提供url、文件路径、直接粘贴内容，并表达翻译意图时启用。
+description: 当用户要求翻译英文内容时启用。触发词：翻译、translate、改成中文。输入形式：URL、文件路径、粘贴内容。
 version: 2.4.1
 author: Yiyue31
 ---
@@ -108,13 +108,9 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 - **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` → `[译文](https://example.com)`。
 
 
-**意译时的额外翻译规则（默认）：**
-
-- **重意不重形**：翻译作者的核心表意，而非单纯逐字直译。若直译生硬、无法传递预期效果，可自由重构句式，用地道目标语言表达相同含义。
-- **情感保真**：保留措辞的情感内涵，而非仅译字典释义。带有主观情感的词汇（如"令人警醒的"、"萦绕心头的"），需让目标语言读者产生相同感受。
-- **表达流畅**：采用目标语言地道的语序与句式；源语句式在目标语言中不自然时，可自由拆分、重组句子。
-
-**直译风格**（仅用户指定时）：跳过上述"意译时的额外翻译规则"。逐字翻译，保留原文句式结构。
+**翻译风格**（默认意译，用户指定时用直译）：
+- **意译**：重意不重形、情感保真、表达流畅。可自由重构句式，保留情感内涵。
+- **直译**：逐字翻译，保留原文句式结构。
 
 **Subagent 输入**：原文、terms.md 匹配项、glossary、keep-list（见 Step 2）、特殊词句表、本文受众（见 Step 2）、翻译风格。
 
@@ -122,10 +118,7 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 输入 = **带 `«english»` 标记的阶段A 译文**（非独立清单）。对每个 chunk 启用独立 subagent（与阶段A 同 chunk 串行）。
 
-**裁定每个残留 `«english»`（#1 词级标准）**：
-
-- **保留** → 替换为 `中文（English）`（仅当读者**确实无法**从上下文推断含义）。
-- **删除** → 连同 `«»` 标记一并去掉（浅显词、上下文已足够清晰的词）。
+**裁定每个残留 `«english»`（#1 词级标准）**：保留→替换为`中文（English）`，删除→去掉`«»`标记。
 
 **硬约束**：
 

@@ -124,7 +124,7 @@ Steps 3 (template selection) and 7 (translation handoff) are not loops. Chinese 
   └── summary-{title}-zh.md                     # Chinese translation (separate translator step; copied here, named = deliverable + `-zh`)
 ```
 
-> Chinese translation (when run) is produced by a separate `yiyue31-translator` invocation (workspace `{title}/translation/`), then copied into `{title}/summary/summary-{title}-zh.md` per the contract. The co-located pair is `summary-{title}.md` (EN) + `summary-{title}-zh.md` (ZH) — not produced by summary.
+> Chinese translation (when run) is produced by a separate `yiyue31-translator` invocation (workspace `{title}/sum-translation/`), then copied into `{title}/summary/summary-{title}-zh.md` per the contract. The co-located pair is `summary-{title}.md` (EN) + `summary-{title}-zh.md` (ZH) — not produced by summary.
 
 ---
 
