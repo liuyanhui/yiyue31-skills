@@ -1,14 +1,10 @@
 ---
 name: yiyue31-summary
-description: Use when user asks to "summarize article", "summarize tech post", "summarize research paper", "summarize documentation", "summarize", "生成总结", "总结文章", or provides URLs/files that need summarization.
+description: Use when the user wants to summarize articles, tech posts, research papers, or documentation.
 version: 2.3.1
 ---
 
 # Tech Article Summarizer
-
-## Description
-
-Article summary generator for summarizing technical articles, blog posts, research papers, documentation, and other content. Supports multiple summary templates to meet different needs. Analyzes article content, extracts key points and highlights, and generates structured, easy-to-read summaries.
 
 ## Requirements
 - **Audience** (drives depth, jargon, and emphasis): `general` (default, applied automatically — no user input needed) | `technical` | `mixed`. The user may override; otherwise `general`. See Step 1.
@@ -219,7 +215,7 @@ The summary deliverable is the **English summary** (`summary-{title}.md`). Chine
    - **Source to translate**: `summary-{title}.md` (becomes the translator's `original-{title}.md`).
    - **Supplementary context**: `analysis-{title}.md` — verbatim highlight meanings (reference only; the translator generates its own analysis/glossary).
    - **Contract**: `translation-contract.md` (in this directory) — verbatim marker transformation, hard constraints, post-translation verification.
-   - **Expected output & co-location**: the translator writes `translated-{title}-zh.md` into `{title}/translation/`. After it finishes, **copy** that file to `{title}/summary/summary-{title}-zh.md` (naming rule: the Chinese version = English deliverable name + `-zh` before `.md`, so `summary-{title}.md` → `summary-{title}-zh.md`). Keep the translator's original in `{title}/translation/`. The co-located pair is then `summary-{title}.md` (EN) + `summary-{title}-zh.md` (ZH).
+   - **Expected output & co-location**: the translator writes `translated-{title}-zh.md` into `{title}/sum-translation/`. After it finishes, **copy** that file to `{title}/summary/summary-{title}-zh.md` (naming rule: the Chinese version = English deliverable name + `-zh` before `.md`, so `summary-{title}.md` → `summary-{title}-zh.md`). Keep the translator's original in `{title}/sum-translation/`. The co-located pair is then `summary-{title}.md` (EN) + `summary-{title}-zh.md` (ZH).
    ````
 
 3. **Hand off.** Inform the user:
@@ -236,9 +232,3 @@ The summary deliverable is the **English summary** (`summary-{title}.md`). Chine
 - **Tech Article Template**: Tech article summary template - Suitable for technical articles, tech blogs, tech announcements, etc. Provides comprehensive analysis and summary, highlighting innovations and practical value. See `{skill-dir}/templates/tech-article.md`. **Default template**.
 - **Paper Template**: Paper summary template - Suitable for academic paper summaries, helping readers quickly learn and understand the core content and innovations of the paper. See `{skill-dir}/templates/paper.md`.
 - **Concise Template**: Concise summary template - Focused on core knowledge, suitable for quick learning. See `{skill-dir}/templates/concise.md`. Only used when user explicitly requests it.
-
-
-**Notes**
-- Follow the steps strictly in order. Do not skip any step.
-- Save the output of each step locally.
-- The output of each step must conform to markdown format requirements, especially heading levels, list indentation, code block formatting, and table formatting.
