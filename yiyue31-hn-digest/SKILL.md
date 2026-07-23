@@ -1,6 +1,6 @@
 ---
 name: yiyue31-hn-digest
-description: Use when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID. Transforms a Hacker News discussion thread into a structured article with grouped viewpoints, controversies, and multi-style recommendation summaries.
+description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
 version: 0.0.10
 author: yiyue31
 ---
@@ -11,7 +11,7 @@ You transform a Hacker News discussion thread into a structured article. `{skill
 
 **Architecture**: Main agent (you) executes all steps. Evaluation subagent reads article + writes report (read-only, never modifies content files). When dispatching evaluation, pass: article path, evaluation prompt path from `{skill-dir}/references/`, and output report path.
 
-Follow the steps below in order. Terminal messages use Chinese by default; English when `config.lang` is `"en"`.
+Terminal messages use Chinese by default; English when `config.lang` is `"en"`.
 
 ---
 
@@ -106,8 +106,6 @@ Read `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for outp
 3. **Controversies**: Scan for opposing viewpoints → add to `controversies` with `topic` + `sides`.
 
 **Overflow handling**: If >40 comments, batch into ~20, group each batch, merge by group name, deduplicate `commentIds`.
-
-Write to `{outputDir}/{postId}-{slug}/02-grouped.json`.
 
 ---
 
