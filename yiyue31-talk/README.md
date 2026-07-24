@@ -29,23 +29,9 @@
 6. 质量审查（翻译味儿 + 可读性 + AI 味儿，并行，最多 2 轮）。
 7. （可选）按需产出另一形态（re-skin + 无新增内容自查）。
 
-## 输出文件汇总
+## 输出文件
 
-每次任务在 `{title}/talk/` 下生成：
-
-| 文件 | 路径 | 说明 | 检查方式 |
-|------|------|------|---------|
-| original-{title}.md | 共用 | 原文 | - |
-| user-input-{title}.md | 共用 | **用户原话（只追加）**；首行记 route/form/input-done | - |
-| integrated-draft-{title}.md | dump | AI 忠实整合初稿 | D4 faithfulness |
-| review-faithfulness-{title}.md | dump | 忠实度审查报告 | - |
-| article-points-{title}.md | 策展 | AI 提取的原文点(≤5 + 可补回清单) | - |
-| selected-points-{title}.md | 策展 | 用户收敛 + 权重 | - |
-| talk-{title}.md | 共用 | **最终分享稿（primary）** | 提议轮 + 质量审查 + 用户确认 |
-| review-propose-{title}.md | 共用 | 读者 / 编辑建议报告（含采纳标记） | - |
-| review-quality-{title}.md | 共用 | 质量审查报告 | - |
-| talk-{title}-{form}.md | 共用 | 按需另一形态（可选） | 减法检查 + 无新增内容自查 |
-| review-diff-{title}-{form}.md | 共用 | 另一形态无新增内容自查报告（可选） | - |
+每次任务在 `{title}/talk/` 下生成的文件、路径与检查方式，见 `SKILL.md` 的「恢复逻辑」表——该处为唯一权威，避免两份清单漂移。
 
 ## 输出格式
 
@@ -62,6 +48,7 @@
   - `evaluate-faithfulness-prompt.md`：dump 模式 D4 忠实度检查。
   - `evaluate-reader-appeal-prompt.md`：读者吸引力建议（加法门）。
   - `evaluate-editor-review-prompt.md`：编辑结构建议（加法门）。
+  - `shared-constraints.md`：读者 / 编辑提议轮共享的 4 条约束（单一来源，由调用方注入）。
   - `evaluate-translationese-prompt.md`：翻译腔检查。
   - `evaluate-readability-prompt.md`：可读性检查。
-  - `evaluate-ai-tone-prompt.md`：AI 味检查（v2.2，与 hn-digest 同步）。
+  - `evaluate-ai-tone-prompt.md`：AI 味检查。
