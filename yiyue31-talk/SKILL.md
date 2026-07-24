@@ -1,7 +1,7 @@
 ---
 name: yiyue31-talk
-description: 读到好文章（技术/新闻）后，产出**可分享的中文心得成品**——把自己的理解、收获、看法或推荐整理成稿。触发："生成心得"、"提取观点"、"写收获"、"分享我的看法"、"写个推荐"等想就一篇文章写下自己想法的场合。
-version: 0.0.3
+description: 读到好文章（技术/新闻）后，产出**可分享的中文心得成品**——把自己的理解、收获、看法或推荐整理成稿。触发："生成心得"、"提取观点"、"写收获"、"分享我的看法"、"写个推荐"等想就一篇文章写下自己想法的场合；中断后续做："继续心得"、"恢复 talk"、"接着上次"、"resume talk"。
+version: 0.0.4
 ---
 
 # 用户心得分享 Skill
@@ -27,7 +27,9 @@ version: 0.0.3
 
 ## 目录约定
 
-`{skill-dir}` = 本 SKILL.md 所在目录路径。
+`{skill-dir}` = 本 SKILL.md 所在目录路径（仅用于读 `references/` 下的 prompt）。
+
+`{title}/talk/` 的根目录是**工作目录（cwd）**——所有产物（original / progress / journal / user-input / integrated-draft / article-points / selected-points / review-* / talk-*）都写在此处，**不写在 `{skill-dir}`**。会话跟着项目走，便于跨设备流转（见「断点与恢复·跨设备」）。
 
 ## Reusable Sub-workflows
 
@@ -57,14 +59,85 @@ version: 0.0.3
 
 仅保留字母、数字、CJK 字符、`-`、`_`，其余替换为 `-`，合并连续 `-`，去除首尾 `-`，限 64 字符。示例：`《AI 重塑软件开发：2026 年趋势》` → `AI-重塑软件开发-2026-趋势`。路径无效时用简短英文替代。
 
+## 断点与恢复
+
+**为什么**：talk 任务用户介入多、常跨天/跨设备；无显式状态指针与决策台账时，恢复只能靠推断文件存在性，易错且不知"上次到哪"。
+
+### 两份会话文件（均在 `{title}/talk/`）
+
+**`progress-{title}.json`**——结构化状态，恢复的**单一权威来源**：
+
+```json
+{
+  "title": "{安全化 title}",
+  "route": "dump | 策展",
+  "form": "free | template",
+  "current_step": "step0 | routing | D1 | D2 | D3 | D4 | C1 | C2 | C3 | assembly | propose | quality | alt-form | done",
+  "input_done": "no | yes",
+  "primary_done": false,
+  "decisions": {
+    "routing": "路由 + 形态选择（含时间）",
+    "selected_points": "策展：保留点 + 权重（强化/保留/弱化/删）",
+    "accepted_proposals": "提议轮：用户采纳的建议清单",
+    "confirmed_structure": "自由结构组装：用户确认的结构"
+  },
+  "next_action": "一句话：接下来做什么",
+  "started_at": "ISO",
+  "last_updated": "ISO"
+}
+```
+
+**`journal-{title}.md`**——逐次交互 append-only 日志（审计时间线）。每条一行：`## [ISO] {step} · {用户|AI} — 发生了什么；触及文件`。只追加、不改写、不删（与 `user-input` 同纪律）。
+
+### Checkpoint 协议（全流程通用，不在每步重复）
+
+每次交互后：① 状态有变 → 更新 `progress-{title}.json`（至少 `current_step` + `last_updated`；发生决策时写对应 `decisions.*`）；② 追加一条 `journal-{title}.md`——用户每批输入、路由/形态决策、AI 生成（C1 提点 / D2 初稿 / 组装稿）、选点 + 打权重、提议轮出报告与采纳、各道质量审查、暂停/恢复都要记。**写盘顺序：内容文件 → journal → progress.json**（progress 最后写，保证"progress 标完成 ⇒ 对应产物必在"）。
+
+`current_step` 迁移表（事件 → 新值；无明示时按此推进）：
+
+| 触发事件 | current_step → | 附带 |
+|---|---|---|
+| Step 0 落盘 `original` | `step0` | 建会话两件套 |
+| 路由定 route/form | `D1`（dump）/ `C1`（策展） | `input_done=no`；写 `decisions.routing` |
+| 用户说 done（D1） | `D2` | `input_done=yes` |
+| D2 落盘 `integrated-draft` | `D3` | — |
+| D3 采纳补段 | 回 `D2`（重出初稿） | 采纳段追加进 `user-input` |
+| D3 不补 / 跳过 | `D4` | — |
+| D4 通过 | `assembly` | — |
+| C1 落盘 `article-points` | `C2` | — |
+| C2 落盘 `selected-points` | `C3` | 写 `decisions.selected_points` |
+| 用户说 done（C3） | `assembly` | `input_done=yes` |
+| assembly 落盘 `talk-{title}.md` | `propose` | 自由结构先写 `decisions.confirmed_structure` |
+| 提议轮出 `review-propose` + 采纳回流 | `quality` | 写 `decisions.accepted_proposals` |
+| 三道审查通过 | `done` | primary 初稿定稿 |
+| 用户确认 `talk-{title}.md` | `done` | `primary_done=true` |
+| 用户要另一形态 | `alt-form` | `primary_done` 已 true |
+| 另一形态完成 / 用户放弃 | `done` | `primary_done` 保持 true |
+
+### 恢复入口
+
+激活时，或用户说"继续心得 / 恢复 talk / 接着上次 / resume talk"：扫 cwd 一层找 `*/talk/progress-*.json`（只扫一层，避免误抓项目内无关会话）。
+
+- 无 → 全新开始（Step 0）。
+- 一份且 `current_step != done` → 出示 title、route/form、current_step、last_updated、next_action、journal 末 1–2 条；AskUserQuestion：继续 / 重新开始 / 跳转步骤。续做前先在 journal 追加一条"恢复"记录接上时间线。
+- 一份且 `current_step == done`：`primary_done=false` → 提示"primary 已定稿，待你确认"；`primary_done=true` → 提示"任务已完成"，问是否开新会话或回到 alt-form。
+- 多份 → 每份出示 title + current_step + last_updated，让用户选。
+- `progress.json` 解析失败 / 字段缺失 → 备份原文件，退化为靠「恢复逻辑」表推断，并提示"进度文件损坏"。
+
+### 跨设备
+
+`{title}/talk/`（含 progress.json + journal.md + 全部产物）写在**工作目录**（cwd），不是 skill 目录——会话随项目跨设备流转（git / 网盘 / 手动拷贝），到目标设备用"继续/恢复"触发即可续做。skill 不做云同步、不加打包步骤。
+
 ## 恢复逻辑
 
-检查 `{title}/talk/` 下已有文件判断模式与进度：
+**先读 `progress-{title}.json`**（`current_step` + `decisions` 为权威），再用下表核对产物文件——表作**一致性校验与兜底**。两向不一致都按"以文件实际存在性定位内容"处理、并提示"进度文件与产物不一致，可能上次未干净落盘"：progress 乐观（标 D2 完成却缺 `integrated-draft`）→ 视为未完成、回 D2；progress 落后（`integrated-draft` 在却标 D1）→ 视为 D2 已完成、推进 current_step。progress.json 完全缺失时退化为纯靠下表推断（向后兼容旧会话）。
 
 | 已有文件 | 模式 / 完成步骤 |
 |---------|---------------|
 | `original-{title}.md` | Step 0 完成 |
-| `user-input-{title}.md` | 首行记 route/form/input-done；D1 / C3 / D3 以 batch 追加；`input-done=yes` → 该路径输入完成 |
+| `progress-{title}.json` | 结构化状态（见"断点与恢复"；Step 0 起创建） |
+| `journal-{title}.md` | 交互日志（见"断点与恢复"；Step 0 起创建） |
+| `user-input-{title}.md` | D1 / C3 / D3 用户原话分批追加（纯内容）；输入是否完成看 `progress.json` 的 `input_done` |
 | `article-points-{title}.md` | 策展，C1 完成（≤5 点 + "可补回"清单）|
 | `selected-points-{title}.md` | 策展，C2 完成（含权重：建议强化 / 保留 / 弱化 / 删）|
 | `integrated-draft-{title}.md` | dump，D2 完成 |
@@ -87,6 +160,8 @@ version: 0.0.3
 
 保存：`{title}/talk/original-{title}.md`
 
+同时创建会话状态两件套（见"断点与恢复"）：`progress-{title}.json`（填 `title` + `started_at` + `current_step: step0`）与 `journal-{title}.md` 首条记录。
+
 ### 路由
 
 **始终**用 AskUserQuestion 询问（即使用户触发语已带看法，也由用户实时选，不自动跳过）。问两件：
@@ -99,11 +174,9 @@ version: 0.0.3
 - **分享**（社交 / 博客，抓眼球优先）→ 默认 **自由结构**：钩子开头；AI 提议结构 → 用户确认（结构决定本身是加法，走提案制）。
 - **归档 / 正式**（存查 / 笔记，规范优先）→ **模板**：固定四块（引言 / 心得正文 / 总结 / 推荐语）；引言内部钩子先行，正文内部围绕用户最主要的单一论点展开、次要点收入批注或总结、不再分多并列小节。
 
-路由决定写入 `user-input-{title}.md` **首行**（创建时置一次，不再改）：
+路由决定写入 `progress-{title}.json` 的 `route` / `form` / `input_done`（单一来源，见"断点与恢复"），并把 `decisions.routing` 记为"路由 + 形态选择（含时间）"；`current_step` 推进到 `D1`（dump）或 `C1`（策展）。`user-input-{title}.md` 只追加用户原话、不带元数据。
 
-`<!-- route: dump|策展 | form: free|template | input-done: no -->`
-
-- 用户说 done 时把 `input-done` 改 `yes`。
+- 用户说 done 时把 `input_done` 改 `yes`。
 - 形态 ↔ 文件后缀：自由结构 = `free` → `-free`；模板 = `template` → `-template`。
 
 **按需另一种形态**：primary 形态经用户确认后，用户可要求出另一形态——**约束式 re-skin**，内容锁定自 primary 的已确认内容，不得新增观点 / 数据 / 引文。保存 `talk-{title}-{form}.md`（如 `talk-{title}-template.md`）。**不重命名** `talk-{title}.md`（`yiyue31-merge` 依赖此文件名）。
@@ -250,4 +323,4 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 
 ---
 
-用户确认 `talk-{title}.md` 后，任务完成。
+用户确认 `talk-{title}.md` 后：置 `primary_done=true`（`current_step` 已为 `done`），任务完成。
