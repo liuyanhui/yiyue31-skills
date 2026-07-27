@@ -449,3 +449,21 @@
 
 1. **translator ai-tone 漂移**：translator 仍 v2.1，与 hn-digest/talk 的 v2.2 漂移。本轮未对齐（超出 talk 改动范围）。已写入 sync 文档待办：下次改 ai-tone 时先对齐。**→ 已于 2026-07-22 对齐至 v2.2，见 `docs/shared-evaluation-prompt-sync.md`。**
 2. **yiyue31-notes 下游断裂**：notes Step 0 依赖旧产物 `{title}/talk/user-viewpoints-{title}.md`，新 talk 产出为 `{title}/takeaways/share-{title}.md`，且 talk 定位已从"用户观点文档"变为"可分享心得"。notes 需单独更新或重新定义与 talk 的关系。本轮按 scope-control 仅标记、未改 notes。**→ 已于 2026-07-22 处理：notes Step 0 改读 `summary-{title}.md` + `talk-{title}.md`（talk 最终文件已改名 `talk-{title}.md`），skill 同步重命名为 `yiyue31-merge`。**
+
+---
+
+## 九、落地记录续：断点恢复（2026-07-27）
+
+为支持跨天/跨设备断点续做，给 talk 加了显式状态与交互日志。两项关键决策（已与用户确认）：
+- **记录粒度**＝结构化状态文件 `progress-{title}.json`（路由/形态/当前步骤/决策台账，恢复单一权威来源）+ 逐次交互 append-only 日志 `journal-{title}.md`。
+- **跨设备**＝会话文件夹自包含、写在工作目录（cwd，即项目所在），随项目流转；skill 不做云同步、不加打包步骤。
+
+### 改动文件
+- `yiyue31-talk/SKILL.md`：新增「断点与恢复」节（两份会话文件 + Checkpoint 协议含 `current_step` 迁移表与写盘顺序 + 恢复入口含边界 + 跨设备说明）；「恢复逻辑」表降级为一致性校验/兜底；路由 route/form/input_done 从 `user-input.md` 首行注释迁进 progress.json；「目录约定」显式锚定 `{title}/talk/` 根目录为 cwd。version 0.0.3 → 0.0.4。
+- `yiyue31-talk/README.md`：「中断恢复」改「断点恢复」并补跨设备；触发语补续做项；输出文件指针补指「断点与恢复」。
+
+### 评审与修正
+3 个 subagent 并行评审（逻辑完备性 / 跨文件一致性+目录约定+下游 / 精简冗余）。应用：`primary_done` 置位点、`current_step` 迁移表、恢复边界（done/损坏/多份）、写盘顺序与双向一致性校验、journal 压一行、为什么段与跨设备段去复述、表行收敛为指针。跳过：与 orchestrator 形态差异声明（motive-why）、Step 0 行注（边际价值低）。
+
+### 仍待
+机制为文档态；迁移表/写盘顺序/双向校验需真实任务跑一次确认执行方按之落盘。
