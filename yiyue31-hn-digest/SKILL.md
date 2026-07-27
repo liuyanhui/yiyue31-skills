@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
-version: 0.0.10
+version: 0.0.11
 author: yiyue31
 ---
 
@@ -132,6 +132,7 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 4. **Background & original voice**: Use fetched original content if available; otherwise infer from title + comments. When the fetched original carries a substantive argument, quote its 1–2 core-argument paragraphs as block quotes inside the relevant body section.
 5. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
 6. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
+7. **Heat marker**: each `###` subsection and roundup bullet that maps to a group in `02-grouped.json` appends a comment-count marker (`（精选 N 条）` / `(N selected comments)`) at the end of its heading/lead-in, so engagement is visible while the body stays editorially ordered (NOT reordered by heat). Skip H1, 背景, whole-thread narrative sections, 争议点, 总结, 参考资料. A group's `commentIds` already unions its subGroups — don't double-count. Details in `assets/article-{templateVersion}.md`.
 
 ---
 

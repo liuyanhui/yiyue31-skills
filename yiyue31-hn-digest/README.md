@@ -99,6 +99,11 @@ bun test
 
 ## Changelog
 
+- **0.0.11**（2026-07-27）：正文可见热度标记
+  - 每个 `###` 小节和 roundup 项末尾追加 `（精选 N 条）` / `(N selected comments)`（N = 该小节映射到的 `02-grouped.json` 分组去重评论数）；H1/背景/争议点/总结/参考资料不加
+  - 改动文件：`assets/article-v1.md`（约束块 + 骨架示例）、`SKILL.md`（Step 7 Generation Rule 7）、`references/evaluate-article-prompt.md`（Structure Adherence 增 Heat marker check）
+  - 原因：正文按编辑判断排序而非纯热度（relevance 优于 engagement），但热度对读者不可见；标记让读者看见讨论热度，同时不动排序
+  - 边界：标记是已按热度筛选后的精选评论数，非全帖评论数，用「精选/selected」字样避免在千楼帖里被误读为「只有 N 人讨论」
 - **0.0.10**（2026-07-13）：移除抓取缓存，每次运行重新抓取
   - 删除 SKILL.md Step 3（Check Cache），原 Step 4-12 重编号为 3-11；主流程不再读写 `~/.hn-digest/cache/`（抓取脚本本就只往 stdout 输出，未改动）
   - 原因：缓存与"反复迭代生成"工作流冲突，增量合并在兜底抓取方式上也不省力；改为每次全量抓取，新鲜度优先，代价是每次联网（已确认接受）

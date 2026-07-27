@@ -1,6 +1,6 @@
 # Article Evaluation Prompt
 
-> Last updated: 2026-07-10 15:45:25
+> Last updated: 2026-07-27 13:54:37
 
 You are evaluating a generated article against the original source comments. Assess the article on the following five dimensions.
 
@@ -43,6 +43,9 @@ Conditional:
 
 OP marker check:
 - Every OP comment must be prefixed with the OP marker and placed first within its group/section. The marker follows the article language: zh `> **[楼主]** `, en `> **[OP]** `. A zh article carrying the untranslated `> **[OP]** ` is a defect.
+
+Heat marker check:
+- Every `###` subsection and roundup bullet that maps to a group in `02-grouped.json` must carry a comment-count marker at the end of its heading/lead-in: zh `（精选 N 条）`, en `(N selected comments)`. Defects: a mapped section with no marker; a marker on 背景 / 争议点 / 总结 / 参考资料 (which take none); or a body reordered by raw heat (the body must stay editorially ordered — the marker exposes heat, it does not dictate order).
 
 Citation format check:
 - No commenter usernames as primary attribution ("augstein 认为……" → use "有评论者认为……" instead).

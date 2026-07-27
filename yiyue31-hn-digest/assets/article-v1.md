@@ -33,6 +33,11 @@ Aggregation voice (anti-AI-texture — the strongest tells in a multi-viewpoint 
 - Do NOT stack "pendulum" sentences that symmetrically recite opposing sides ("有评论者认为……另一方则指出……" / "Some think X, while others argue Y."). Land on the concrete disagreement instead of a balanced restatement.
 - Do NOT open group sections with meta-narration ("第一组讨论了……" / "Group A discusses..."). The heading names the topic — open with the viewpoint itself. Vary how viewpoints are introduced across sections.
 
+Heat marker (surface engagement without reordering):
+- Keep the body editorially ordered; do NOT reorder by raw heat. But each `###` subsection and roundup bullet that maps to one or more groups in `02-grouped.json` must append a comment-count marker at the end of its heading / lead-in: zh `（精选 N 条）`, en `(N selected comments)`. N = number of unique comments under the mapped group(s); a group's own `commentIds` already unions its subGroups, so summing a group together with its subGroups double-counts.
+- No marker on: H1, 背景, whole-thread narrative sections (e.g. 怎么做到的 / 意味着什么 when they synthesize across the thread rather than map to one group), 争议点, 总结, 参考资料.
+- The word 精选 / selected is load-bearing: the count is of the heat-filtered digest comments, not the full thread, so a reader does not mistake `（精选 7 条）` for "only 7 people discussed this" inside a 1000+ comment thread.
+
 Sharp viewpoints & quotes:
 - Wrap sharp/counter-intuitive points in **bold** (1–3 per section, only when they genuinely reframe understanding).
 - Quote exact COMMENT words sparingly (≤1–2 fragments per section) as **{translated text}（{original text}）**. Skip the parenthetical when lang matches source. Full-width （） in Chinese, half-width () in English.
@@ -78,9 +83,9 @@ Summary:
 
 === Controversy ===
 ## 核心观点 / Core Viewpoints
-### {中心问题本身作小标题，或"支持方 / 反对方"}
+### {中心问题本身作小标题，或"支持方 / 反对方"}（精选 N 条）
 {观点作为对该问题的回答逐层展开；最尖锐点加粗 + 评论原话片段。每段≤5句。}
-### {另一方 / 另一切角}
+### {另一方 / 另一切角}（精选 N 条）
 {过渡句 + 观点。每段≤5句。}
 ## 争议点 / Controversies
 {分歧的根源，而非"A 说 X、B 说 Y"的复述。}
@@ -99,7 +104,7 @@ Summary:
 
 === Scattered Q&A ===
 ## 要点 / Notable points
-{相关但零散的看法 roundup，按粗略主题分组。}
+{相关但零散的看法 roundup，按粗略主题分组；每个 bullet 末尾加 `（精选 N 条）`。}
 （老实的 roundup 优于强造叙事。）
 -->
 
