@@ -467,3 +467,23 @@
 
 ### 仍待
 机制为文档态；迁移表/写盘顺序/双向校验需真实任务跑一次确认执行方按之落盘。
+
+---
+
+## 十、落地记录续：参考资料 + 多来源模型 + 跨模型自识别（2026-07-27）
+
+使用背景定型：读好文章 → 学习深入思考 → 发个人博客。新文章以**原文为基线**，汇合**参考资料 + 个人看法**综合生成。故 refs 从"可选旁路"升为一等输入。三项关键决策（已与用户确认）：
+- **refs 作为会话状态**：`{title}/talk/refs/` + `refs/MANIFEST.md`（append-only 溯源）；URL 内容用 web-access 抓取后**落盘**（不只存链接，链接会腐烂）；任意步骤可追加，走 Checkpoint 协议（不改 `current_step`）；progress.json 不记 refs（由文件 + MANIFEST 承载，避免双源漂移）。
+- **多来源内容模型**：合法来源由"原文 + 用户输入"扩为"原文 + 参考 + 用户输入"；成品归属三栏——原文 / 参考[X] / 我的话。牵动 D2 / D4 / 组装 / 提议轮 / C1。
+- **跨模型自识别**：progress.json 加 `skill` + `skill_version`。澄清是**跨模型不是跨 Agent**（harness 固定 Claude Code），故不做程序快照、会话 README、能力降级——跨模型靠既有模型无关状态 + 显式程序。
+
+### 改动文件
+- `SKILL.md`：新增「参考资料」小节；Checkpoint 协议补"追加参考资料"；D2 / D4 / 组装 / C1 改三源三栏；progress.json 加 `skill` / `skill_version`；恢复表加 refs/ + MANIFEST 行。version 0.0.4 → 0.0.5。
+- 4 个 prompt：`evaluate-faithfulness-prompt.md`（重写，三源 + 参考输入）、`shared-constraints.md`（第 4 条加参考）、`evaluate-reader-appeal-prompt.md` / `evaluate-editor-review-prompt.md`（输入加 refs + 可回溯措辞三源；editor 论点支撑三源）。均 talk 内部，时间戳更新、不做 sibling sync。
+- `README.md`：加「参考资料」功能条；输出格式行改三栏。
+
+### 评审与修正
+验证（grep 旧双源措辞）发现两处计划未点名但属同意图的位置——两个提议轮 prompt 各自的输入清单与"可回溯"措辞、README 输出格式行也硬编码双源；不加改子代理会拿到冲突来源清单，故一并改。prompt-sync 检查：ai-tone 共享集未动、仍一致。
+
+### 仍待
+真实任务跑一次：refs 落盘、D4 三源、提议轮用 refs、跨会话 / 跨设备 / 跨模型续做。
