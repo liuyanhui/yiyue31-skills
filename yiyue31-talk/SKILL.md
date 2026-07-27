@@ -1,7 +1,7 @@
 ---
 name: yiyue31-talk
 description: 读到好文章（技术/新闻）后，产出**可分享的中文心得成品**——把自己的理解、收获、看法或推荐整理成稿。触发："生成心得"、"提取观点"、"写收获"、"分享我的看法"、"写个推荐"等想就一篇文章写下自己想法的场合；中断后续做："继续心得"、"恢复 talk"、"接着上次"、"resume talk"。
-version: 0.0.4
+version: 0.0.5
 ---
 
 # 用户心得分享 Skill
@@ -70,6 +70,8 @@ version: 0.0.4
 ```json
 {
   "title": "{安全化 title}",
+  "skill": "yiyue31-talk",
+  "skill_version": "0.0.5",
   "route": "dump | 策展",
   "form": "free | template",
   "current_step": "step0 | routing | D1 | D2 | D3 | D4 | C1 | C2 | C3 | assembly | propose | quality | alt-form | done",
@@ -91,7 +93,7 @@ version: 0.0.4
 
 ### Checkpoint 协议（全流程通用，不在每步重复）
 
-每次交互后：① 状态有变 → 更新 `progress-{title}.json`（至少 `current_step` + `last_updated`；发生决策时写对应 `decisions.*`）；② 追加一条 `journal-{title}.md`——用户每批输入、路由/形态决策、AI 生成（C1 提点 / D2 初稿 / 组装稿）、选点 + 打权重、提议轮出报告与采纳、各道质量审查、暂停/恢复都要记。**写盘顺序：内容文件 → journal → progress.json**（progress 最后写，保证"progress 标完成 ⇒ 对应产物必在"）。
+每次交互后：① 状态有变 → 更新 `progress-{title}.json`（至少 `current_step` + `last_updated`；发生决策时写对应 `decisions.*`）；② 追加一条 `journal-{title}.md`——用户每批输入、路由/形态决策、AI 生成（C1 提点 / D2 初稿 / 组装稿）、选点 + 打权重、提议轮出报告与采纳、各道质量审查、追加参考资料、暂停/恢复都要记。**写盘顺序：内容文件 → journal → progress.json**（progress 最后写，保证"progress 标完成 ⇒ 对应产物必在"）。
 
 `current_step` 迁移表（事件 → 新值；无明示时按此推进）：
 
@@ -137,6 +139,8 @@ version: 0.0.4
 | `original-{title}.md` | Step 0 完成 |
 | `progress-{title}.json` | 结构化状态（见"断点与恢复"；Step 0 起创建） |
 | `journal-{title}.md` | 交互日志（见"断点与恢复"；Step 0 起创建） |
+| `refs/` | 参考资料（任意步骤追加；URL 内容抓取后保存） |
+| `refs/MANIFEST.md` | 参考资料溯源清单（append-only） |
 | `user-input-{title}.md` | D1 / C3 / D3 用户原话分批追加（纯内容）；输入是否完成看 `progress.json` 的 `input_done` |
 | `article-points-{title}.md` | 策展，C1 完成（≤5 点 + "可补回"清单）|
 | `selected-points-{title}.md` | 策展，C2 完成（含权重：建议强化 / 保留 / 弱化 / 删）|
@@ -181,6 +185,15 @@ version: 0.0.4
 
 **按需另一种形态**：primary 形态经用户确认后，用户可要求出另一形态——**约束式 re-skin**，内容锁定自 primary 的已确认内容，不得新增观点 / 数据 / 引文。保存 `talk-{title}-{form}.md`（如 `talk-{title}-template.md`）。**不重命名** `talk-{title}.md`（`yiyue31-merge` 依赖此文件名）。
 
+### 参考资料（任意步骤可追加）
+
+用户可随时追加参考资料（URL / md / txt 等）补充背景。**必须落盘**——URL 内容用 web-access skill 抓取后保存，不只存链接（链接会腐烂，跨设备 / 跨天续做时拿不到）。
+
+- 存放：`{title}/talk/refs/`，每份 `ref-{NN}-{安全化名}.{ext}`（文件保留原扩展名；URL 转 markdown 存 `.md`）。
+- 溯源：`refs/MANIFEST.md`（append-only）逐条记 序号 / 类型（url|file|paste）/ 来源 / 抓取时间 / 存为文件名 / 备注。
+- 旁路动作：不改 `current_step`；走 Checkpoint 协议（存文件 + 写 MANIFEST + journal + 更新 progress `last_updated`）。
+- 用途与归属：refs 是合法来源之一（见 D2 / D4 / 组装 / 提议轮），成品按三栏标注——原文 / 参考[X] / 我的话。
+
 ### 批量输入与 "done?" 门
 
 D1（dump）与 C3（策展批注）均为**循环**：用户可分多批输入，AI 把每批原样**追加**到 `user-input-{title}.md`（只追加、不改写、不删）。
@@ -197,14 +210,14 @@ D1（dump）与 C3（策展批注）均为**循环**：用户可分多批输入�
 
 #### D2: AI 忠实整合成稿
 
-读 `user-input` + `original`，产出结构化初稿：
+读 `user-input` + `original` + `refs`，产出结构化初稿：
 
 - 按主题或原文章节归并用户观点。
-- 明确标注原文 vs 我的话。
+- 明确标注原文 / 参考[X] / 我的话。
 - 补足让没读过原文的读者也能看懂的上下文（仅必要）。
 - 顺可读性。
 
-**护栏（强制）**：严格按"原文 + 用户输入"成稿，禁止 AI 自行发挥。可重组、补必要原文上下文、顺可读性，但不得添加原文与用户输入之外的任何观点、论据或修饰。**用户说得少，稿子就短——不能为丰满而编造。** 角度提炼、张力放大等加值留给"读者 / 编辑提议轮"。
+**护栏（强制）**：严格按"原文 + 参考 + 用户输入"成稿，禁止 AI 自行发挥。可重组、补必要原文 / 参考上下文、顺可读性，但不得添加原文、参考与用户输入之外的任何观点、论据或修饰。**用户说得少，稿子就短——不能为丰满而编造。** 角度提炼、张力放大等加值留给"读者 / 编辑提议轮"。
 
 保存：`{title}/talk/integrated-draft-{title}.md`
 
@@ -214,10 +227,10 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 
 #### D4: faithfulness 检查（Evaluate Once）
 
-核对 `integrated-draft`：每条"我的"观点都能在 `user-input`（含 D3 采纳段）找到来源，且无原文与用户输入之外的内容（禁止 AI 发挥）。
+核对 `integrated-draft`：每条"我的"观点都能在 `user-input`（含 D3 采纳段）找到来源，且无原文、参考与用户输入之外的内容（禁止 AI 发挥）。
 
 - `{eval-prompt}`：`{skill-dir}/references/evaluate-faithfulness-prompt.md`
-- `{input-files}`：`integrated-draft` + `user-input` + `original`
+- `{input-files}`：`integrated-draft` + `user-input` + `original` + `refs`
 - `{output-file}`：`{title}/talk/review-faithfulness-{title}.md`
 - `{max-rounds}`：2
 
@@ -231,7 +244,7 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 
 #### C1: AI 提取原文点
 
-单遍分析 `original`，抽取"点"：关键论断 + 出彩句 + 争议点。**总数 ≤ 5**（聚焦，不贪多）。AI 主动标注其中 top 2-3 为"**建议强化 / 重点**"（标注是提案，走提案制）。按讨论价值排序（高优先）。
+单遍分析 `original`（脊柱；refs 不在此提点，留待 C3 / D2 / 提议轮引用），抽取"点"：关键论断 + 出彩句 + 争议点。**总数 ≤ 5**（聚焦，不贪多）。AI 主动标注其中 top 2-3 为"**建议强化 / 重点**"（标注是提案，走提案制）。按讨论价值排序（高优先）。
 
 同时把**未入选的点**单列一份"**可补回**"清单（用户可勾选补回）。
 
@@ -271,7 +284,7 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
   3. **总结**：关键启示（无指定长度）。
   4. **推荐语**：两版——**≤100 汉字**（社交动态）+ **≤200 汉字**（博客前言），文稿内标注用途；社交版尤其要"开头即钩"，因其本身就是动态正文。
 
-**通则**：全文区分原文 vs 我的话；数据 / 名称保持原值。引言 / 总结 / 推荐语 / 过渡这些 AI 生成的成稿文字仅作"待确认"草稿，其加值由下一道"提议轮"把关。
+**通则**：全文区分原文 / 参考[X] / 我的话；数据 / 名称保持原值。引言 / 总结 / 推荐语 / 过渡这些 AI 生成的成稿文字仅作"待确认"草稿，其加值由下一道"提议轮"把关。
 
 保存：`{title}/talk/talk-{title}.md`
 
@@ -285,6 +298,7 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 - `talk-{title}.md`（组装初稿）
 - `user-input-{title}.md`（用户原话，第一参照）
 - `original-{title}.md`（原文）
+- `refs/`（参考资料，合法来源之一；建议须可回溯到用户原话、原文或参考）
 - （策展模式额外）`selected-points-{title}.md`（选点 + 权重 + 强化理由，与 `user-input` 同为第一参照）
 
 **两个 subagent（并行）**：
