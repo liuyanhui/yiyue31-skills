@@ -41,6 +41,7 @@ summarize what HN is saying in this post
 
 ```
 01-raw-data.json              # 原始统一 JSON（顶层含 latestCommentAt 时间戳）
+02-filtered.json              # Step 5 过滤结果（active + outlierPool + outlierBatches）
 02-grouped.json               # 分组结果
 03-article.md                 # 最终文章
 recommendation-{slug}-{postId}.md  # 多风格推荐摘要
@@ -56,10 +57,12 @@ evaluation-*.md               # 各评估报告（可观测性）
 hn-digest/
 ├── SKILL.md                  # 入口提示词文档
 ├── README.md                 # 本文件
-├── scripts/                  # 抓取器代码（详见 scripts/README.md）
+├── scripts/                  # 抓取器与预处理（详见 scripts/README.md）
 │   ├── algolia.ts
 │   ├── firebase.ts
+│   ├── preprocess.ts         # Step 5 代码驱动过滤 + outlier 分批
 │   ├── lib/utils.ts
+│   ├── lib/filter.ts         # Step 5 过滤实现（共享）
 │   └── __tests__/            # bun:test 测试套件
 ├── references/               # 按需加载的评估 prompt
 │   ├── evaluate-article-prompt.md
@@ -92,7 +95,7 @@ hn-digest/
 bun test
 ```
 
-当前规模：7 个测试文件，103 个 pass / 5 个 skip（需网络的集成测试） / 0 个 fail。
+当前规模：8 个测试文件，107 个 pass / 5 个 skip（需网络的集成测试） / 0 个 fail。
 
 ## 设计决策
 
@@ -101,6 +104,14 @@ bun test
 
 ## Changelog
 
+- **0.2.0**（2026-07-28）：Step 5 过滤改代码驱动 + standout map-reduce
+  - 新增 `scripts/preprocess.ts`：读 `01-raw-data.json` 跑确定性过滤（depth → activity → 分层选择），输出 `02-filtered.json`（active + outlierPool + outlierBatches）
+  - 过滤逻辑抽到共享 `scripts/lib/filter.ts`；`filter.test.ts` 由"镜像参考实现"改为测真·实现，消除手工同步
+  - outlier 池 > 60 时预分批（~40/批），standout pass 走 map-reduce（每批选候选 → 合并定 2–4），防单次 LLM 调用超上下文
+  - SKILL.md Step 5 改为调用 preprocess.ts；Step 6 读 `02-filtered.json`
+  - 2GB：单次读小 JSON 文本（<1MB），无需流式
+  - 改动文件：`scripts/{lib/filter.ts,preprocess.ts}`、`scripts/__tests__/{filter,preprocess}.test.ts`、`SKILL.md`、`README.md`、`scripts/README.md`
+  - 原因：用户第 2 点要"程序辅助预处理/预分组"突破上下文上限；代码驱动让过滤确定性可测，分批让大线程 standout 不超上下文
 - **0.1.0**（2026-07-28）：数据覆盖 + 双轨产物重构
   - 抓取：移除评论链路的 Jina（完备性优先于可用性），方法链改 Algolia → Firebase；`firebase.ts` 抓取深度配置化（`--fetchDepth`，默认 10）并加 `--maxFetchComments` 安全帽（默认 500，2GB 防护）；保留 Step 4 抓原文的 Jina Reader URL
   - 过滤：Step 5 由"纯热度 top-N"改为多样性分层选择（OP + 每子树 ≥1 代表 + 热度补齐），低回复的离群评论保留供 standout 挑选；`maxComments` 默认 30→80（上限 150）、`depth` 默认 2→5（上限 10）

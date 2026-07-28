@@ -4,6 +4,8 @@ hn-digest 的抓取器（fetcher）代码。每个 fetcher 是一个独立的可
 
 两个 fetcher 是同一个目标（"获取 HN 评论"）的两种实现，按优先级 fallback：Algolia → Firebase。（评论链路的 Jina 已移除：完备性优先于可用性，且其 markdown 抓取脆弱；抓"原文"仍用 Jina Reader URL，见 SKILL.md Step 4。）
 
+`preprocess.ts` 不是 fetcher，是 Step 5 的代码驱动过滤器：读 fetcher 产出的 `01-raw-data.json`，确定性过滤后写 `02-filtered.json`（active + outlierPool + outlierBatches）。
+
 ## 用法
 
 每个脚本独立调用：
@@ -11,6 +13,7 @@ hn-digest 的抓取器（fetcher）代码。每个 fetcher 是一个独立的可
 ```bash
 bun scripts/algolia.ts <postId>
 bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]
+bun scripts/preprocess.ts <01-raw-data.json> [--depth N] [--minReplies N] [--maxComments N]
 ```
 
 `<postId>` 是 HN 帖子的纯数字 ID（例如 `8863`）。脚本会输出统一 JSON 到 stdout，错误信息到 stderr，退出码 0 表示成功。
@@ -21,7 +24,9 @@ bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]
 |------|---------|------|
 | `algolia.ts` | HN Algolia Search API (`hn.algolia.com/api/v1/items/<id>`) | 统一 JSON |
 | `firebase.ts` | HN Firebase API (`hn.firebaseio.com/v0/item/<id>`)，递归抓取子评论，受 `--fetchDepth` / `--maxFetchComments` 约束 | 统一 JSON |
+| `preprocess.ts` | Step 5 代码驱动过滤：读 `01-raw-data.json`，depth → activity → 分层选择；outlier 池 > 60 时分批 | `02-filtered.json` |
 | `lib/utils.ts` | 共享工具函数 | — |
+| `lib/filter.ts` | Step 5 过滤实现（`preprocess.ts` 与 `filter.test.ts` 共用同一份） | — |
 
 ## 统一 JSON 结构
 
@@ -74,6 +79,17 @@ bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]
 | `fetchWithTimeout(url, opts, timeoutMs)` | 带超时的 `fetch`，默认 30s |
 | `delay(ms)` | Promise 风格的 sleep |
 
+## lib/filter.ts
+
+Step 5 过滤的实现，`preprocess.ts`（生产）与 `__tests__/filter.test.ts`（测试）共用同一份，无需手工同步：
+
+| 函数 | 作用 |
+|------|------|
+| `depthTruncate(comments, depth)` | 砍掉超过深度的评论 + 重算 childIds |
+| `partitionByActivity(filtered, minReplies)` | 拆分为 active set 与 outlier pool |
+| `selectDiverse(active, config, postAuthor, byId)` | 分层选择到 maxComments（OP + 每子树 ≥1 代表 + 热度补齐） |
+| `applyFilters(comments, config, postAuthor)` | 上面三步的组合，返回选中的 active 集 |
+
 ## 错误处理
 
 每个脚本失败时退出码为 1，stderr 包含错误描述。SKILL.md 的 Step 3 描述了上层（Claude）如何根据错误类型决定 retry / fallback / terminate。
@@ -93,7 +109,8 @@ bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]
 | `fetchers.test.ts` | 两个 fetcher 的集成测试（需网络，默认 skip） |
 | `utils.test.ts` | `lib/utils.ts` 的单元测试（40 个 pass） |
 | `error-scenarios.test.ts` | fetcher 在错误场景下的行为（部分需网络） |
-| `filter.test.ts` | 过滤管道的镜像实现测试（与 SKILL.md Step 5 对齐） |
+| `filter.test.ts` | `lib/filter.ts` 过滤逻辑测试（Step 5） |
+| `preprocess.test.ts` | `preprocess.ts` 输出形状 + outlier 分批 + 参数解析 |
 | `grouped-schema.test.ts` | 分组输出 schema 校验 |
 | `e2e-output.test.ts` | 端到端输出测试 |
 

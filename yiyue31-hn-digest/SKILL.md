@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
-version: 0.1.0
+version: 0.2.0
 author: yiyue31
 ---
 
@@ -85,29 +85,28 @@ All methods exhausted → output "所有抓取方式均失败: {methods + reason
 
 ---
 
-## Step 5: Comment Filtering Pipeline
+## Step 5: Comment Filtering Pipeline (code-driven)
 
-Goal: keep a diverse, representative set — not just the loudest heat — so both the hot-track grouping and the standout pass have material. Apply in order:
+Run the deterministic filter — it produces `02-filtered.json` next to the input:
 
-1. **Depth**: Remove `depth > config.depth`. Recalculate each remaining comment's `childIds` to only include IDs still present.
-2. **Activity**: Remove `childIds.length < config.minReplies` (using recalculated values) → the **active set**. Comments that survive depth but fail this filter (low-reply, potentially surprising) are NOT discarded: they form the **outlier pool** the standout pass reads (Step 6.4).
-3. **Diversity-preserving selection** to `config.maxComments` (replaces pure heat top-N): always include OP comments that are active; then guarantee ≥1 representative per top-level reply subtree (the hottest active comment in each root chain, so no major thread is dropped); then fill remaining slots by `childIds.length` desc. This keeps every discussion thread represented instead of letting one hot subtree crowd out the rest.
-4. **OP**: Set `isOP: true` where `comment.author === post.author`, else `false`.
+`bun {skill-dir}/scripts/preprocess.ts {outputDir}/{postId}-{slug}/01-raw-data.json --depth {config.depth} --minReplies {config.minReplies} --maxComments {config.maxComments}`
 
-If 0 comments remain in the active set AND the outlier pool is empty → output "过滤后无符合条件的评论" → terminate. Otherwise pass the active set (+ the outlier pool for Step 6.4) to Step 6 (AI groups inline, no subagent).
+The script (`scripts/lib/filter.ts`) applies: (1) depth truncation, (2) activity partition → active set + outlier pool, (3) diversity-preserving selection to `maxComments` (OP + ≥1 representative per top-level subtree + heat fill), (4) OP mark. It writes `02-filtered.json` = `{ active, outlierPool, outlierBatches, meta }`. When the outlier pool is large (`> 60`), it is pre-split into `outlierBatches` (~40 each) so the standout pass (Step 6.4) can map-reduce without any single LLM call going oversized. 2GB note: `01-raw-data.json` is small JSON text (a maxed-out ~500-comment thread is <1MB); the script reads it once — no streaming warranted at these sizes.
+
+If `meta.activeCount === 0 && meta.outlierCount === 0` → output "过滤后无符合条件的评论" → terminate. Otherwise pass `02-filtered.json` to Step 6 (AI groups inline, no subagent).
 
 ---
 
 ## Step 6: Comment Grouping → 02-grouped.json
 
-Read `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for output structure (fallback to highest version if missing). Section names follow `config.lang`.
+Read `02-filtered.json` (active + outlierPool + outlierBatches from Step 5) and `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for output structure (fallback to highest version if missing). Section names follow `config.lang`.
 
-1. **Nested grouping**: Group by `config.groupBy` dimensions in order (e.g., `["topic","stance"]` → first by topic, then by stance). Each comment in exactly ONE group. OP comments first within their group.
+1. **Nested grouping** (over `active`): Group by `config.groupBy` dimensions in order (e.g., `["topic","stance"]` → first by topic, then by stance). Each comment in exactly ONE group. OP comments first within their group.
 2. **sortGroupsBy**: `"relevance"` = rank by (total childIds.length, unique authors, OP presence) desc. `"engagement"` = rank by total childIds.length desc.
-3. **Controversies**: Scan for opposing viewpoints → add to `controversies` with `topic` + `sides`.
-4. **Standout picks** (the cold/outrageous track — adds reader surprise, separate from the heat-ranked groups): from the outlier pool (Step 5) plus the active set, pick 2–4 comments that are the most counter-consensus, counter-intuitive, sharp, or outrageous. Faithful to the real comment text — never fabricate or paraphrase the surprising part away. Write to a top-level `standouts` array (each entry: `commentId`, `quote` = the comment's exact words, `reason` = why it is surprising, in `config.lang`). Set `standouts: []` if nothing genuinely surprising exists.
+3. **Controversies**: Scan `active` for opposing viewpoints → add to `controversies` with `topic` + `sides`.
+4. **Standout picks** (the cold/outrageous track — adds reader surprise, separate from the heat-ranked groups): pick 2–4 comments that are the most counter-consensus, counter-intuitive, sharp, or outrageous, from `outlierPool` plus `active`. Faithful to the real comment text — never fabricate or paraphrase the surprising part away. **If `outlierBatches` is present** (large pool), map-reduce: pick surprising candidates from each batch, then pick the final 2–4 from the union — so no single call reads the whole oversized pool. Write to a top-level `standouts` array (each entry: `commentId`, `quote` = the comment's exact words, `reason` = why it is surprising, in `config.lang`). Set `standouts: []` if nothing genuinely surprising exists.
 
-**Overflow handling**: If >40 comments, batch into ~20, group each batch, merge by group name, deduplicate `commentIds`.
+**Overflow handling**: If `active` > 40 comments, batch into ~20, group each batch, merge by group name, deduplicate `commentIds`.
 
 ---
 
