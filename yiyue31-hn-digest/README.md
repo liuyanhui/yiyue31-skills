@@ -104,6 +104,10 @@ bun test
 
 ## Changelog
 
+- **0.2.1**（2026-07-28）：评估完善 + 文档精简（subagent 评审跟进）
+  - SKILL.md：Step 6 显式写 `02-grouped.json`；`active` 空 / outlier 非空 边界；Step 9 采样明确取 `active`；"terminate silently" 改明确报错；架构说明单数→复数；删 Jina 移除史 / 2GB note / 重复 2GB 短语 / 7.7 marker 复述 / 6.4 忠实度句 / Algolia 注（C1/C2/C4/C5/C6 + T1–T6）
+  - evaluate-article-prompt.md：D3 加 References check + 语种一致性 check；D5 加原文引用 check；**空话双扣修复**——空话统一交 AI Tone Check、D5 不再扣；D1/D4 fabrication 划清观点/事实不双扣；D3/D5 锚点映射 major/minor 严重度；输出格式矛盾修正；D2 删复述；Heat marker check 拆行（P1/P2/P3/P4/P5/P6/P7 + S1/S2/S5）
+  - reader-audit-prompt.md：AI Tone Check 引用 Step 9 → Step 8（C3）
 - **0.2.0**（2026-07-28）：Step 5 过滤改代码驱动 + standout map-reduce
   - 新增 `scripts/preprocess.ts`：读 `01-raw-data.json` 跑确定性过滤（depth → activity → 分层选择），输出 `02-filtered.json`（active + outlierPool + outlierBatches）
   - 过滤逻辑抽到共享 `scripts/lib/filter.ts`；`filter.test.ts` 由"镜像参考实现"改为测真·实现，消除手工同步

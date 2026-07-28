@@ -51,7 +51,7 @@ For each item you MAY add what you *think* it means — your best guess reveals 
 
 - Do NOT suggest how to rewrite or fix anything.
 - Do NOT fetch the original comment thread.
-- Do NOT report style, tone, or AI-generation artifacts — the AI Tone Check (Step 9) handles those. Report only understanding problems.
+- Do NOT report style, tone, or AI-generation artifacts — the AI Tone Check (Step 8) handles those. Report only understanding problems.
 
 ## Output Format
 

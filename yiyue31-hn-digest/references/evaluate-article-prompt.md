@@ -15,13 +15,13 @@ Are the extracted viewpoints faithful to the original comments?
 - 10: All viewpoints perfectly faithful.
 - 7–9: Minor inaccuracies that do not change the meaning.
 - 4–6: Some viewpoints distorted or misrepresented.
-- 0–3: Major factual errors or fabricated viewpoints.
+- 0–3: Major viewpoint distortions or fabricated viewpoints. (Fabricated facts/external knowledge are scored in dimension 4 — do not double-count.)
 
 ### 2. Viewpoint Completeness (观点完整性) — Weight: 20%
 
 Are any IMPORTANT viewpoints silently dropped? Note: this is NOT "represent every comment equally." Concentrating depth on the 2–3 viewpoints that reframe understanding and rounding up the rest briefly is GOOD practice, not a deduction — penalize only genuinely important viewpoints that vanish entirely.
 
-Check: read `02-grouped.json`. For each group, judge whether its IMPORTANT viewpoints are reflected anywhere in the article (a brief roundup is fine). Deduct only when an important viewpoint is absent — not when minor or echo comments are merely rounded up.
+Check: read `02-grouped.json`. For each group, judge whether its IMPORTANT viewpoints are reflected anywhere in the article (a brief roundup is fine).
 
 - 10: All important viewpoints captured (minor ones may be rounded up).
 - 7–9: A minor important viewpoint missing, but all major ones present.
@@ -45,7 +45,9 @@ OP marker check:
 - Every OP comment must be prefixed with the OP marker and placed first within its group/section. The marker follows the article language: zh `> **[楼主]** `, en `> **[OP]** `. A zh article carrying the untranslated `> **[OP]** ` is a defect.
 
 Heat marker check:
-- Every `###` subsection and roundup bullet that maps to a group in `02-grouped.json` must carry a part/whole coverage marker at the end of its heading/lead-in: zh `（N / M 条）`, en `(N / M comments)` (N = unique comments under the mapped group(s); M = total unique comments across all groups). Defects: a mapped section with no marker; a marker on 背景 / 争议点 / 意外之声 / 总结 / 参考资料 (which take none); or a body reordered by raw heat (the body must stay editorially ordered — the marker exposes coverage, it does not dictate order).
+- Every `###` subsection and roundup bullet mapping to a group in `02-grouped.json` must carry a coverage marker at its heading/lead-in end: zh `（N / M 条）`, en `(N / M comments)`.
+  - N = unique comments under the mapped group(s); M = total unique across all groups.
+  - Defects: a mapped section with no marker; a marker on 背景 / 争议点 / 意外之声 / 总结 / 参考资料 (which take none); or a body reordered by raw heat (the marker exposes coverage, it does not dictate order).
 
 Standout section check:
 - When `02-grouped.json` `standouts` is non-empty, the article must include a `## 意外之声 / Standout takes` section (before 总结) rendering each pick as a blockquote of the comment's exact words plus a one-line reason it is surprising. Omit the section only when `standouts` is empty. Defects: section missing despite non-empty standouts; blockquotes that paraphrase or fabricate the surprising claim instead of quoting it; section present but aimless.
@@ -54,12 +56,19 @@ Citation format check:
 - No commenter usernames as primary attribution ("augstein 认为……" → use "有评论者认为……" instead).
 - Exception: naming is acceptable when quoting an exact, insightful comment AND providing context.
 
+Language consistency check:
+- Section headings follow `config.lang` (a zh article must not carry untranslated headings like `## Background`). Em-dash (——) mid-sentence use is deferred to the Translationese Check.
+
 Title prefix check:
 - H1 heading must begin with `[Hacker News] `. Deduct 1-2 points if missing.
 
-- 10: Skeleton matches thread type; proper OP markers; clean citations; 争议点 present only when genuinely warranted.
-- 7–9: Minor formatting deviations or occasional unnecessary username drops.
-- 4–6: Wrong skeleton for the thread type, OP markers missing, a fabricated 争议点, or excessive username attribution.
+References check:
+- A `## 参考资料 / References` section is present with the HN discussion link. If the post has an external URL, the original-article link is included AND its raw URL shown on a separate indented line (it must survive conversion to HTML/PDF/etc.). Defects: section missing, HN link missing, or a raw URL not on its own line.
+
+Score by severity, not defect count:
+- 10: All structure checks pass (skeleton matches type; OP markers; coverage markers; standout section when warranted; citations; title prefix; references).
+- 7–9: 1–2 MINOR defects (occasional username drop, a single missing coverage marker, raw URL not indented).
+- 4–6: A MAJOR defect (wrong skeleton, OP markers missing, fabricated 争议点, missing References or HN link, coverage markers absent across sections).
 - 0–3: Structure completely wrong.
 
 ### 4. Factual Correctness (事实正确性) — Weight: 15%
@@ -69,26 +78,29 @@ Is the article free from fabricated content and external knowledge?
 - 10: All content derives from the provided comments.
 - 7–9: Minor extrapolations that are reasonable inferences.
 - 4–6: Some content appears fabricated or includes external knowledge.
-- 0–3: Significant fabrication or external knowledge.
+- 0–3: Fabricated facts or external knowledge not in the comments. (Fabricated viewpoints are scored in dimension 1 — do not double-count.)
 
 ### 5. Writing Quality & Engagement (写作质量与引读力) — Weight: 20%
 
 Is the article well-written AND does it give the reader a reason to keep reading? (Engagement is weighted here because a faithful-but-forgettable digest is the failure mode this dimension exists to catch.)
 
+**Boundary with AI Tone Check**: lexical AI-tone tells AND dramatized meta-narration / 空话 (sentences that narrate the discussion's action without a viewpoint) are scored by the standalone AI Tone Check — do not double-penalize them in this dimension.
+
 - **Jargon handling**: Are technical/financial terms explained on first use or replaced with plain language?
 - **Background hook**: Does the background open with something connecting the topic to the reader's interest, and give enough context to make the reader care? (Anti-patterns: "这篇文章来自……" dry opening; OR a background so thin the reader has no stakes.)
-- **Transitions**: Do subsections flow into each other via SUBSTANTIVE transition sentences that name the logical link between topics? Dramatized narration of "the debate did X" (争论分了叉 / 露出了底色 / 撞上反驳) is NOT a transition — it narrates the discussion's action without adding a viewpoint; treat it as 空话 and deduct. (Anti-pattern: sections read like independent mini-articles glued together — but the fix is a substantive link, not dramatized connective tissue.)
+- **Transitions**: Do subsections flow via SUBSTANTIVE transition sentences that name the logical link between topics? Sections that read like independent mini-articles with no link = defect (the fix is a substantive link, not dramatized connective tissue).
 - **Summary value**: Does the summary provide value beyond a recap? (Anti-pattern: "讨论没有共识" — provide an unanswered question, practical implication, or higher-level observation instead.)
 - **Sharp viewpoint highlighting**: Mark sharp/counter-intuitive viewpoints with **bold**. Format important COMMENT quotes as **{translated text}**（{original text}）（when lang differs from source; full-width （） in zh, half-width () in en）. Keep bold to 1–3 per section and comment-fragment quotes to 1–2 per section. Longer SOURCE-article block quotes are a separate, encouraged budget.
+- **Original-article voice**: when the fetched original carries a substantive argument, are its 1–2 core-argument paragraphs quoted as a blockquote in the relevant section (not just paraphrased)? Fetched original with a real argument but only paraphrased = defect.
 - **Controversy depth**: Identify the ROOT of disagreements, not just "X says A, Y says B."
-- **Aggregation voice**: sections open with the viewpoint itself, not with meta-narration about the discussion (a digest-specific tell). Generic lexical AI-tone tells (symmetric opposition, superlatives, casual voice) are caught by the standalone AI Tone Check — do not double-penalize THOSE here. But dramatized meta-narration / 空话 (sentences that narrate the debate's action without carrying a viewpoint) is a writing-quality defect — deduct it here too, since it undermines engagement rather than serving it.
+- **Aggregation voice**: sections open with the viewpoint itself, not with meta-narration about the discussion (a digest-specific tell).
 - **Anti-formula**: Does the article avoid the homogeneity tells of THIS digest? Watch for: the same summary opening recurring (e.g., "与其说…不如说…" every time); the same controversy phrasing as a tic (e.g., "分歧的根子在于…"); an identical macro-structure regardless of whether the thread is a breakthrough, an obituary, or a flame war. A piece that reads as "the same digest again" loses the reader — deduct when the formula is visible.
 - **Resonance / insight**: Does the article leave the reader with something that lingers — a reframe of the reader's understanding, or one clearly-labeled editorial observation ("值得一提的是…") that is supported by the source and goes beyond the commenters' frames? Dramatized framing of the discussion itself does NOT count as resonance. A faithful but forgettable piece caps at 7 on this dimension; reward genuine pull.
 
-- 10: All checks pass, including a moment of genuine resonance. Reads like a well-edited publication piece.
-- 7–9: Most checks pass, 1-2 minor issues; competent but may lack a memorable insight.
-- 4–6: Several issues (unexplained jargon, no transitions, flat summary, or visible formula).
-- 0–3: Major writing quality problems across multiple checks.
+- 10: All checks pass, including a moment of genuine resonance.
+- 7–9: 1–2 MINOR defects (a thin background, 1–2 unexplained terms); no memorable insight.
+- 4–6: A MAJOR defect (no transitions, flat summary, visible formula, or no original-article blockquote when the original had a real argument).
+- 0–3: Major writing-quality problems across multiple checks.
 
 ## Output Format
 
@@ -104,13 +116,13 @@ Write your evaluation as:
 {1-2 sentence justification, including per-group coverage assessment}
 
 ### Structure Adherence: {score}/10
-{1-2 sentence justification, including OP marker and citation format assessment}
+{1–3 sentence justification: name any FAILED structure checks (skip passed ones) + OP/citation assessment}
 
 ### Factual Correctness: {score}/10
 {1-2 sentence justification}
 
 ### Writing Quality & Engagement: {score}/10
-{1-2 sentence justification, noting which writing checks passed/failed and whether the piece achieved any resonance/insight or showed formula tells}
+{1–3 sentence justification: name any FAILED writing checks (skip passed ones) + whether resonance was achieved or a formula was visible}
 
 ### Overall Score: {weighted_average}/10
 
