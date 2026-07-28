@@ -49,7 +49,7 @@
   - `evaluate-faithfulness-prompt.md`：dump 模式 D4 忠实度检查。
   - `evaluate-reader-appeal-prompt.md`：读者吸引力建议（加法门）。
   - `evaluate-editor-review-prompt.md`：编辑结构建议（加法门）。
-  - `shared-constraints.md`：读者 / 编辑提议轮共享的 4 条约束（单一来源，由调用方注入）。
+  - `shared-constraints.md`：读者 / 编辑提议轮共享的 5 条约束（单一来源，由调用方注入）。
   - `evaluate-translationese-prompt.md`：翻译腔检查。
   - `evaluate-readability-prompt.md`：可读性检查。
   - `evaluate-ai-tone-prompt.md`：AI 味检查。

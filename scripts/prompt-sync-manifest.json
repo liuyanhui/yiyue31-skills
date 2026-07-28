@@ -6,7 +6,8 @@
       "copies": [
         "yiyue31-hn-digest/references/evaluate-ai-tone-prompt.md",
         "yiyue31-talk/references/evaluate-ai-tone-prompt.md",
-        "yiyue31-translator/references/evaluate-ai-tone-prompt.md"
+        "yiyue31-translator/references/evaluate-ai-tone-prompt.md",
+        "yiyue31-paraphrase/references/evaluate-ai-tone-prompt.md"
       ]
     }
   ]

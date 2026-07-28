@@ -66,3 +66,17 @@ summary 与 hn-digest 各有一份 `evaluate-reader-audit-prompt.md`，原列为
   - `evaluate-translationese-prompt.md` v1.0：脱胎自 translator 中文翻译腔检查，改为面向"中文原创心得稿"（无译文/原文配对、去翻译专属括注规则）。
   - `evaluate-readability-prompt.md` v1.0：脱胎自 translator 中文可读性检查，改为通用中文文本。
   - `evaluate-faithfulness-prompt.md` v1.0：talk 专属（dump 模式 D4 忠实度检查），无对应兄弟。
+
+## paraphrase 加入记录（2026-07-28）
+
+paraphrase（yiyue31-paraphrase）新增英文→精简地道中文改写，复用 ai-tone，另建五份独立审查 prompt。
+
+- **ai-tone**：co-locate hn-digest 原文（timestamp `2026-07-03 17:52:56`），加入同步组——`scripts/prompt-sync-manifest.json` 的 ai-tone 组 `copies` 已追加 `yiyue31-paraphrase/references/evaluate-ai-tone-prompt.md`。同步方式 cp。
+- **五份独立审查 prompt（不参与同步，体裁/语言不同，类比 talk 三份）**：
+  - `evaluate-translationese-prompt.md`：脱胎自 **translator** 中文翻译腔检查（不是 talk 版——paraphrase 保留金句，更接近 translator）。改为面向改写稿：清单取自 `expression-rules.md` 的 L1（R1–R7），保留金句 `**中文（English）**` 授权例外（不判打嗝），去 translator 的原文/译文配对强假设（源文仅作可选上下文）。
+  - `evaluate-faithfulness-prompt.md`：脱胎自 talk 忠实度检查，改为**两层**——金句中文半边宽松（不偏离主要意义）、其余严格（不歪曲/不编造）；且只守底线、不查"是否漏点"（drop/merge 已由 triage 授权）。
+  - `evaluate-conciseness-prompt.md`：**新写**（无兄弟——translator 不压缩，summary 把表达质量折进评分量表）。清单取自 `expression-rules.md` 的 L2（R8–R10），字数 advisory 不卡比例。
+  - `evaluate-editor-review-prompt.md`：脱胎自 talk 编辑结构审查。paraphrase 无 user-author、端到端 model-invoked → 约束**内联**在 prompt 里（"纯 craft、可回溯、不加新事实、PM 套用+边界上呈"），**不**另建 `shared-constraints.md`（单一消费者无漂移风险）。
+  - `evaluate-reader-audit-prompt.md`：脱胎自 summary Reader Audit，改为中文、面向博客大众读者（画像 大众/扫读/跨领域），复用 blocking-vs-lookupable 分类。
+
+按"不同输出语言 / 不同用途是独立文档、不绑时间戳"规则，以上五份均**不做内容同步**。`expression-rules.md`、`analyze-prompt.md`、`generate-paraphrase-prompt.md` 为 paraphrase 专属生成类文件，无兄弟，不进同步。

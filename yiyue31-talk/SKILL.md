@@ -1,7 +1,7 @@
 ---
 name: yiyue31-talk
 description: 读到好文章（技术/新闻）后，产出**可分享的中文心得成品**——把自己的理解、收获、看法或推荐整理成稿。触发："生成心得"、"提取观点"、"写收获"、"分享我的看法"、"写个推荐"等想就一篇文章写下自己想法的场合；中断后续做："继续心得"、"恢复 talk"、"接着上次"、"resume talk"。
-version: 0.0.5
+version: 0.0.6
 ---
 
 # 用户心得分享 Skill
@@ -29,7 +29,7 @@ version: 0.0.5
 
 `{skill-dir}` = 本 SKILL.md 所在目录路径（仅用于读 `references/` 下的 prompt）。
 
-`{title}/talk/` 的根目录是**工作目录（cwd）**——所有产物（original / progress / journal / user-input / integrated-draft / article-points / selected-points / review-* / talk-*）都写在此处，**不写在 `{skill-dir}`**。会话跟着项目走，便于跨设备流转（见「断点与恢复·跨设备」）。
+`{title}/talk/` 的根目录是**工作目录（cwd）**，所有产物（original / progress / journal / user-input / draft / points / picked / review-* / talk-*）都写在此处，**不写在 `{skill-dir}`**。会话跟着项目走，便于跨设备流转（见「断点与恢复·跨设备」）。
 
 ## Reusable Sub-workflows
 
@@ -57,7 +57,9 @@ version: 0.0.5
 
 ## title 安全化
 
-仅保留字母、数字、CJK 字符、`-`、`_`，其余替换为 `-`，合并连续 `-`，去除首尾 `-`，限 64 字符。示例：`《AI 重塑软件开发：2026 年趋势》` → `AI-重塑软件开发-2026-趋势`。路径无效时用简短英文替代。
+仅保留字母、数字、CJK 字符、`-`、`_`，其余替换为 `-`，合并连续 `-`，去除首尾 `-`。**压成短 slug，限 16 字符**（CJK 与拉丁字母各计 1；超出时截到最近的 `-` 词边界，无词边界则硬截）。示例：`《AI 重塑软件开发：2026 年趋势》` → `AI-重塑软件开发`；`《大模型时代的软件开发范式转移与实践总结》` → `大模型时代的软件开发范`（截断）。路径无效时用简短英文替代。
+
+**为什么限短**：`{title}` 既是目录名又出现在每个产物文件名（`{name}-{title}.md`）里，不限长则目录与全部文件都过长（对标 yiyue31-summary 的 ≤5 词短 slug）。
 
 ## 断点与恢复
 
@@ -71,7 +73,7 @@ version: 0.0.5
 {
   "title": "{安全化 title}",
   "skill": "yiyue31-talk",
-  "skill_version": "0.0.5",
+  "skill_version": "0.0.6",
   "route": "dump | 策展",
   "form": "free | template",
   "current_step": "step0 | routing | D1 | D2 | D3 | D4 | C1 | C2 | C3 | assembly | propose | quality | alt-form | done",
@@ -102,12 +104,12 @@ version: 0.0.5
 | Step 0 落盘 `original` | `step0` | 建会话两件套 |
 | 路由定 route/form | `D1`（dump）/ `C1`（策展） | `input_done=no`；写 `decisions.routing` |
 | 用户说 done（D1） | `D2` | `input_done=yes` |
-| D2 落盘 `integrated-draft` | `D3` | — |
+| D2 落盘 `draft` | `D3` | - |
 | D3 采纳补段 | 回 `D2`（重出初稿） | 采纳段追加进 `user-input` |
-| D3 不补 / 跳过 | `D4` | — |
-| D4 通过 | `assembly` | — |
-| C1 落盘 `article-points` | `C2` | — |
-| C2 落盘 `selected-points` | `C3` | 写 `decisions.selected_points` |
+| D3 不补 / 跳过 | `D4` | - |
+| D4 通过 | `assembly` | - |
+| C1 落盘 `points` | `C2` | - |
+| C2 落盘 `picked` | `C3` | 写 `decisions.selected_points` |
 | 用户说 done（C3） | `assembly` | `input_done=yes` |
 | assembly 落盘 `talk-{title}.md` | `propose` | 自由结构先写 `decisions.confirmed_structure` |
 | 提议轮出 `review-propose` + 采纳回流 | `quality` | 写 `decisions.accepted_proposals` |
@@ -132,7 +134,7 @@ version: 0.0.5
 
 ## 恢复逻辑
 
-**先读 `progress-{title}.json`**（`current_step` + `decisions` 为权威），再用下表核对产物文件——表作**一致性校验与兜底**。两向不一致都按"以文件实际存在性定位内容"处理、并提示"进度文件与产物不一致，可能上次未干净落盘"：progress 乐观（标 D2 完成却缺 `integrated-draft`）→ 视为未完成、回 D2；progress 落后（`integrated-draft` 在却标 D1）→ 视为 D2 已完成、推进 current_step。progress.json 完全缺失时退化为纯靠下表推断（向后兼容旧会话）。
+**先读 `progress-{title}.json`**（`current_step` + `decisions` 为权威），再用下表核对产物文件——表作**一致性校验与兜底**。两向不一致都按"以文件实际存在性定位内容"处理、并提示"进度文件与产物不一致，可能上次未干净落盘"：progress 乐观（标 D2 完成却缺 `draft`）→ 视为未完成、回 D2；progress 落后（`draft` 在却标 D1）→ 视为 D2 已完成、推进 current_step。progress.json 完全缺失时退化为纯靠下表推断（向后兼容旧会话）。
 
 | 已有文件 | 模式 / 完成步骤 |
 |---------|---------------|
@@ -142,10 +144,10 @@ version: 0.0.5
 | `refs/` | 参考资料（任意步骤追加；URL 内容抓取后保存） |
 | `refs/MANIFEST.md` | 参考资料溯源清单（append-only） |
 | `user-input-{title}.md` | D1 / C3 / D3 用户原话分批追加（纯内容）；输入是否完成看 `progress.json` 的 `input_done` |
-| `article-points-{title}.md` | 策展，C1 完成（≤5 点 + "可补回"清单）|
-| `selected-points-{title}.md` | 策展，C2 完成（含权重：建议强化 / 保留 / 弱化 / 删）|
-| `integrated-draft-{title}.md` | dump，D2 完成 |
-| `review-faithfulness-{title}.md` | dump，D4 完成（核 `integrated-draft`）|
+| `points-{title}.md` | 策展，C1 完成（≤5 点 + "可补回"清单）|
+| `picked-{title}.md` | 策展，C2 完成（含权重：建议强化 / 保留 / 弱化 / 删）|
+| `draft-{title}.md` | dump，D2 完成 |
+| `review-faith-{title}.md` | dump，D4 完成（核 `draft`）|
 | `talk-{title}.md` | 共用组装完成（primary 形态）|
 | `review-propose-{title}.md` | 读者 / 编辑提议轮完成（建议已出，含用户采纳标记）|
 | `review-quality-{title}.md` | 减法三道检查完成 |
@@ -216,10 +218,11 @@ D1（dump）与 C3（策展批注）均为**循环**：用户可分多批输入�
 - 明确标注原文 / 参考[X] / 我的话。
 - 补足让没读过原文的读者也能看懂的上下文（仅必要）。
 - 顺可读性。
+- **标点（硬约束）**：禁止 em dash（`—`、`——`），用逗号 / 冒号 / 拆句等中文写法代替（与组装一致）。
 
 **护栏（强制）**：严格按"原文 + 参考 + 用户输入"成稿，禁止 AI 自行发挥。可重组、补必要原文 / 参考上下文、顺可读性，但不得添加原文、参考与用户输入之外的任何观点、论据或修饰。**用户说得少，稿子就短——不能为丰满而编造。** 角度提炼、张力放大等加值留给"读者 / 编辑提议轮"。
 
-保存：`{title}/talk/integrated-draft-{title}.md`
+保存：`{title}/talk/draft-{title}.md`
 
 #### D3: 缺口提示（可选）
 
@@ -227,11 +230,11 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 
 #### D4: faithfulness 检查（Evaluate Once）
 
-核对 `integrated-draft`：每条"我的"观点都能在 `user-input`（含 D3 采纳段）找到来源，且无原文、参考与用户输入之外的内容（禁止 AI 发挥）。
+核对 `draft`：每条"我的"观点都能在 `user-input`（含 D3 采纳段）找到来源，且无原文、参考与用户输入之外的内容（禁止 AI 发挥）。
 
 - `{eval-prompt}`：`{skill-dir}/references/evaluate-faithfulness-prompt.md`
-- `{input-files}`：`integrated-draft` + `user-input` + `original` + `refs`
-- `{output-file}`：`{title}/talk/review-faithfulness-{title}.md`
+- `{input-files}`：`draft` + `user-input` + `original` + `refs`
+- `{output-file}`：`{title}/talk/review-faith-{title}.md`
 - `{max-rounds}`：2
 
 不通过 → 按 D2 护栏修正，复审。
@@ -248,7 +251,7 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 
 同时把**未入选的点**单列一份"**可补回**"清单（用户可勾选补回）。
 
-保存：`{title}/talk/article-points-{title}.md`
+保存：`{title}/talk/points-{title}.md`
 
 #### C2: 用户多选收敛 + 权重
 
@@ -258,7 +261,7 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 
 用户对每点选一个权重，并可改 AI 的建议。**始终**附一个**自由文本输入框**，让用户加 AI 没提到的点。**若用户一个点都不选，询问是否换 dump 路径或回 C1 重提点；不可默默进入空组装。**"强化"是加法 → 走提案制（用户确认该点的强化方向）。
 
-记录：`{title}/talk/selected-points-{title}.md`（格式：每点一行带权重标签 + 末尾"# 用户补充"段落）
+记录：`{title}/talk/picked-{title}.md`（格式：每点一行带权重标签 + 末尾"# 用户补充"段落）
 
 **为什么是"点"不是"问题"**：呈现原文的点，让用户直接对内容反应，而非回答 AI 拟的、可能跑题的问题（同"为什么是这个形态"）。收敛即一次多选 + 打权重，秒级完成。
 
@@ -273,6 +276,8 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 ### 共用组装：分享稿（primary 形态）
 
 **输出语言固定为中文。** 产出 primary 形态初稿（待提议轮确认）。
+
+**标点（硬约束）**：全文禁止 em dash（`—`、`——`），用逗号 / 冒号 / 拆句等中文写法代替；ai-tone 检查兜底复核。
 
 **形态分支**：
 - **自由结构**：AI 先提议一个结构（提案）→ 用户确认 → 按确认结构组装。用户拒绝则请用户给出自己的结构或要求 AI 重提，结构未定前不进组装。钩子开篇，长短自由。
@@ -299,13 +304,13 @@ AI 列出原文里用户没提到的关键点（"你没提 X、Y，要补吗？"
 - `user-input-{title}.md`（用户原话，第一参照）
 - `original-{title}.md`（原文）
 - `refs/`（参考资料，合法来源之一；建议须可回溯到用户原话、原文或参考）
-- （策展模式额外）`selected-points-{title}.md`（选点 + 权重 + 强化理由，与 `user-input` 同为第一参照）
+- （策展模式额外）`picked-{title}.md`（选点 + 权重 + 强化理由，与 `user-input` 同为第一参照）
 
 **两个 subagent（并行）**：
 1. **读者视角**（appeal / 吸引力）：以"目标读者会不会想读下去、会不会被勾住"为镜，建议如何让开头更抓人、张力更明显、节奏更带感。prompt：`{skill-dir}/references/evaluate-reader-appeal-prompt.md`。
 2. **编辑视角**（structure / 完备性）：以"结构是否清楚、论点是否站得住、有没有缺口或冗余"为镜，建议如何重组、补必要上下文、砍多余。prompt：`{skill-dir}/references/evaluate-editor-review-prompt.md`。
 
-两个 prompt 共享 4 条约束（不改义 / 不删用户保留项 / 只建议不自动改 / 可回溯强化但不编造），**单一定义于** `{skill-dir}/references/shared-constraints.md`：调用每个 subagent 时，先把该文件内容拼在该视角 prompt 之前作为强制前提；约束不再内联进两份 prompt，避免拷贝漂移。
+两个 prompt 共享 5 条约束（不改义 / 不删用户保留项 / 只建议不自动改 / 可回溯强化但不编造 / 改写不引入 em dash），**单一定义于** `{skill-dir}/references/shared-constraints.md`：调用每个 subagent 时，先把该文件内容拼在该视角 prompt 之前作为强制前提；约束不再内联进两份 prompt，避免拷贝漂移。
 
 **合并报告**：两个 subagent 的建议合并为一份，保存 `{title}/talk/review-propose-{title}.md`。每条标明：来源视角（读者 / 编辑）、类型（结构 / 张力 / 完备性 / 措辞）、引用位置、可回溯依据、具体改写建议（"建议更自然"不算，必须给具体改写或具体增删）。两个视角建议冲突时并排列出，由用户裁定。
 
