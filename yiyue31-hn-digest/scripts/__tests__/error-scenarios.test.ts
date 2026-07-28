@@ -170,9 +170,9 @@ describe("Error Scenario 3: Malformed config.json rule in SKILL.md", () => {
     const skillContent = readFileSync(SKILL_MD_PATH, "utf-8");
 
     // Verify all default config fields are documented in the schema table
-    expect(skillContent).toContain("| 2 |");
+    expect(skillContent).toContain("| 5 |");
     expect(skillContent).toContain("| 3 |");
-    expect(skillContent).toContain("| 30 |");
+    expect(skillContent).toContain("| 80 |");
     expect(skillContent).toContain('| `"zh"`');
     expect(skillContent).toContain('| `"hn-digest/"`');
   });
@@ -289,26 +289,6 @@ describe("Error Scenario 6: All fetch methods fail for invalid postId", () => {
       expect(result.stderr.length).toBeGreaterThan(0);
     },
     TIMEOUT_MS
-  );
-
-  test(
-    "Jina fetcher returns output for non-existent post ID (Jina proxies the page)",
-    async () => {
-      // Jina Reader acts as a proxy and returns whatever HN renders, so even
-      // non-existent posts yield output (exit code 0). The skill prompt
-      // normalizes and validates the Jina output later (Step 3).
-      const result = await runFetcher("scripts/jina.ts", INVALID_POST_ID);
-
-      // Jina may succeed (0) or fail (1) depending on network conditions.
-      // If it succeeds, there must be stdout content.
-      if (result.exitCode === 0) {
-        expect(result.stdout.length).toBeGreaterThan(0);
-      } else {
-        // If it fails, stderr should contain the reason.
-        expect(result.stderr.length).toBeGreaterThan(0);
-      }
-    },
-    120000
   );
 
   test(

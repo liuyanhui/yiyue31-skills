@@ -109,6 +109,28 @@ export function validateGroupedSchema(data: unknown): {
     });
   }
 
+  // Optional standouts (Step 6.4) — present only when the standout pass found
+  // genuinely surprising comments.
+  if (d.standouts !== undefined) {
+    if (!Array.isArray(d.standouts)) {
+      errors.push("'standouts' must be an array if present");
+    } else {
+      d.standouts.forEach((standout: unknown, index: number) => {
+        const st = standout as Record<string, unknown>;
+        const prefix = `standouts[${index}]`;
+        if (typeof st.commentId !== "string" || st.commentId.length === 0) {
+          errors.push(`${prefix}: missing or invalid 'commentId' (must be a non-empty string)`);
+        }
+        if (typeof st.quote !== "string" || st.quote.length === 0) {
+          errors.push(`${prefix}: missing or invalid 'quote' (must be a non-empty string)`);
+        }
+        if (typeof st.reason !== "string" || st.reason.length === 0) {
+          errors.push(`${prefix}: missing or invalid 'reason' (must be a non-empty string)`);
+        }
+      });
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 
@@ -164,6 +186,26 @@ describe("validateGroupedSchema", () => {
     const result = validateGroupedSchema(data);
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
+  });
+
+  test("accepts valid standouts array", () => {
+    const data = makeValidGroupedData();
+    (data as Record<string, unknown>).standouts = [
+      { commentId: "c1", quote: "a surprising exact quote", reason: "counters the consensus" },
+    ];
+    const result = validateGroupedSchema(data);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  test("rejects standouts entry missing quote", () => {
+    const data = makeValidGroupedData();
+    (data as Record<string, unknown>).standouts = [
+      { commentId: "c1", reason: "no quote field" },
+    ];
+    const result = validateGroupedSchema(data);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes("standouts[0]") && e.includes("quote"))).toBe(true);
   });
 
   // --- Negative tests ---

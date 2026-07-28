@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
-version: 0.0.11
+version: 0.1.0
 author: yiyue31
 ---
 
@@ -27,9 +27,11 @@ Extract the post ID from user input — either a full URL (`https://news.ycombin
 
 | Field | Type | Constraint | Default |
 |-------|------|-----------|---------|
-| `depth` | integer | 1–5 | 2 |
+| `depth` | integer | 1–10 | 5 |
 | `minReplies` | integer | 0–100 | 3 |
-| `maxComments` | integer | 5–100 | 30 |
+| `maxComments` | integer | 5–150 | 80 |
+| `fetchDepth` | integer | 1–15 | 10 |
+| `maxFetchComments` | integer | 1–2000 | 500 |
 | `lang` | enum | `"zh"` / `"en"` | `"zh"` |
 | `outputDir` | string | valid directory path | `"hn-digest/"` |
 | `fetchOriginalPost` | boolean | — | false |
@@ -37,6 +39,8 @@ Extract the post ID from user input — either a full URL (`https://news.ycombin
 | `groupBy` | string[] | `"topic"`, `"stance"` | `["topic","stance"]` |
 | `sortGroupsBy` | enum | `"relevance"` / `"engagement"` | `"relevance"` |
 | `templateVersion` | string | maps to assets/ files | `"v1"` |
+
+`depth` is the **analysis filter** (Step 5 keeps comments at depth ≤ `depth`). `fetchDepth` is the **Firebase fetch depth** (only matters when Algolia fails); fetch broadly, filter narrowly. `maxFetchComments` is a 2GB / time safety cap on Firebase's recursive fetch.
 
 ### Config Location & Loading
 
@@ -54,7 +58,7 @@ CLI args > config.json > defaults. CLI flags map to config fields by name, excep
 
 ## Step 3: Fetch Data
 
-Try methods in order: Algolia → Firebase → Jina. Every run fetches fresh — there is no cache.
+Try methods in order: Algolia → Firebase. Every run fetches fresh — there is no cache. (Jina was removed from the comment-fetch chain: it scraped the HN page as fragile markdown and served only as an availability fallback; data completeness is prioritized over fetch availability. The separate original-article fetch in Step 4 still uses the Jina Reader URL.)
 
 **Retries**: `maxFetchRetries` per method. 429 → wait 2s, retry same method. Empty comments = valid result. All methods 404 → output "帖子不存在或已被删除" → terminate.
 
@@ -62,13 +66,10 @@ For each method: output "正在获取数据... (使用 {Method} 方式)". On suc
 
 | Method | Script | Notes |
 |--------|--------|-------|
-| Algolia | `bun {skill-dir}/scripts/algolia.ts {postId}` | Output is unified JSON. |
-| Firebase | `bun {skill-dir}/scripts/firebase.ts {postId}` | Fetches to depth 5; filtering in Step 5. |
-| Jina | `bun {skill-dir}/scripts/jina.ts {postId}` | Output is raw markdown; normalize manually (see below). |
+| Algolia | `bun {skill-dir}/scripts/algolia.ts {postId}` | Single request, full comment tree. Preferred — most complete and lightest on memory. |
+| Firebase | `bun {skill-dir}/scripts/firebase.ts {postId} --fetchDepth {config.fetchDepth} --maxFetchComments {config.maxFetchComments}` | Recursive per-comment fetch; fallback when Algolia fails. Bounded by `fetchDepth` and `maxFetchComments` (2GB / time safety). |
 
-**Jina normalization**: Parse markdown → extract title, author, comments → build unified JSON (each comment: `id`, `author`, `parentId: null`, `childIds: []`, `depth: 0`, `contentMarkdown`). Validate: `post.title` non-empty and `comments` array exists.
-
-**`latestCommentAt`**: newest comment's ISO 8601 UTC timestamp, set by fetch scripts (Jina path leaves it `null`).
+**`latestCommentAt`**: newest comment's ISO 8601 UTC timestamp, set by both fetch scripts.
 
 All methods exhausted → output "所有抓取方式均失败: {methods + reasons}" → terminate.
 
@@ -86,14 +87,14 @@ All methods exhausted → output "所有抓取方式均失败: {methods + reason
 
 ## Step 5: Comment Filtering Pipeline
 
-Apply in order:
+Goal: keep a diverse, representative set — not just the loudest heat — so both the hot-track grouping and the standout pass have material. Apply in order:
 
 1. **Depth**: Remove `depth > config.depth`. Recalculate each remaining comment's `childIds` to only include IDs still present.
-2. **Activity**: Remove `childIds.length < config.minReplies` (using recalculated values).
-3. **Quantity**: Sort by `childIds.length` desc, take top `config.maxComments`.
+2. **Activity**: Remove `childIds.length < config.minReplies` (using recalculated values) → the **active set**. Comments that survive depth but fail this filter (low-reply, potentially surprising) are NOT discarded: they form the **outlier pool** the standout pass reads (Step 6.4).
+3. **Diversity-preserving selection** to `config.maxComments` (replaces pure heat top-N): always include OP comments that are active; then guarantee ≥1 representative per top-level reply subtree (the hottest active comment in each root chain, so no major thread is dropped); then fill remaining slots by `childIds.length` desc. This keeps every discussion thread represented instead of letting one hot subtree crowd out the rest.
 4. **OP**: Set `isOP: true` where `comment.author === post.author`, else `false`.
 
-If 0 comments remain → output "过滤后无符合条件的评论" → terminate. Otherwise pass the filtered array to Step 6 (AI groups inline, no subagent).
+If 0 comments remain in the active set AND the outlier pool is empty → output "过滤后无符合条件的评论" → terminate. Otherwise pass the active set (+ the outlier pool for Step 6.4) to Step 6 (AI groups inline, no subagent).
 
 ---
 
@@ -104,6 +105,7 @@ Read `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for outp
 1. **Nested grouping**: Group by `config.groupBy` dimensions in order (e.g., `["topic","stance"]` → first by topic, then by stance). Each comment in exactly ONE group. OP comments first within their group.
 2. **sortGroupsBy**: `"relevance"` = rank by (total childIds.length, unique authors, OP presence) desc. `"engagement"` = rank by total childIds.length desc.
 3. **Controversies**: Scan for opposing viewpoints → add to `controversies` with `topic` + `sides`.
+4. **Standout picks** (the cold/outrageous track — adds reader surprise, separate from the heat-ranked groups): from the outlier pool (Step 5) plus the active set, pick 2–4 comments that are the most counter-consensus, counter-intuitive, sharp, or outrageous. Faithful to the real comment text — never fabricate or paraphrase the surprising part away. Write to a top-level `standouts` array (each entry: `commentId`, `quote` = the comment's exact words, `reason` = why it is surprising, in `config.lang`). Set `standouts: []` if nothing genuinely surprising exists.
 
 **Overflow handling**: If >40 comments, batch into ~20, group each batch, merge by group name, deduplicate `commentIds`.
 
@@ -132,7 +134,8 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 4. **Background & original voice**: Use fetched original content if available; otherwise infer from title + comments. When the fetched original carries a substantive argument, quote its 1–2 core-argument paragraphs as block quotes inside the relevant body section.
 5. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
 6. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
-7. **Heat marker**: each `###` subsection and roundup bullet that maps to a group in `02-grouped.json` appends a comment-count marker (`（精选 N 条）` / `(N selected comments)`) at the end of its heading/lead-in, so engagement is visible while the body stays editorially ordered (NOT reordered by heat). Skip H1, 背景, whole-thread narrative sections, 争议点, 总结, 参考资料. A group's `commentIds` already unions its subGroups — don't double-count. Details in `assets/article-{templateVersion}.md`.
+7. **Coverage marker**: each `###` subsection and roundup bullet that maps to a group in `02-grouped.json` appends a part/whole marker (`（N / M 条）` zh, `(N / M comments)` en) at the end of its heading/lead-in. N = unique comments under the mapped group(s); M = total unique comments across all groups in `02-grouped.json` (the set the digest actually grouped). The ratio shows how much of the discussion each section covers, while the body stays editorially ordered (NOT reordered by heat). Skip H1, 背景, whole-thread narrative sections, 争议点, 意外之声, 总结, 参考资料. A group's `commentIds` already unions its subGroups — don't double-count. Details in `assets/article-{templateVersion}.md`.
+8. **Standout section**: render `## 意外之声 / Standout takes` (all skeletons, before 总结) from `02-grouped.json` `standouts` — each pick as a blockquote of the comment's exact words plus a one-line reason it is surprising. Omit the section entirely when `standouts` is empty.
 
 ---
 

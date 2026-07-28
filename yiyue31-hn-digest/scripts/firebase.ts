@@ -2,8 +2,12 @@ import { fetchWithTimeout, delay, htmlToMarkdown, flattenCommentTree, parsePostI
 import type { CommentNode } from "./lib/utils";
 
 const FIREBASE_API_BASE = "https://hacker-news.firebaseio.com/v0";
-const MAX_DEPTH = 5;
 const REQUEST_DELAY_MS = 50;
+
+// Defaults used when the caller passes no flags. The skill passes
+// --fetchDepth / --maxFetchComments from config (SKILL.md Step 3).
+const DEFAULT_FETCH_DEPTH = 10;
+const DEFAULT_MAX_FETCH_COMMENTS = 500;
 
 interface FirebaseItem {
   id: number;
@@ -26,6 +30,7 @@ interface FetchMeta {
   skippedDeleted: number;
   skippedDead: number;
   maxDepthReached: boolean;
+  maxCommentsReached: boolean;
   latestTime: number;
 }
 
@@ -49,6 +54,7 @@ async function fetchCommentTree(
   kidIds: number[],
   currentDepth: number,
   maxDepth: number,
+  maxFetchComments: number,
   meta: FetchMeta
 ): Promise<CommentTreeNode[]> {
   if (currentDepth > maxDepth) {
@@ -59,6 +65,13 @@ async function fetchCommentTree(
   const nodes: CommentTreeNode[] = [];
 
   for (const kidId of kidIds) {
+    // 2GB / time safety: stop once we have accepted enough live items.
+    // meta is shared across recursion, so this caps the whole traversal.
+    if (meta.totalFetched >= maxFetchComments) {
+      meta.maxCommentsReached = true;
+      break;
+    }
+
     await delay(REQUEST_DELAY_MS);
 
     const item = await fetchItem(kidId);
@@ -85,7 +98,7 @@ async function fetchCommentTree(
 
     // Recurse into children
     const children = item.kids
-      ? await fetchCommentTree(item.kids, currentDepth + 1, maxDepth, meta)
+      ? await fetchCommentTree(item.kids, currentDepth + 1, maxDepth, maxFetchComments, meta)
       : [];
 
     nodes.push({ item, children });
@@ -109,10 +122,49 @@ function convertTreeToCommentNodes(nodes: CommentTreeNode[]): CommentNode[] {
   });
 }
 
+interface FirebaseCliOptions {
+  postId: string;
+  fetchDepth: number;
+  maxFetchComments: number;
+}
+
+// Usage: bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]
+// Flags accept both "--flag value" and "--flag=value" forms.
+function parseArgs(argv: string[]): FirebaseCliOptions {
+  let fetchDepth = DEFAULT_FETCH_DEPTH;
+  let maxFetchComments = DEFAULT_MAX_FETCH_COMMENTS;
+  const positional: string[] = [];
+
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    const next = argv[i + 1];
+
+    if (a === "--fetchDepth" || a === "--fetch-depth") {
+      const v = Number(next);
+      if (Number.isFinite(v) && v > 0) fetchDepth = Math.floor(v);
+      i++;
+    } else if (a.startsWith("--fetchDepth=") || a.startsWith("--fetch-depth=")) {
+      const v = Number(a.split("=")[1]);
+      if (Number.isFinite(v) && v > 0) fetchDepth = Math.floor(v);
+    } else if (a === "--maxFetchComments" || a === "--max-fetch-comments") {
+      const v = Number(next);
+      if (Number.isFinite(v) && v > 0) maxFetchComments = Math.floor(v);
+      i++;
+    } else if (a.startsWith("--maxFetchComments=") || a.startsWith("--max-fetch-comments=")) {
+      const v = Number(a.split("=")[1]);
+      if (Number.isFinite(v) && v > 0) maxFetchComments = Math.floor(v);
+    } else {
+      positional.push(a);
+    }
+  }
+
+  return { postId: positional[0] ?? "", fetchDepth, maxFetchComments };
+}
+
 async function main(): Promise<void> {
-  const input = process.argv[2];
+  const { postId: input, fetchDepth, maxFetchComments } = parseArgs(process.argv.slice(2));
   if (!input) {
-    process.stderr.write("Usage: bun scripts/firebase.ts <postId>\n");
+    process.stderr.write("Usage: bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]\n");
     process.exit(1);
   }
 
@@ -153,11 +205,12 @@ async function main(): Promise<void> {
     skippedDeleted: 0,
     skippedDead: 0,
     maxDepthReached: false,
+    maxCommentsReached: false,
     latestTime: 0,
   };
 
   const commentTrees = postItem.kids
-    ? await fetchCommentTree(postItem.kids, 1, MAX_DEPTH, meta)
+    ? await fetchCommentTree(postItem.kids, 1, fetchDepth, maxFetchComments, meta)
     : [];
 
   // Convert to CommentNode format and flatten
@@ -196,6 +249,9 @@ async function main(): Promise<void> {
       skippedDeleted: meta.skippedDeleted,
       skippedDead: meta.skippedDead,
       maxDepthReached: meta.maxDepthReached,
+      maxCommentsReached: meta.maxCommentsReached,
+      fetchDepth,
+      maxFetchComments,
     },
   };
 

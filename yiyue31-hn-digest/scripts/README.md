@@ -2,7 +2,7 @@
 
 hn-digest 的抓取器（fetcher）代码。每个 fetcher 是一个独立的可执行 TypeScript 脚本，负责把 HN 帖子评论抓下来并输出为统一的 JSON 结构。
 
-三个 fetcher 是同一个目标（"获取 HN 评论"）的三种实现，按优先级 fallback：Algolia → Firebase → Jina。
+两个 fetcher 是同一个目标（"获取 HN 评论"）的两种实现，按优先级 fallback：Algolia → Firebase。（评论链路的 Jina 已移除：完备性优先于可用性，且其 markdown 抓取脆弱；抓"原文"仍用 Jina Reader URL，见 SKILL.md Step 4。）
 
 ## 用法
 
@@ -10,8 +10,7 @@ hn-digest 的抓取器（fetcher）代码。每个 fetcher 是一个独立的可
 
 ```bash
 bun scripts/algolia.ts <postId>
-bun scripts/firebase.ts <postId>
-bun scripts/jina.ts <postId>
+bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]
 ```
 
 `<postId>` 是 HN 帖子的纯数字 ID（例如 `8863`）。脚本会输出统一 JSON 到 stdout，错误信息到 stderr，退出码 0 表示成功。
@@ -21,13 +20,12 @@ bun scripts/jina.ts <postId>
 | 脚本 | 抓取方式 | 输出 |
 |------|---------|------|
 | `algolia.ts` | HN Algolia Search API (`hn.algolia.com/api/v1/items/<id>`) | 统一 JSON |
-| `firebase.ts` | HN Firebase API (`hn.firebaseio.com/v0/item/<id>`)，递归抓取所有子评论 | 统一 JSON |
-| `jina.ts` | Jina Reader (`r.jina.ai/{hn-url}`)，把 HN 网页转 Markdown | Markdown 文本（非 JSON，需 AI 后处理） |
+| `firebase.ts` | HN Firebase API (`hn.firebaseio.com/v0/item/<id>`)，递归抓取子评论，受 `--fetchDepth` / `--maxFetchComments` 约束 | 统一 JSON |
 | `lib/utils.ts` | 共享工具函数 | — |
 
 ## 统一 JSON 结构
 
-`algolia.ts` 和 `firebase.ts` 输出此结构。`jina.ts` 输出原始 Markdown，由 SKILL.md Step 3 Method 3 描述的 AI 正规化流程转换为这个结构。
+`algolia.ts` 和 `firebase.ts` 输出此结构。
 
 ```typescript
 {
@@ -54,7 +52,10 @@ bun scripts/jina.ts <postId>
     totalFetched: number,        // 仅 firebase
     skippedDeleted: number,      // 仅 firebase
     skippedDead: number,         // 仅 firebase
-    maxDepthReached: boolean     // 仅 firebase
+    maxDepthReached: boolean,    // 仅 firebase
+    maxCommentsReached: boolean, // 仅 firebase；触达 --maxFetchComments 安全帽
+    fetchDepth: number,          // 仅 firebase
+    maxFetchComments: number     // 仅 firebase
   }
 }
 ```
@@ -89,8 +90,7 @@ bun scripts/jina.ts <postId>
 
 | 文件 | 测试内容 |
 |------|---------|
-| `fetchers.test.ts` | 三个 fetcher 的集成测试（需网络，默认 skip） |
-| `jina-integration.test.ts` | Jina 特定集成测试（需网络，默认 skip） |
+| `fetchers.test.ts` | 两个 fetcher 的集成测试（需网络，默认 skip） |
 | `utils.test.ts` | `lib/utils.ts` 的单元测试（40 个 pass） |
 | `error-scenarios.test.ts` | fetcher 在错误场景下的行为（部分需网络） |
 | `filter.test.ts` | 过滤管道的镜像实现测试（与 SKILL.md Step 5 对齐） |
@@ -107,7 +107,6 @@ bun 默认递归发现 `*.test.ts`，包括 `scripts/__tests__/`。
 
 ## 实现备注
 
-- Algolia `/items/{id}` 端点返回完整评论树，无截断
-- Firebase 是递归抓取（一个请求拿一条评论，再并发抓所有子评论），可以拿到全量数据，但请求量大
-- Jina Reader 不返回 JSON，而是把整个 HN 页面转 Markdown，输出格式依赖 HN 的 HTML 结构，相对脆弱
-- 主备用 URL：`r.jina.ai` → `r.jinaai.cn`（国内镜像，`jina.ts` 在主 URL 失败时自动切换）
+- Algolia `/items/{id}` 端点单请求返回完整评论树，无截断，是主路径（最完备、内存最省）
+- Firebase 是递归抓取（一个请求拿一条评论），可拿全量，但请求量大；受 `--fetchDepth`（默认 10）与 `--maxFetchComments`（默认 500）约束，防止超大线程在低内存（2GB）机器上建全树失控或请求超时
+- 评论链路的 Jina 已移除；抓"原文"仍走 Jina Reader URL（见 SKILL.md Step 4）

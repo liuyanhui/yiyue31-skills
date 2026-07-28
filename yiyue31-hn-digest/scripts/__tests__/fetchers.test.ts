@@ -92,26 +92,4 @@ describe.skip("Fetcher Integration Tests (network required)", () => {
       TIMEOUT_MS
     );
   });
-
-  describe("Jina fetcher", () => {
-    test(
-      "should return non-empty markdown output",
-      async () => {
-        const result = await runFetcher("scripts/jina.ts", TEST_POST_ID);
-
-        expect(result.exitCode).toBe(0);
-        expect(result.stdout.length).toBeGreaterThan(0);
-
-        // Verify it contains some HN-like content
-        const lower = result.stdout.toLowerCase();
-        const hasContent =
-          lower.includes("hacker") ||
-          lower.includes("comment") ||
-          lower.includes("point") ||
-          lower.includes("test");
-        expect(hasContent).toBe(true);
-      },
-      TIMEOUT_MS
-    );
-  });
 });

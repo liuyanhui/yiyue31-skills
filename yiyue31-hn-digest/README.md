@@ -17,9 +17,11 @@ summarize what HN is saying in this post
 
 | 参数 | 默认 | 说明 |
 |------|------|------|
-| `--depth N` | 2 | 评论树截断深度（1–5） |
+| `--depth N` | 5 | 分析保留的评论树深度（1–10），Step 5 过滤用 |
 | `--minReplies N` | 3 | 单条评论最少需要的子评论数 |
-| `--maxComments N` | 30 | 入选评论上限 |
+| `--maxComments N` | 80 | 入选评论上限（5–150） |
+| `--fetchDepth N` | 10 | Firebase 抓取深度（1–15），仅在 Algolia 失败时生效 |
+| `--maxFetchComments N` | 500 | Firebase 抓取评论数安全帽（2GB / 时间防护） |
 | `--lang zh\|en` | `zh` | 输出文章语言 |
 | `--outputDir path` | `.` | 输出目录 |
 | `--with-original` | 关 | 同时抓取原文链接内容作为背景 |
@@ -57,7 +59,6 @@ hn-digest/
 ├── scripts/                  # 抓取器代码（详见 scripts/README.md）
 │   ├── algolia.ts
 │   ├── firebase.ts
-│   ├── jina.ts
 │   ├── lib/utils.ts
 │   └── __tests__/            # bun:test 测试套件
 ├── references/               # 按需加载的评估 prompt
@@ -82,7 +83,8 @@ hn-digest/
 
 - [Bun](https://bun.sh/) 运行时（执行抓取脚本与测试）
 - `turndown`（HTML → Markdown，已在 `package.json` 中）
-- Jina Reader：`https://r.jina.ai`，备用 `https://r.jinaai.cn`
+- Jina Reader：`https://r.jina.ai`，备用 `https://r.jinaai.cn`（仅用于 Step 4 抓原文；评论链路不再使用）
+- 目标机器 2GB 内存：LLM 推理在服务端不占本地内存，本地仅 bun 脚本处理 JSON；Firebase 抓取受 `--maxFetchComments` 约束，防超大线程建全树 OOM
 
 ## 测试
 
@@ -90,7 +92,7 @@ hn-digest/
 bun test
 ```
 
-当前规模：8 个测试文件，100 个 pass / 9 个 skip（需网络的集成测试） / 0 个 fail。
+当前规模：7 个测试文件，103 个 pass / 5 个 skip（需网络的集成测试） / 0 个 fail。
 
 ## 设计决策
 
@@ -99,6 +101,13 @@ bun test
 
 ## Changelog
 
+- **0.1.0**（2026-07-28）：数据覆盖 + 双轨产物重构
+  - 抓取：移除评论链路的 Jina（完备性优先于可用性），方法链改 Algolia → Firebase；`firebase.ts` 抓取深度配置化（`--fetchDepth`，默认 10）并加 `--maxFetchComments` 安全帽（默认 500，2GB 防护）；保留 Step 4 抓原文的 Jina Reader URL
+  - 过滤：Step 5 由"纯热度 top-N"改为多样性分层选择（OP + 每子树 ≥1 代表 + 热度补齐），低回复的离群评论保留供 standout 挑选；`maxComments` 默认 30→80（上限 150）、`depth` 默认 2→5（上限 10）
+  - 产物：新增 standout 判定 pass，文章加跨类型 `## 意外之声 / Standout takes` 小节（冷门/离谱轨，与热点反差，提升趣味）；`02-grouped.json` 加 `standouts` 字段
+  - 标记：`（精选 N 条）` 改为 `（N / M 条）` 比值（M = digest 实际分组的评论总数），消除"精选"措辞歧义
+  - 改动文件：`scripts/firebase.ts`、删 `scripts/jina.ts` + `jina-integration.test.ts`、`SKILL.md`、`assets/{article-v1.md,grouped-example-v1.json}`、`references/evaluate-article-prompt.md`、`scripts/__tests__/{filter,grouped-schema,fetchers,error-scenarios}.test.ts`、`README.md`、`scripts/README.md`
+  - 原因：digest 原本只分析 ≤30 条热评，既丢冷门观点又让标记分母含义模糊；扩覆盖 + 双轨 + 比值标记一并解决。超大线程（500+）的 map-reduce 留待后续
 - **0.0.11**（2026-07-27）：正文可见热度标记
   - 每个 `###` 小节和 roundup 项末尾追加 `（精选 N 条）` / `(N selected comments)`（N = 该小节映射到的 `02-grouped.json` 分组去重评论数）；H1/背景/争议点/总结/参考资料不加
   - 改动文件：`assets/article-v1.md`（约束块 + 骨架示例）、`SKILL.md`（Step 7 Generation Rule 7）、`references/evaluate-article-prompt.md`（Structure Adherence 增 Heat marker check）

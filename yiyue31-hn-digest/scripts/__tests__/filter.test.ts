@@ -17,17 +17,31 @@ interface FilterConfig {
 }
 
 /**
- * Implements the 4-step filter pipeline from the skill prompt (T-009).
- * This mirrors the filtering rules described in SKILL.md Step 6.
+ * Reference implementation of the Step 5 filter pipeline (mirrors SKILL.md).
+ * Steps: depth truncation → activity filter (active set) → diversity-preserving
+ * selection to maxComments → OP mark.
  *
- * IMPORTANT: If SKILL.md filtering rules change, this implementation must be updated to match.
+ * The outlier pool (depth-survivors that fail the activity filter) is consumed by
+ * the standout pass (Step 6.4) and is NOT part of this function's output.
+ *
+ * IMPORTANT: If SKILL.md Step 5 rules change, this implementation must be updated to match.
  */
+
+// Walk the parentId chain (over depth-survivors) up to the top-level root id.
+function rootOf(comment: FilterComment, byId: Map<string, FilterComment>): string {
+  let cur = comment;
+  while (cur.parentId !== null && byId.has(cur.parentId)) {
+    cur = byId.get(cur.parentId)!;
+  }
+  return cur.id;
+}
+
 function applyFilters(
   comments: FilterComment[],
   config: FilterConfig,
   postAuthor: string
 ): FilterComment[] {
-  // Step 6.1: Depth Truncation
+  // Step 5.1: Depth Truncation
   let filtered = comments.filter((c) => c.depth <= config.depth);
 
   // Recalculate childIds based on remaining comments
@@ -37,26 +51,61 @@ function applyFilters(
     childIds: c.childIds.filter((id) => remainingIds.has(id)),
   }));
 
-  // Step 6.2: Activity Filter
-  filtered = filtered.filter((c) => c.childIds.length >= config.minReplies);
+  // byId over depth-survivors, used to cluster active comments by top-level root
+  const byId = new Map(filtered.map((c) => [c.id, c]));
 
-  // Step 6.3: Quantity Cap
-  filtered.sort((a, b) => b.childIds.length - a.childIds.length);
-  filtered = filtered.slice(0, config.maxComments);
+  // Step 5.2: Activity Filter → active set
+  const active = filtered.filter((c) => c.childIds.length >= config.minReplies);
 
-  // Step 6.4: OP Identification
-  filtered = filtered.map((c) => ({
-    ...c,
-    isOP: c.author === postAuthor,
-  }));
+  // Step 5.3: Diversity-preserving selection to maxComments
+  const selected = new Map<string, FilterComment>();
+  const tryAdd = (c?: FilterComment): void => {
+    if (!c || selected.size >= config.maxComments || selected.has(c.id)) return;
+    selected.set(c.id, c);
+  };
 
-  return filtered;
+  // (a) OP comments first
+  for (const c of active) {
+    if (c.author === postAuthor) tryAdd(c);
+  }
+
+  // (b) one representative per top-level subtree (hottest active comment per root)
+  const byRoot = new Map<string, FilterComment[]>();
+  for (const c of active) {
+    const r = rootOf(c, byId);
+    if (!byRoot.has(r)) byRoot.set(r, []);
+    byRoot.get(r)!.push(c);
+  }
+  for (const rootId of byRoot.keys()) {
+    const members = byRoot
+      .get(rootId)!
+      .slice()
+      .sort((a, b) => b.childIds.length - a.childIds.length);
+    tryAdd(members.find((m) => !selected.has(m.id)));
+  }
+
+  // (c) heat fill
+  const rest = active
+    .filter((c) => !selected.has(c.id))
+    .sort((a, b) => b.childIds.length - a.childIds.length);
+  for (const c of rest) tryAdd(c);
+
+  // Output in heat order (grouping re-ranks anyway; deterministic + consistent
+  // with pre-diversity behavior).
+  let result = [...selected.values()].sort(
+    (a, b) => b.childIds.length - a.childIds.length
+  );
+
+  // Step 5.4: OP Identification
+  result = result.map((c) => ({ ...c, isOP: c.author === postAuthor }));
+
+  return result;
 }
 
 describe("Comment Filtering Pipeline", () => {
   const postAuthor = "testuser";
 
-  describe("Step 6.1: Depth Truncation", () => {
+  describe("Step 5.1: Depth Truncation", () => {
     test("removes comments deeper than config.depth", () => {
       const comments: FilterComment[] = [
         { id: "1", author: "a", parentId: null, childIds: ["2", "3"], depth: 0, contentMarkdown: "" },
@@ -95,7 +144,7 @@ describe("Comment Filtering Pipeline", () => {
     });
   });
 
-  describe("Step 6.2: Activity Filter", () => {
+  describe("Step 5.2: Activity Filter", () => {
     test("removes comments with childIds.length < minReplies", () => {
       const comments: FilterComment[] = [
         { id: "1", author: "a", parentId: null, childIds: ["2", "3", "4"], depth: 0, contentMarkdown: "" },
@@ -118,8 +167,8 @@ describe("Comment Filtering Pipeline", () => {
     });
   });
 
-  describe("Step 6.3: Quantity Cap", () => {
-    test("takes top maxComments by childIds.length", () => {
+  describe("Step 5.3: Diversity-preserving selection", () => {
+    test("respects maxComments cap and outputs heat order", () => {
       const comments: FilterComment[] = Array.from({ length: 50 }, (_, i) => ({
         id: `c${i}`,
         author: `author${i}`,
@@ -132,12 +181,44 @@ describe("Comment Filtering Pipeline", () => {
       const result = applyFilters(comments, { depth: 5, minReplies: 0, maxComments: 30 }, postAuthor);
 
       expect(result.length).toBe(30);
-      // First result should have the most childIds
+      // Output is heat-ordered (first has most childIds)
       expect(result[0].childIds.length).toBeGreaterThanOrEqual(result[result.length - 1].childIds.length);
+    });
+
+    test("always includes OP comments even with zero replies", () => {
+      // OP has the fewest childIds; pure heat top-N would drop it, diversity selection keeps it.
+      const comments: FilterComment[] = [
+        { id: "hot1", author: "other", parentId: null, childIds: ["a", "b", "c"], depth: 0, contentMarkdown: "" },
+        { id: "hot2", author: "other", parentId: null, childIds: ["d", "e"], depth: 0, contentMarkdown: "" },
+        { id: "op", author: "testuser", parentId: null, childIds: [], depth: 0, contentMarkdown: "OP" },
+      ];
+
+      const result = applyFilters(comments, { depth: 5, minReplies: 0, maxComments: 2 }, postAuthor);
+
+      expect(result.map((c) => c.id)).toContain("op");
+      expect(result.length).toBe(2);
+    });
+
+    test("guarantees a representative per top-level subtree", () => {
+      const comments: FilterComment[] = [
+        // subtree A (root a1)
+        { id: "a1", author: "x", parentId: null, childIds: ["a2", "a3"], depth: 0, contentMarkdown: "" },
+        { id: "a2", author: "x", parentId: "a1", childIds: ["a4"], depth: 1, contentMarkdown: "" },
+        { id: "a3", author: "x", parentId: "a1", childIds: [], depth: 1, contentMarkdown: "" },
+        { id: "a4", author: "x", parentId: "a2", childIds: [], depth: 2, contentMarkdown: "" },
+        // subtree B (root b1)
+        { id: "b1", author: "y", parentId: null, childIds: ["b2"], depth: 0, contentMarkdown: "" },
+        { id: "b2", author: "y", parentId: "b1", childIds: [], depth: 1, contentMarkdown: "" },
+      ];
+
+      const result = applyFilters(comments, { depth: 5, minReplies: 0, maxComments: 2 }, postAuthor);
+      const ids = new Set(result.map((c) => c.id));
+      expect(ids.has("a1")).toBe(true);
+      expect(ids.has("b1")).toBe(true);
     });
   });
 
-  describe("Step 6.4: OP Identification", () => {
+  describe("Step 5.4: OP Identification", () => {
     test("marks OP comments correctly", () => {
       const comments: FilterComment[] = [
         { id: "1", author: "testuser", parentId: null, childIds: ["2"], depth: 0, contentMarkdown: "OP reply" },
