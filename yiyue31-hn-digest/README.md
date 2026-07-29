@@ -77,9 +77,10 @@ hn-digest/
 ├── package.json
 └── bun.lock
 
-# 运行时数据（不在 skill 目录里）
-~/.hn-digest/
-└── config.json               # 首次运行自动生成
+# 运行时数据（写在项目根 / 运行目录，不在 skill 目录里）
+hn-digest.config.json          # 项目级配置（手动创建；不自动生成，避免冻结旧默认值）
+hn-digest/                     # 产物输出目录
+└── {postId}-{slug}/           # 单帖全部产物
 ```
 
 ## 依赖
@@ -104,6 +105,19 @@ bun test
 
 ## Changelog
 
+- **0.2.3**（2026-07-29）：分组强制全覆盖 + 兜底组 + 确定性覆盖校验
+  - SKILL.md Step 6：6.1 改为"每条 active 必归且仅归一组 + 不归主题的进兜底组 `其他观点`"(dimension topic),不再丢弃;overflow 合并改为并集 `commentIds` 不丢;新增 6.5 强制跑 `check-coverage.ts` 直到 clean 才进 Step 7
+  - Step 7：兜底组 `其他观点` 只做简短 roundup 或并入 `## 要点`,不作正文主角小节(仍带 marker)
+  - 新增 `scripts/check-coverage.ts`：确定性校验 active 是否全归组、有无跨组重复、有无引用非 active;clean 退出 0 否则 1;导出纯函数 `checkCoverage` 供单测
+  - 新增 `scripts/__tests__/check-coverage.test.ts`：clean / 父组+同组子组非重复 / missing / duplicate / extra
+  - 原因：诊断发现分组只归 depth 0-1 共 28 条,把全部 depth ≥2 丢弃,致文章分母 M 卡在 ~30,与 maxComments 无关;强制全覆盖 + 兜底组 + 校验三管齐下根治,校验脚本已在 49076057 产物上复现(52 missing + 1 duplicate)
+  - 改动文件：`SKILL.md`、`scripts/check-coverage.ts`(新)、`scripts/__tests__/check-coverage.test.ts`(新)、`README.md`
+- **0.2.2**（2026-07-29）：config 从全局 homedir 迁到项目内 + 消除默认值快照陷阱
+  - SKILL.md Step 2：config 路径 `{homedir}/.hn-digest/config.json` → `{cwd}/hn-digest.config.json`（项目根，独立于 outputDir）；首次运行不再写默认值快照（文件缺失即用默认值、不创建文件）；新增运行时打印生效配置 + 来源；废弃全局 `~/.hn-digest/config.json`（不再读取，可删）
+  - 优先级：`CLI args > config.json > defaults` → `CLI args > hn-digest.config.json > defaults`
+  - 原因：全局 config 在首次运行时快照了旧默认值（depth=2, maxComments=30），后来默认值改 5/80 后被静默盖过，导致 `（N / 30 条）` 仍为 30；迁项目内 + 不快照 + 打印三处一并根治
+  - 测试：`error-scenarios.test.ts` Scenario 3 更新优先级断言，新增断言锁定项目内路径 / 无快照 / 无 homedir / 有打印
+  - 改动文件：`SKILL.md`、`scripts/__tests__/error-scenarios.test.ts`、`README.md`
 - **0.2.1**（2026-07-28）：评估完善 + 文档精简（subagent 评审跟进）
   - SKILL.md：Step 6 显式写 `02-grouped.json`；`active` 空 / outlier 非空 边界；Step 9 采样明确取 `active`；"terminate silently" 改明确报错；架构说明单数→复数；删 Jina 移除史 / 2GB note / 重复 2GB 短语 / 7.7 marker 复述 / 6.4 忠实度句 / Algolia 注（C1/C2/C4/C5/C6 + T1–T6）
   - evaluate-article-prompt.md：D3 加 References check + 语种一致性 check；D5 加原文引用 check；**空话双扣修复**——空话统一交 AI Tone Check、D5 不再扣；D1/D4 fabrication 划清观点/事实不双扣；D3/D5 锚点映射 major/minor 严重度；输出格式矛盾修正；D2 删复述；Heat marker check 拆行（P1/P2/P3/P4/P5/P6/P7 + S1/S2/S5）

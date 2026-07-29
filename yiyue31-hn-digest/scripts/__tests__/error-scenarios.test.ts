@@ -180,8 +180,24 @@ describe("Error Scenario 3: Malformed config.json rule in SKILL.md", () => {
   test("SKILL.md describes config merge priority", () => {
     const skillContent = readFileSync(SKILL_MD_PATH, "utf-8");
 
-    // CLI > config.json > built-in defaults (current wording)
-    expect(skillContent).toContain("CLI args > config.json > defaults");
+    // CLI > project config > built-in defaults
+    expect(skillContent).toContain("CLI args > hn-digest.config.json > defaults");
+  });
+
+  test("SKILL.md loads project-local config without snapshotting defaults", () => {
+    const skillContent = readFileSync(SKILL_MD_PATH, "utf-8");
+
+    // Config is project-local at the repo root
+    expect(skillContent).toContain("hn-digest.config.json");
+
+    // Effective config + source is printed at run start
+    expect(skillContent).toContain("生效配置");
+
+    // Must NOT auto-write a defaults snapshot on first run (that freezes old defaults)
+    expect(skillContent).not.toContain("首次运行，已生成默认配置");
+
+    // Must NOT read the legacy global homedir config
+    expect(skillContent).not.toContain("{homedir}/.hn-digest/config.json");
   });
 });
 

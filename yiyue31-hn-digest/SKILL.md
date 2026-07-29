@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
-version: 0.2.1
+version: 0.2.3
 author: yiyue31
 ---
 
@@ -44,15 +44,17 @@ Extract the post ID from user input — either a full URL (`https://news.ycombin
 
 ### Config Location & Loading
 
-Path: `{homedir}/.hn-digest/config.json`. The skill directory is read-only.
+Path: `{cwd}/hn-digest.config.json` (project-local, at the project/repo root where the skill runs). The skill directory is read-only; config is project-local only — the legacy user-home config is no longer read.
 
-- File missing → create dir, write defaults, output "首次运行，已生成默认配置 {path}".
+- File missing → use defaults, do NOT create a file; output "未找到项目配置 {path}，使用默认值". Never auto-write a config on first run — a generated defaults snapshot freezes old defaults and silently defeats future default changes.
 - Malformed JSON → output "config.json 格式错误，使用默认值", use defaults (do NOT overwrite user's file).
 - Valid JSON → read, clamp out-of-range values, replace invalid fields with defaults (output "config.json 字段 {field} 值无效，使用默认值 {default}").
 
+After resolving, output the effective config with its source so any override is visible at run start: "生效配置 [来源: {path 或 默认值}]: depth=.., minReplies=.., maxComments=.., fetchDepth=.., maxFetchComments=.., lang=.., outputDir=.., fetchOriginalPost=.., groupBy=.., sortGroupsBy=.., templateVersion=.., maxFetchRetries=..".
+
 ### Config Priority
 
-CLI args > config.json > defaults. CLI flags map to config fields by name, except: `--with-original` → `fetchOriginalPost: true`. `maxFetchRetries` is config-file-only.
+CLI args > hn-digest.config.json > defaults. CLI flags map to config fields by name, except: `--with-original` → `fetchOriginalPost: true`. `maxFetchRetries` is config-file-only.
 
 ---
 
@@ -103,14 +105,16 @@ Read `02-filtered.json` (active + outlierPool + outlierBatches from Step 5) and 
 
 **If `active` is empty but `outlierPool` is not**: skip 6.1–6.3 (`groups` and `controversies` stay empty), still run 6.4 standouts; in Step 7 use the scattered-Q&A body with only `## 意外之声` (plus 总结 / 参考资料).
 
-1. **Nested grouping** (over `active`): Group by `config.groupBy` dimensions in order (e.g., `["topic","stance"]` → first by topic, then by stance). Each comment in exactly ONE group. OP comments first within their group.
+1. **Nested grouping** (over `active`): Group by `config.groupBy` dimensions in order (e.g., `["topic","stance"]` → first by topic, then by stance). **Every comment in `active` MUST be assigned to exactly one group — none may be omitted** (the coverage marker M = total grouped comments; dropped comments silently shrink the digest and misrepresent how much of the thread was analyzed — depth ≥2 comments are routinely dropped if this is not enforced). Comments that don't fit a named topic go into a catch-all `其他观点`/`Other` group (dimension `topic`) rather than being dropped. OP comments first within their group.
 2. **sortGroupsBy**: `"relevance"` = rank by (total childIds.length, unique authors, OP presence) desc. `"engagement"` = rank by total childIds.length desc.
 3. **Controversies**: Scan `active` for opposing viewpoints → add to `controversies` with `topic` + `sides`.
 4. **Standout picks** (the cold/outrageous track — adds reader surprise, separate from the heat-ranked groups): pick 2–4 comments that are the most counter-consensus, counter-intuitive, sharp, or outrageous, from `outlierPool` plus `active`. **If `outlierBatches` is present** (large pool), map-reduce: pick surprising candidates from each batch, then pick the final 2–4 from the union — so no single call reads the whole oversized pool. Write to a top-level `standouts` array (each entry: `commentId`, `quote` = the comment's exact words, `reason` = why it is surprising, in `config.lang`). Set `standouts: []` if nothing genuinely surprising exists.
 
-**Overflow handling**: If `active` > 40 comments, batch into ~20, group each batch, merge by group name, deduplicate `commentIds`.
+**Overflow handling**: If `active` > 40 comments, batch into ~20, group each batch (assigning EVERY comment in the batch), merge by group name and union `commentIds` across batches — drop nothing. Re-verify with the coverage check (6.5).
 
 Write the result to `{outputDir}/{postId}-{slug}/02-grouped.json` (fields: `groups`, `controversies`, `standouts` — see `assets/grouped-example-{config.templateVersion}.json`).
+
+5. **Coverage check (mandatory)**: After writing `02-grouped.json`, run `bun {skill-dir}/scripts/check-coverage.ts {outputDir}/{postId}-{slug}/02-filtered.json {outputDir}/{postId}-{slug}/02-grouped.json`. It reports active ids missing from any group, ids owned by more than one group, and grouped ids not in active. If it reports anything, fix (assign missing comments to a topic or the `其他观点` catch-all; remove cross-group duplicates) and re-run until it reports clean. Do not proceed to Step 7 with gaps — a non-clean result means the article's coverage marker will understate the thread.
 
 ---
 
@@ -139,6 +143,7 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 6. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
 7. **Coverage marker**: each `###` subsection and roundup bullet that maps to a group in `02-grouped.json` appends `（N / M 条）` (zh) or `(N / M comments)` (en). N = unique comments under the mapped group(s); M = total unique across all groups. Body stays editorially ordered (not by heat); a group's `commentIds` already unions its subGroups — don't double-count. Skip list + full rules in `assets/article-{templateVersion}.md`.
 8. **Standout section**: render `## 意外之声 / Standout takes` (all skeletons, before 总结) from `02-grouped.json` `standouts` — each pick as a blockquote of the comment's exact words plus a one-line reason it is surprising. Omit the section entirely when `standouts` is empty.
+9. **Catch-all group**: if `02-grouped.json` contains an `其他观点`/`Other` group (the coverage safety net from Step 6.1), render it briefly as a short roundup or fold it into `## 要点` — never as a full body section. It exists to guarantee coverage, not to carry narrative weight. It still takes a coverage marker `（N / M 条）`.
 
 ---
 
