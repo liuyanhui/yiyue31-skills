@@ -33,9 +33,9 @@ Aggregation voice (anti-AI-texture — the strongest tells in a multi-viewpoint 
 - Do NOT stack "pendulum" sentences that symmetrically recite opposing sides ("有评论者认为……另一方则指出……" / "Some think X, while others argue Y."). Land on the concrete disagreement instead of a balanced restatement.
 - Do NOT open group sections with meta-narration ("第一组讨论了……" / "Group A discusses..."). The heading names the topic — open with the viewpoint itself. Vary how viewpoints are introduced across sections.
 
-Coverage marker (surface engagement without reordering):
-- Keep the body editorially ordered; do NOT reorder by raw heat. But each `###` subsection and roundup bullet that maps to one or more groups in `02-grouped.json` must append a part/whole marker at the end of its heading / lead-in: zh `（N / M 条）`, en `(N / M comments)`. N = number of unique comments under the mapped group(s); M = total unique comments across all groups in `02-grouped.json` (the set the digest actually grouped). The ratio lets a reader see how much of the discussion a section covers; a group's own `commentIds` already unions its subGroups, so summing a group together with its subGroups double-counts.
-- No marker on: H1, 背景, whole-thread narrative sections (e.g. 怎么做到的 / 意味着什么 when they synthesize across the thread rather than map to one group), 争议点, 意外之声, 总结, 参考资料.
+Coverage note (one end-of-article line — no per-section markers):
+- Keep the body editorially ordered; do NOT reorder by raw heat. Do NOT append `（N / M 条）` / `(N / M comments)` to section headings — the part/whole ratio is an internal coverage metric; readers cannot interpret it and it clashes with the editorial voice.
+- Instead state coverage ONCE as a `<small>` line at the very end of the article (after the `## 参考资料 / References` links): zh `本摘要基于该 Hacker News 帖子的 {inputCount} 条评论，按"回复数与讨论深度"选取 {activeCount} 条代表性观点归纳，不同立场的比重反映其在原讨论中的份量，而非编辑倾向。` en `This digest is based on {inputCount} comments from the Hacker News thread, distilled to {activeCount} representative viewpoints selected by reply volume and discussion depth; the weight given to each stance reflects its share of the original discussion, not editorial bias.` Pull `{inputCount}` and `{activeCount}` from `02-filtered.json` `meta`. State the selection principle in plain words; never expose raw params (depth / minReplies / maxComments) — readers cannot interpret them.
 
 Sharp viewpoints & quotes:
 - Wrap sharp/counter-intuitive points in **bold** (1–3 per section, only when they genuinely reframe understanding).
@@ -83,9 +83,9 @@ Summary:
 
 === Controversy ===
 ## 核心观点 / Core Viewpoints
-### {中心问题本身作小标题，或"支持方 / 反对方"}（N / M 条）
+### {中心问题本身作小标题，或"支持方 / 反对方"}
 {观点作为对该问题的回答逐层展开；最尖锐点加粗 + 评论原话片段。每段≤5句。}
-### {另一方 / 另一切角}（N / M 条）
+### {另一方 / 另一切角}
 {过渡句 + 观点。每段≤5句。}
 ## 争议点 / Controversies
 {分歧的根源，而非"A 说 X、B 说 Y"的复述。}
@@ -104,7 +104,7 @@ Summary:
 
 === Scattered Q&A ===
 ## 要点 / Notable points
-{相关但零散的看法 roundup，按粗略主题分组；每个 bullet 末尾加 `（N / M 条）`。}
+{相关但零散的看法 roundup，按粗略主题分组。}
 （老实的 roundup 优于强造叙事。）
 -->
 
@@ -118,3 +118,5 @@ Summary:
   {post.url}
 - [HN 讨论](https://news.ycombinator.com/item?id={postId})
   https://news.ycombinator.com/item?id={postId}
+
+<small>{Coverage note：跟随 config.lang，计数取自 `02-filtered.json` `meta`（inputCount / activeCount），完整中英文措辞与"不暴露原始参数"规则见上方 Coverage note 约束}</small>

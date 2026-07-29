@@ -1,6 +1,6 @@
 # Article Evaluation Prompt
 
-> Last updated: 2026-07-28
+> Last updated: 2026-07-29
 
 You are evaluating a generated article against the original source comments. Assess the article on the following five dimensions.
 
@@ -44,10 +44,10 @@ Conditional:
 OP marker check:
 - Every OP comment must be prefixed with the OP marker and placed first within its group/section. The marker follows the article language: zh `> **[楼主]** `, en `> **[OP]** `. A zh article carrying the untranslated `> **[OP]** ` is a defect.
 
-Heat marker check:
-- Every `###` subsection and roundup bullet mapping to a group in `02-grouped.json` must carry a coverage marker at its heading/lead-in end: zh `（N / M 条）`, en `(N / M comments)`.
-  - N = unique comments under the mapped group(s); M = total unique across all groups.
-  - Defects: a mapped section with no marker; a marker on 背景 / 争议点 / 意外之声 / 总结 / 参考资料 (which take none); or a body reordered by raw heat (the marker exposes coverage, it does not dictate order).
+Coverage note check:
+- The article must NOT carry per-section `（N / M 条）` / `(N / M comments)` markers on headings — that ratio is internal and reader-opaque.
+- The article must end with ONE `<small>` coverage line after the `## 参考资料 / References` links: zh `本摘要基于该 Hacker News 帖子的 {inputCount} 条评论，按"回复数与讨论深度"选取 {activeCount} 条代表性观点归纳……`; en equivalent. Counts come from `02-filtered.json` `meta` (inputCount = `01-raw-data.json` comment count; activeCount = unique commentIds across `02-grouped.json` groups). It states the selection principle in plain words and exposes NO raw params (depth / minReplies / maxComments).
+  - Defects: any per-section `（N / M 条）` marker present; the end coverage note missing; the note leaking raw params; or a body reordered by raw heat.
 
 Standout section check:
 - When `02-grouped.json` `standouts` is non-empty, the article must include a `## 意外之声 / Standout takes` section (before 总结) rendering each pick as a blockquote of the comment's exact words plus a one-line reason it is surprising. Omit the section only when `standouts` is empty. Defects: section missing despite non-empty standouts; blockquotes that paraphrase or fabricate the surprising claim instead of quoting it; section present but aimless.
@@ -66,9 +66,9 @@ References check:
 - A `## 参考资料 / References` section is present with the HN discussion link. If the post has an external URL, the original-article link is included AND its raw URL shown on a separate indented line (it must survive conversion to HTML/PDF/etc.). Defects: section missing, HN link missing, or a raw URL not on its own line.
 
 Score by severity, not defect count:
-- 10: All structure checks pass (skeleton matches type; OP markers; coverage markers; standout section when warranted; citations; title prefix; references).
-- 7–9: 1–2 MINOR defects (occasional username drop, a single missing coverage marker, raw URL not indented).
-- 4–6: A MAJOR defect (wrong skeleton, OP markers missing, fabricated 争议点, missing References or HN link, coverage markers absent across sections).
+- 10: All structure checks pass (skeleton matches type; OP markers; end coverage note; standout section when warranted; citations; title prefix; references).
+- 7–9: 1–2 MINOR defects (occasional username drop, a single missing/leaky coverage note, raw URL not indented).
+- 4–6: A MAJOR defect (wrong skeleton, OP markers missing, fabricated 争议点, missing References or HN link, per-section coverage markers present or end coverage note missing).
 - 0–3: Structure completely wrong.
 
 ### 4. Factual Correctness (事实正确性) — Weight: 15%

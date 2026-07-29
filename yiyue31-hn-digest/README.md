@@ -105,6 +105,12 @@ bun test
 
 ## Changelog
 
+- **0.2.4**（2026-07-29）：移除正文每节覆盖标记，改为文末单句覆盖说明
+  - 去掉每个 `###` 小节 / roundup 项末尾的 `（N / M 条）` 比值标记——该比值是内部覆盖指标，读者无法解读，且与编辑型正文语体冲突
+  - 改为文末（`## 参考资料` 之后）一行 `<small>` 覆盖说明：`本摘要基于该 Hacker News 帖子的 {inputCount} 条评论，按"回复数与讨论深度"选取 {activeCount} 条代表性观点归纳，不同立场的比重反映其在原讨论中的份量，而非编辑倾向。`（计数取自 `02-filtered.json` `meta`，跟随 config.lang）
+  - 只讲筛选原则，不暴露原始参数（depth / minReplies / maxComments）
+  - 改动文件：`SKILL.md`（Step 7 Rule 7 / Rule 9）、`assets/article-v1.md`（约束块 + 骨架占位 + 文末行）、`references/evaluate-article-prompt.md`（Heat marker check → Coverage note check + 评分锚点）
+  - 原因：标记是操作者/QA 的覆盖审计产物，原样搬进读者文档造成语体割裂与歧义；文末单句既给规模感又化解"是否 cherry-pick"的疑虑，覆盖审计仍由 `check-coverage.ts` 保障
 - **0.2.3**（2026-07-29）：分组强制全覆盖 + 兜底组 + 确定性覆盖校验
   - SKILL.md Step 6：6.1 改为"每条 active 必归且仅归一组 + 不归主题的进兜底组 `其他观点`"(dimension topic),不再丢弃;overflow 合并改为并集 `commentIds` 不丢;新增 6.5 强制跑 `check-coverage.ts` 直到 clean 才进 Step 7
   - Step 7：兜底组 `其他观点` 只做简短 roundup 或并入 `## 要点`,不作正文主角小节(仍带 marker)

@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
-version: 0.2.3
+version: 0.2.4
 author: yiyue31
 ---
 
@@ -141,9 +141,9 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 4. **Background & original voice**: Use fetched original content if available; otherwise infer from title + comments. When the fetched original carries a substantive argument, quote its 1–2 core-argument paragraphs as block quotes inside the relevant body section.
 5. **References**: Append `## 参考资料`/`## References` with HN link and original article link (if exists).
 6. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
-7. **Coverage marker**: each `###` subsection and roundup bullet that maps to a group in `02-grouped.json` appends `（N / M 条）` (zh) or `(N / M comments)` (en). N = unique comments under the mapped group(s); M = total unique across all groups. Body stays editorially ordered (not by heat); a group's `commentIds` already unions its subGroups — don't double-count. Skip list + full rules in `assets/article-{templateVersion}.md`.
+7. **Coverage note (no per-section markers)**: do NOT append `（N / M 条）` / `(N / M comments)` to section headings — that ratio is an internal coverage metric; readers cannot interpret it and it clashes with the editorial voice. Body stays editorially ordered (not by heat). Instead state coverage ONCE as a `<small>` line at the very end (after `## 参考资料`), pulling counts from `02-filtered.json` `meta`: zh `本摘要基于该 Hacker News 帖子的 {meta.inputCount} 条评论，按"回复数与讨论深度"选取 {meta.activeCount} 条代表性观点归纳，不同立场的比重反映其在原讨论中的份量，而非编辑倾向。`, en `This digest is based on {meta.inputCount} comments from the Hacker News thread, distilled to {meta.activeCount} representative viewpoints selected by reply volume and discussion depth; the weight given to each stance reflects its share of the original discussion, not editorial bias.` State the selection principle in plain words; never expose raw params (depth / minReplies / maxComments) — readers cannot interpret them. Full rules in `assets/article-{templateVersion}.md`.
 8. **Standout section**: render `## 意外之声 / Standout takes` (all skeletons, before 总结) from `02-grouped.json` `standouts` — each pick as a blockquote of the comment's exact words plus a one-line reason it is surprising. Omit the section entirely when `standouts` is empty.
-9. **Catch-all group**: if `02-grouped.json` contains an `其他观点`/`Other` group (the coverage safety net from Step 6.1), render it briefly as a short roundup or fold it into `## 要点` — never as a full body section. It exists to guarantee coverage, not to carry narrative weight. It still takes a coverage marker `（N / M 条）`.
+9. **Catch-all group**: if `02-grouped.json` contains an `其他观点`/`Other` group (the coverage safety net from Step 6.1), render it briefly as a short roundup or fold it into `## 要点` — never as a full body section. It exists to guarantee coverage, not to carry narrative weight.
 
 ---
 
