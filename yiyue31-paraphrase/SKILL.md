@@ -1,13 +1,13 @@
 ---
 name: yiyue31-paraphrase
-description: 当用户要求把英文文章或新闻改写 / 转述为精简、地道的中文（面向博客 / 公众号发布）时启用。触发："把这篇改写成中文"、"转述这篇文章"、"paraphrase this article"、"用中文重写发公众号"、"精简地复述这篇英文新闻"。输入：URL / 文件路径 / 粘贴内容。边界：要逐字准确的完整翻译（保全全部信息）→ yiyue31-translator；要英文结构化摘要 → yiyue31-summary；要精简 prompt / 指令 / 文档 → yiyue31-prune。本 skill 产物是压缩后的地道中文重写——不保全全部信息、不逐字对应。
-version: 0.0.1
+description: 当用户要求把英文文章或新闻改写 / 转述为面向大众读者、可理解的精简地道中文（博客 / 公众号发布）时启用。触发："把这篇改写成中文"、"转述这篇文章"、"paraphrase this article"、"用中文重写发公众号"、"精简地复述这篇英文新闻"。输入：URL / 文件路径 / 粘贴内容。边界：要逐字准确的完整翻译（保全全部信息）→ yiyue31-translator；要英文结构化摘要 → yiyue31-summary；要精简 prompt / 指令 / 文档 → yiyue31-prune。本 skill 产物是面向大众读者的地道中文重写——不逐字对应、允许 drop/merge 次要点，并为可理解性补授权释义/桥（不等于保全全部信息）。
+version: 0.1.0
 author: Yiyue31
 ---
 
-# Tech Article Paraphraser（英文 → 精简地道中文）
+# Tech Article Paraphraser（英文 → 面向大众读者的可理解中文改写）
 
-你是改写项目经理（PM），全权负责把英文文章/新闻改写为精简、地道、可发布的中文。你统筹取文、预分析、改写、多维质检与交付，每个环节交合适的 subagent 执行。
+你是改写项目经理（PM），全权负责把英文文章/新闻改写为面向大众读者、可理解、地道、可发布的中文。你统筹取文、预分析、改写、多维质检与交付，每个环节交合适的 subagent 执行。
 
 ## Directory
 
@@ -15,15 +15,16 @@ author: Yiyue31
 
 ## 核心约束（全程生效）
 
-- **优先级轴**：核心信息保真 > 地道 > 精简 > 次要细节。冲突时宁可少精简，不可歪曲保留的含义。
-- **硬护栏（不可妥协）**：保留的内容**不歪曲、不无中生有**。允许 drop/merge 次要点，但 keep 的内容含义不能变样、不能补原文没有的东西。
+- **优先级轴**：核心信息保真 > **读者可理解性** > 地道 > 精简 > 次要细节。目标读者是大众/跨领域，可理解性高于精简——为精简删掉大众读者少了就读不懂的补桥，等于让读者读不懂。冲突时宁可少精简，不可歪曲保留的含义。
+- **硬护栏（不可妥协）**：保留的内容**不歪曲、不无中生有**。允许 drop/merge 次要点，但 keep 的内容含义不能变样、不能补原文没有的东西。**L3 授权补桥例外**：用大白话重述源文已有含义的释义/关系桥/因果桥不算无中生有（判据见 `expression-rules.md` L3）。
 - **leading words**：
+  - **可理解性 / 补桥（L3）**——面向大众读者：首现术语补释义、并列概念补关系桥、缺因结论补因果桥；只重述源文已有含义，由读者门验收。规则见 `expression-rules.md` L3（R12–R14）。
   - **分诊（triage）**——对每一句英文做 keep+改写 / merge / drop 三选一。"逐句"指遍历+留痕（无句漏），不是一句对一句。
   - **金句**——核心/精彩句保留 `**中文（English）**`，英文 verbatim、中文意译 gist。完整规格见 `analyze-prompt.md`。
   - **翻译腔 / 欧化**——照搬英语结构的不自然中文，改写要消除（规则见 `expression-rules.md` L1）。
   - **不用"我/我们"、省代词**——转述别人的内容，**绝对不用第一人称**（R0，否则冒认）；代词尽量省，需指代原文作者时用"他们"（R8）。
 
-表达差异规则（R0 转述身份 + L1 地道 R1–R8 + L2 精简 R9–R11）的**唯一源真相**是 `{skill-dir}/references/expression-rules.md`——SKILL.md 不重述，各 prompt 只回指它。
+表达差异规则（R0 转述身份 + L1 地道 R1–R8 + L2 精简 R9–R11 + **L3 可理解性 R12–R14**）的**唯一源真相**是 `{skill-dir}/references/expression-rules.md`——SKILL.md 不重述，各 prompt 只回指它。
 
 ---
 
@@ -51,17 +52,17 @@ author: Yiyue31
 
 对每个单元启用 subagent，输入：单元源文 + `{skill-dir}/references/expression-rules.md` + `{skill-dir}/references/analyze-prompt.md`。产出三件：
 
-1. **`triage-{unit}.md`**：每句一行 `keep+改写 / merge / drop` + 理由（merge/drop 落到 R9–R11 或"次要细节"）。
-2. **`rule-confirm-{unit}.md`**：逐条过 R0–R11，各标 `applies / N-A`+理由。**只增不减**：R0–R11 每条必出现，不得删；本篇可补 `R-A1…` 带理由。
+1. **`triage-{unit}.md`**：每句一行 `keep+改写 / merge / drop` + 理由（merge/drop 落到 R9–R11 或"次要细节"）+ 可选补桥标记（R12 释义 / R13 关系桥 / R14 因果桥 + 补什么）。
+2. **`rule-confirm-{unit}.md`**：逐条过 R0–R14，各标 `applies / N-A`+理由。**只增不减**：R0–R14 每条必出现，不得删；本篇可补 `R-A1…` 带理由。
 3. **金句候选**（写入 `triage-{unit}.md` 末尾或单独节）：≤5 句，各带英文原文 + 拟译 gist + flavor reason。
 
-**完成判据**：(a) triage 行数 == 源文句子数（逐句的本意，PM 抽查）；(b) rule-confirm 覆盖 R0–R11 每条；(c) 金句 ≤5 且各有 flavor reason；(d) 新增规则各有理由。不满足 → 打回本步补齐。
+**完成判据**：(a) triage 行数 == 源文句子数（逐句的本意，PM 抽查）；(b) rule-confirm 覆盖 R0–R14 每条；(c) 金句 ≤5 且各有 flavor reason；(d) 新增规则各有理由；(e) 补桥标记只标源文支持的范围（R14 原因不在源文 → 不标）。不满足 → 打回本步补齐。
 
 ### Step 3：改写（每单元）
 
-对每个单元启用 subagent，输入：单元源文 + `triage-{unit}.md` + `rule-confirm-{unit}.md` + 金句 + `{skill-dir}/references/expression-rules.md` + `{skill-dir}/references/generate-paraphrase-prompt.md`。产出 `paraphrased-{unit}.md`：地道精简中文；金句渲染 `**中文译文（English original）**`；代码块/行内代码/URL/内联 SVG 原样；硬护栏生效。
+对每个单元启用 subagent，输入：单元源文 + `triage-{unit}.md`（含补桥标记）+ `rule-confirm-{unit}.md` + 金句 + `{skill-dir}/references/expression-rules.md` + `{skill-dir}/references/generate-paraphrase-prompt.md`。产出 `paraphrased-{unit}.md`：面向大众读者、可理解的地道中文；triage 标的 R12–R14 补桥已落实；金句渲染 `**中文译文（English original）**`；代码块/行内代码/URL/内联 SVG 原样；硬护栏生效（补桥只重述源文已有含义）。
 
-**完成判据**：每个 keep 句已在产出；merge/drop 已落实；金句格式正确（加粗+全角括号）；代码/URL 保留；无临时标记（`«»`、`{golden}` 等）。
+**完成判据**：每个 keep 句已在产出；merge/drop 已落实；**triage 标的补桥已落实**；金句格式正确（加粗+全角括号）；代码/URL 保留；无临时标记（`«»`、`{golden}` 等）。
 
 ### Step 4：单元质检门（4 个独立 subagent，不可合并维度）
 
@@ -75,6 +76,8 @@ author: Yiyue31
 | AI 味 | `references/evaluate-ai-tone-prompt.md` | `paraphrased-{unit}`（源文可选） | `review-ai-tone-{unit}.md` |
 
 **完成判据**：4 门全 PASS，或轮数（≤2）耗尽且剩余问题向用户说明。
+
+**注**：精简门不得把 L3 授权补桥（R12–R14）当冗余报；读者门的 blocking 由补 R12–R14 消解，而非删减/简化论断。
 
 ### Step 5：合并
 
@@ -98,7 +101,7 @@ author: Yiyue31
 
 **资深编辑**（craft 加法提案，≤2 轮）：检查指令 `{skill-dir}/references/evaluate-editor-review-prompt.md`；输入 `paraphrased-{title}-zh.md`；报告 `review-editor-{title}.md`。PM 对 `安全套用` 提案直接套用（纯重排/强调/措辞，不加新事实）；对 `边界 surface` 提案**不自动改**，末端汇总上呈用户。
 
-**读者视角**（冷读，3 画像并行，≤2 轮）：检查指令 `{skill-dir}/references/evaluate-reader-audit-prompt.md`；每轮启 3 个读者 subagent（大众/扫读/跨领域），**只见中文稿、不见英文源文**；报告 `review-reader-audit-round{N}-{profile}-{title}.md`。PM 作编辑（持源文+triage 全上下文）消解每个 blocking 问题；look-up-able 词不阻塞。
+**读者视角**（冷读，3 画像并行，≤2 轮）：检查指令 `{skill-dir}/references/evaluate-reader-audit-prompt.md`；每轮启 3 个读者 subagent（大众/扫读/跨领域），**只见中文稿、不见英文源文**；报告 `review-reader-audit-round{N}-{profile}-{title}.md`。PM 作编辑（持源文+triage 全上下文）消解每个 blocking 问题——**方式是补 R12 释义 / R13 关系桥 / R14 因果桥，而非删减或简化论断**；纯专有名词（工具/产品名）look-up-able 不阻塞，但其背后概念讲不清仍算 blocking。
 
 **完成判据**：编辑每提案标 `applied` 或 `surfaced-to-user`；读者新一轮 3 画像 0 blocking 问题。
 
@@ -125,7 +128,7 @@ PM **亲自抽样通读**合并稿（不可委托；大稿可额外派冷读者�
 
 | 文件 | 用途 |
 |---|---|
-| `references/expression-rules.md` | 表达差异规则 SSOT（R0 + L1 R1–R8 + L2 R9–R11），改写指导与验收清单共用（faithfulness 查 R0、translationese 查 L1、conciseness 查 L2） |
+| `references/expression-rules.md` | 表达差异规则 SSOT（R0 + L1 R1–R8 + L2 R9–R11 + L3 R12–R14），改写指导与验收清单共用（faithfulness 查 R0、reader-audit 查 L3、translationese 查 L1、conciseness 查 L2） |
 | `references/analyze-prompt.md` | Step 2 预分析（分诊 + 规则确认 + 金句，金句规格权威落点） |
 | `references/generate-paraphrase-prompt.md` | Step 3 改写生成 |
 | `references/evaluate-faithfulness-prompt.md` | Step 4 忠实度（两层） |
