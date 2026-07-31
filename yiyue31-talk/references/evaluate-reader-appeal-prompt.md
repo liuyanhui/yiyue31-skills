@@ -11,10 +11,9 @@
 ## 输入
 
 1. **待审文本**：组装初稿 `talk-{title}.md`。
-2. **用户原话**：`user-input-{title}.md`（第一参照，建议须可回溯到此、原文或参考）。
+2. **内容池**：`content-{title}.json`（第一参照；建议须可回溯到 pool 的 mine／original／ref item）。
 3. **原文**：`original-{title}.md`。
-4. **参考资料**：`refs/`（合法来源之一；与用户原话、原文同等可回溯）。
-5. （策展模式额外）`picked-{title}.md`：选点 + 权重 + 强化理由，与 `user-input` 同为第一参照。
+4. **参考资料**：`refs/`（合法来源之一；与 pool 内容同等可回溯）。
 
 > **共享约束（5 条，强制）**：由调用方从 `{skill-dir}/references/shared-constraints.md` 注入本 prompt 之前（见 SKILL.md「共用：读者 / 编辑提议轮」）；本文件不再内联，避免两份 prompt 拷贝漂移。
 
