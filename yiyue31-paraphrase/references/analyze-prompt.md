@@ -51,7 +51,7 @@
 - **英文半边**：verbatim 原汁原味，不改写、不截断。
 - **中文半边**：意译 gist，**保真线 = 不偏离主要意义**即可（不要求逐字对等；精度由英文承担，中文负责让中文读者懂大意 + 读着顺）。
 - **渲染格式**：`**中文译文（English original）**`——加粗 + 全角括号 + 英文原文在内。
-  - 例：`***欲速则不达（the only way to go fast is to go well）***`（此处用加粗，非斜体；随文内联，不单列章节）。
+  - 例：`**欲速则不达（the only way to go fast is to go well）**`（加粗 + 全角括号；随文内联，不单列章节）。
   - 修正示例：英文 `the only way to go fast is to go well` → 渲染 `**想快就得先做对（the only way to go fast is to go well）**`。
 
 ## 输出

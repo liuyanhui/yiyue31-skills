@@ -22,3 +22,11 @@
 
 ## 关于本目录既有分析文档
 `execution-report-2026-07-29.md` / `general-reader-adaptation-analysis.md` / `improvement-recommendations.md` 是定位调整前的分析草稿，描述的路线图比实际落地大得多，保留作历史参考，不代表当前实现。
+
+---
+
+## 2026-07-31 更新：ai-tone 为 paraphrase 定制、退出同步组
+
+上文"未改动 `evaluate-ai-tone-prompt.md`（跨 skill 同步项）"已不成立。发现同步版 ai-tone 约三分之一检查项（戏剧化元叙述整块、模糊归因）是为 hn-digest 多源讨论综述写的，对 paraphrase 单篇转述大量 N/A。遂为 paraphrase 写专属版：砍讨论综述的动作化叙述与模糊归因，把仍适用的戏剧化框架词/渲染旁白并入套路化（模式 A），空话/元叙述移交 conciseness 门 R9，本门只留工整套路化 + 口语口水化两类。该副本已从 `scripts/prompt-sync-manifest.json` 的 ai-tone 组 `copies` 移除，独立维护；`check-prompt-sync.js` 仍 exit 0（剩余 hn-digest / talk / translator 三副本同步）。
+
+上文第 17 行"易触发 ai-tone 门的戏剧化元叙述"按 7-29 当时的同步版成立；定制后该检查已不在 ai-tone 门（故事化仍会触发本门的套路化/升华，故不故事化的结论不变）。

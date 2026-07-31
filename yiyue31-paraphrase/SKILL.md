@@ -93,9 +93,9 @@ author: Yiyue31
 > **字数**：{TBD}
 ```
 
-字数模型估算（advisory）填入，替换 TBD。产 `{title}/paraphrase/paraphrased-{title}-zh.md`。
+字数由模型估算后填入，替换 TBD（advisory：字数仅展示，不卡压缩比例）。产 `{title}/paraphrase/paraphrased-{title}-zh.md`。
 
-**完成判据**：无 triage 残段 / 无 `«»` / 无临时花括号；header 完整；字数非 TBD。
+**完成判据**：无 triage 残段 / 无 `«»` / 无临时花括号；header 完整；字数占位符已填实（无 TBD 残留）。
 
 ### Step 6：全局门（合并稿上，2 类 subagent）
 
@@ -115,7 +115,7 @@ node {skill-dir}/scripts/verify-no-first-person.js {title}/paraphrase/paraphrase
 
 exit 1（发现"我/我们"）→ **打回编辑门（Step 6）** 改为第三人称/无人称后重跑，不得交付。**为什么**：faithfulness 门跑在编辑门前，编辑门的 craft 改写可能把无人称/第三人称改回"我/我们"（R0 绝对禁）；硬禁令必须在最终交付物上机械复核，不能只信中间 draft 的 LLM 门。
 
-PM **亲自抽样通读**合并稿（不可委托；大稿可额外派冷读者覆盖，但 PM 的样本通读不可外包），记 `{title}/paraphrase/pm-review-{title}.md`：读了哪些段、红旗摘要、裁定。核查：**第一人称机械校验 exit 0**；金句 ≤ cap；代码/URL 保留；无标记残留；字数非 TBD；两道全局门已收敛。
+PM **亲自抽样通读**合并稿（不可委托；大稿可额外派冷读者覆盖，但 PM 的样本通读不可外包），记 `{title}/paraphrase/pm-review-{title}.md`：读了哪些段、红旗摘要、裁定。核查：**第一人称机械校验 exit 0**；金句 ≤ cap；代码/URL 保留；无标记残留；字数占位符已填实（无 TBD 残留）；两道全局门已收敛。
 
 - **pass** → 交付 `paraphrased-{title}-zh.md`，并把编辑门 `边界 surface` 提案一并呈给用户定夺。
 - **rework** → 打回所属步（第一人称→Step 6 编辑、歪曲→Step 4 忠实度、冗余→Step 4 精简、理解→Step 6 读者、结构→Step 6 编辑）。
@@ -134,7 +134,7 @@ PM **亲自抽样通读**合并稿（不可委托；大稿可额外派冷读者�
 | `references/evaluate-faithfulness-prompt.md` | Step 4 忠实度（两层） |
 | `references/evaluate-translationese-prompt.md` | Step 4 翻译腔（L1） |
 | `references/evaluate-conciseness-prompt.md` | Step 4 精简（L2） |
-| `references/evaluate-ai-tone-prompt.md` | Step 4 AI 味（自 hn-digest 同步，内容一致） |
+| `references/evaluate-ai-tone-prompt.md` | Step 4 AI 味（paraphrase 专属版：砍讨论综述动作化叙述/模糊归因，空话交 conciseness；已退出 ai-tone 同步组，独立维护） |
 | `references/evaluate-editor-review-prompt.md` | Step 6 资深编辑 |
 | `references/evaluate-reader-audit-prompt.md` | Step 6 读者视角 |
 

@@ -65,7 +65,7 @@ summary 与 hn-digest 各有一份 `evaluate-reader-audit-prompt.md`，原列为
 - talk 另建三份独立审查 prompt，**不参与同步**（体裁不同，类比 summary 英文版独立）：
   - `evaluate-translationese-prompt.md` v1.0：脱胎自 translator 中文翻译腔检查，改为面向"中文原创心得稿"（无译文/原文配对、去翻译专属括注规则）。
   - `evaluate-readability-prompt.md` v1.0：脱胎自 translator 中文可读性检查，改为通用中文文本。
-  - `evaluate-faithfulness-prompt.md` v1.0：talk 专属（dump 模式 D4 忠实度检查），无对应兄弟。
+  - `evaluate-faithfulness-prompt.md` v1.0：talk 专属忠实度检查；2026-07-31 v0.0.7 重构后输入改 content pool、所有采集路线必过（不再 dump 专属 D4），无对应兄弟。
 
 ## paraphrase 加入记录（2026-07-28）
 
@@ -80,3 +80,12 @@ paraphrase（yiyue31-paraphrase）新增英文→精简地道中文改写，复�
   - `evaluate-reader-audit-prompt.md`：脱胎自 summary Reader Audit，改为中文、面向博客大众读者（画像 大众/扫读/跨领域），复用 blocking-vs-lookupable 分类。
 
 按"不同输出语言 / 不同用途是独立文档、不绑时间戳"规则，以上五份均**不做内容同步**。`expression-rules.md`、`analyze-prompt.md`、`generate-paraphrase-prompt.md` 为 paraphrase 专属生成类文件，无兄弟，不进同步。
+
+## paraphrase ai-tone 退出同步组（2026-07-31）
+
+paraphrase 的 `evaluate-ai-tone-prompt.md` 从 ai-tone 同步组移除，改为 paraphrase 专属、独立维护。
+
+- **原因**：同步版 ai-tone 约三分之一检查项（模式 C 戏剧化元叙述整块、模式 A 模糊归因）是为 hn-digest 多源讨论综述写的；paraphrase 转述单篇技术文章/新闻，没有多源讨论可供动作化叙述，这些项大量 N/A。
+- **定制内容**：砍动作化叙述与模糊归因；把仍适用的戏剧化框架词/渲染旁白并入套路化（模式 A）；空话/元叙述移交 conciseness 门 R9；本门只留工整套路化 + 口语口水化两类。
+- **配置**：`scripts/prompt-sync-manifest.json` 的 ai-tone 组 `copies` 已移除 `yiyue31-paraphrase/references/evaluate-ai-tone-prompt.md`。
+- **校验**：`check-prompt-sync.js` 仍 exit 0（剩余 hn-digest / talk / translator 三副本继续同步）。
