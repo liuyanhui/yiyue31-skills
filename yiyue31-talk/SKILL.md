@@ -35,13 +35,13 @@ version: 0.0.7
     {
       "id": "i01",
       "source": "mine | original | ref",
-      "ref_id": "refs 序号 NN（source=ref 时填，对应 refs/ref-{NN}；三栏'参考[X]'的 X 读此）",
+      "ref_id": "refs 序号 NN（source=ref 时填，对应 refs/ref-{NN}-{安全化名}.{ext}，序号→文件名见 refs/MANIFEST.md；三栏'参考[X]'的 X 读此）",
       "text": "verbatim",
       "weight": "boost | keep | dim | drop",
       "key": false,
       "origin_anchor": "原文位置（source=original/ref 时填，可选；faithfulness 回溯用）",
       "annotates": "批注指向的 item_id（策展批注时填，可空）",
-      "provenance": "dump | curate-pick | curate-note | d3-adopt"
+      "provenance": "dump | curate-pick | curate-added | curate-note | d3-adopt"
     }
   ]
 }

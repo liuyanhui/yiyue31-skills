@@ -15,7 +15,7 @@
 3. **原文**：`original-{title}.md`。
 4. **参考资料**：`refs/`（合法来源之一；与 pool 内容同等可回溯）。
 
-> **共享约束（5 条，强制）**：由调用方从 `{skill-dir}/references/shared-constraints.md` 注入本 prompt 之前（见 SKILL.md「共用：读者 / 编辑提议轮」）；本文件不再内联，避免两份 prompt 拷贝漂移。
+> **共享约束（5 条，强制）**：由调用方从 `{skill-dir}/references/shared-constraints.md` 注入本 prompt 之前（见 SKILL.md「提议轮」）；本文件不再内联，避免两份 prompt 拷贝漂移。
 
 ## 检查维度（只报结构问题）
 
