@@ -73,6 +73,31 @@ function markOP(comments: FilterComment[], postAuthor: string): FilterComment[] 
   return comments.map((c) => ({ ...c, isOP: c.author === postAuthor }));
 }
 
+// 02-filtered.json is a slim index, not a second copy of the comments. We drop
+// contentMarkdown (the body — ~90% of each entry, and a verbatim duplicate of
+// 01-raw-data.json). The filter pipeline never reads contentMarkdown, so it is
+// dead weight here; downstream steps (Step 6 grouping / 6.4 standouts / Step 7
+// generation) join the body from 01 by id when they need it.
+interface SlimComment {
+  id: string;
+  author: string;
+  parentId: string | null;
+  childIds: string[];
+  depth: number;
+  isOP?: boolean;
+}
+
+function slim(c: FilterComment): SlimComment {
+  return {
+    id: c.id,
+    author: c.author,
+    parentId: c.parentId,
+    childIds: c.childIds,
+    depth: c.depth,
+    isOP: c.isOP,
+  };
+}
+
 function main(): void {
   const { inputPath, config } = parseArgs(process.argv.slice(2));
   if (!inputPath) {
@@ -103,8 +128,8 @@ function main(): void {
     : null;
 
   const output = {
-    active: selectedActive,
-    outlierPool: selectedOutliers,
+    active: selectedActive.map(slim),
+    outlierPool: selectedOutliers.map(slim),
     outlierBatches,
     meta: {
       inputCount: comments.length,

@@ -72,6 +72,16 @@ describe("preprocess.ts", () => {
       // isOP marked (c0 is the OP)
       const op = out.outlierPool.find((c: { id: string }) => c.id === "c0");
       expect(op.isOP).toBe(true);
+      // slim contract: bodies are NOT duplicated into 02-filtered.json;
+      // downstream joins contentMarkdown from 01-raw-data.json by id
+      for (const c of out.outlierPool) {
+        expect(c.contentMarkdown).toBeUndefined();
+        expect(c).toHaveProperty("id");
+        expect(c).toHaveProperty("author");
+        expect(c).toHaveProperty("childIds");
+        expect(c).toHaveProperty("parentId");
+        expect(c).toHaveProperty("depth");
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -111,6 +121,41 @@ describe("preprocess.ts", () => {
       const out = JSON.parse(readFileSync(join(dir, "02-filtered.json"), "utf-8"));
       expect(out.outlierBatches).toBeNull();
       expect(out.meta.batched).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("slim contract: active entries drop contentMarkdown too (threaded input)", () => {
+    dir = freshDir();
+    try {
+      // c0 has 3 replies → clears minReplies=3 → active; c1–c3 → outlierPool
+      const comments = [
+        { id: "c0", author: "op", parentId: null, childIds: ["c1", "c2", "c3"], depth: 0, contentMarkdown: "op body" },
+        { id: "c1", author: "u1", parentId: "c0", childIds: [], depth: 1, contentMarkdown: "r1" },
+        { id: "c2", author: "u2", parentId: "c0", childIds: [], depth: 1, contentMarkdown: "r2" },
+        { id: "c3", author: "u3", parentId: "c0", childIds: [], depth: 1, contentMarkdown: "r3" },
+      ];
+      writeFileSync(
+        join(dir, "01-raw-data.json"),
+        JSON.stringify({
+          source: "algolia",
+          post: { id: "1", title: "t", author: "op", url: null, postScore: 1, textContent: null },
+          comments,
+        }),
+        "utf-8",
+      );
+      const result = runPreprocess(join(dir, "01-raw-data.json"));
+
+      expect(result.exitCode).toBe(0);
+      const out = JSON.parse(readFileSync(join(dir, "02-filtered.json"), "utf-8"));
+      expect(out.meta.activeCount).toBe(1);
+      const active0 = out.active[0];
+      expect(active0.id).toBe("c0");
+      expect(active0.isOP).toBe(true);
+      expect(active0.contentMarkdown).toBeUndefined(); // slimmed
+      expect(active0.childIds).toEqual(["c1", "c2", "c3"]); // structural fields retained
+      for (const c of out.outlierPool) expect(c.contentMarkdown).toBeUndefined();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
-version: 0.2.4
+version: 0.2.5
 author: yiyue31
 ---
 
@@ -93,7 +93,7 @@ Run the deterministic filter — it produces `02-filtered.json` next to the inpu
 
 `bun {skill-dir}/scripts/preprocess.ts {outputDir}/{postId}-{slug}/01-raw-data.json --depth {config.depth} --minReplies {config.minReplies} --maxComments {config.maxComments}`
 
-The script (`scripts/lib/filter.ts`) applies: (1) depth truncation, (2) activity partition → active set + outlier pool, (3) diversity-preserving selection to `maxComments` (OP + ≥1 representative per top-level subtree + heat fill), (4) OP mark. It writes `02-filtered.json` = `{ active, outlierPool, outlierBatches, meta }`. When the outlier pool is large (`> 60`), it is pre-split into `outlierBatches` (~40 each) so the standout pass (Step 6.4) can map-reduce without any single LLM call going oversized.
+The script (`scripts/lib/filter.ts`) applies: (1) depth truncation, (2) activity partition → active set + outlier pool, (3) diversity-preserving selection to `maxComments` (OP + ≥1 representative per top-level subtree + heat fill), (4) OP mark. It writes `02-filtered.json` = `{ active, outlierPool, outlierBatches, meta }`. Each `active`/`outlierPool` entry is a **slim index** — `{ id, author, parentId, childIds, depth, isOP }` — with **no `contentMarkdown`** (the body is a verbatim duplicate of `01-raw-data.json`); join the body from `01-raw-data.json` by `id` whenever a comment's text is needed (Steps 6 and 7). When the outlier pool is large (`> 60`), it is pre-split into `outlierBatches` (~40 each, id-only) so the standout pass (Step 6.4) can map-reduce without any single LLM call going oversized.
 
 If `meta.activeCount === 0 && meta.outlierCount === 0` → output "过滤后无符合条件的评论" → terminate. Otherwise pass `02-filtered.json` to Step 6 (AI groups inline, no subagent).
 
@@ -101,7 +101,7 @@ If `meta.activeCount === 0 && meta.outlierCount === 0` → output "过滤后无�
 
 ## Step 6: Comment Grouping → 02-grouped.json
 
-Read `02-filtered.json` (active + outlierPool + outlierBatches from Step 5) and `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for output structure (fallback to highest version if missing). Section names follow `config.lang`.
+Read `02-filtered.json` (active + outlierPool + outlierBatches from Step 5) and `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for output structure (fallback to highest version if missing). `02-filtered.json` is a slim index — join each comment's `contentMarkdown` from `01-raw-data.json` by `id`. Section names follow `config.lang`.
 
 **If `active` is empty but `outlierPool` is not**: skip 6.1–6.3 (`groups` and `controversies` stay empty), still run 6.4 standouts; in Step 7 use the scattered-Q&A body with only `## 意外之声` (plus 总结 / 参考资料).
 
@@ -126,7 +126,7 @@ Max 3 rounds. Passing threshold: Overall Score >= 8.0.
 
 Each round:
 
-1. Generate (round 1) or revise (rounds 2-3) the article using template from `{skill-dir}/assets/article-{templateVersion}.md`, grouped data, post metadata, filtered comments, and original post content (if fetched).
+1. Generate (round 1) or revise (rounds 2-3) the article using template from `{skill-dir}/assets/article-{templateVersion}.md`, grouped data, post metadata, filtered comments (bodies joined from `01-raw-data.json` by id), and original post content (if fetched).
 2. Write to `{outputDir}/{postId}-{slug}/article-draft-round{N}.md`.
 3. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-article-prompt.md`. Subagent reads: draft + `01-raw-data.json` + `02-grouped.json`. Writes: `evaluation-article-round{N}.md`.
 4. Overall Score >= 8.0 → PASS → copy draft to `03-article.md` → Step 8. Score < 8.0 → track as best candidate → next round.
