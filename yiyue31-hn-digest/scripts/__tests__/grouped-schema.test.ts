@@ -121,8 +121,16 @@ export function validateGroupedSchema(data: unknown): {
         if (typeof st.commentId !== "string" || st.commentId.length === 0) {
           errors.push(`${prefix}: missing or invalid 'commentId' (must be a non-empty string)`);
         }
+        if (typeof st.author !== "string" || st.author.length === 0) {
+          errors.push(`${prefix}: missing or invalid 'author' (must be a non-empty string)`);
+        }
         if (typeof st.quote !== "string" || st.quote.length === 0) {
           errors.push(`${prefix}: missing or invalid 'quote' (must be a non-empty string)`);
+        }
+        // translation is optional — omitted when the source language already equals
+        // config.lang; when present it must be a non-empty string.
+        if (st.translation !== undefined && (typeof st.translation !== "string" || st.translation.length === 0)) {
+          errors.push(`${prefix}: invalid 'translation' (must be a non-empty string when present)`);
         }
         if (typeof st.reason !== "string" || st.reason.length === 0) {
           errors.push(`${prefix}: missing or invalid 'reason' (must be a non-empty string)`);
@@ -191,11 +199,31 @@ describe("validateGroupedSchema", () => {
   test("accepts valid standouts array", () => {
     const data = makeValidGroupedData();
     (data as Record<string, unknown>).standouts = [
-      { commentId: "c1", quote: "a surprising exact quote", reason: "counters the consensus" },
+      { commentId: "c1", author: "alice", quote: "a surprising exact quote", translation: "一句令人意外的原话翻译", reason: "counters the consensus" },
     ];
     const result = validateGroupedSchema(data);
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
+  });
+
+  test("accepts standouts entry without translation (source = target language)", () => {
+    const data = makeValidGroupedData();
+    (data as Record<string, unknown>).standouts = [
+      { commentId: "c1", author: "alice", quote: "a surprising exact quote", reason: "counters the consensus" },
+    ];
+    const result = validateGroupedSchema(data);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  test("rejects standouts entry missing author", () => {
+    const data = makeValidGroupedData();
+    (data as Record<string, unknown>).standouts = [
+      { commentId: "c1", quote: "a surprising exact quote", reason: "counters the consensus" },
+    ];
+    const result = validateGroupedSchema(data);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes("standouts[0]") && e.includes("author"))).toBe(true);
   });
 
   test("rejects standouts entry missing quote", () => {
