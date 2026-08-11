@@ -105,6 +105,20 @@ bun test
 
 ## Changelog
 
+- **0.2.6**（2026-08-11）：声明段落整合 + 标题/小标题统一 + 意外之声重做
+  - 声明：`insert-header.ts` 改为在 H1 后注入**单个** `<small>` 段落，合并免责声明 + 方法论/中立性（从文末折进来）+ 讨论快照（时间戳、postScore、comments.length）；**删除文末 coverage note**（与开头信息重复）。新增 `snapshotFromRaw`
+  - 标题：H1 前缀 `[Hacker News]` → `[HN]`；zh 文章 H1 改为 post.title 的**中文译名**，并在 H1 下加 `<small>原标题：…</small>` 行保留原文
+  - 小标题：全部改**单语**（跟随 config.lang），不再双语并列——此前 SKILL.md 说"follow config.lang"但模板与评估 prompt 用双语，规范自相矛盾致每次输出不一致
+  - 意外之声：单节（不拆"出彩/意外"两节）；英文 `Standout takes` → `Surprising takes`（原标签语义偏"出彩"，是选材不意外的根因之一）；候选源改 **outlierPool 优先**、active 仅罕见例外（此前含 active 致复述正文）；加硬意外门槛（反共识/反直觉/离谱，"讲得清楚"不算）+ **不足 2 条输出空数组并省略整节**（空属正常）；每条改**四段 blockquote**（作者/译文/原文/为何意外），字段间空行分隔，防转 HTML 时塌成一行
+  - 改动文件：`scripts/insert-header.ts`、`scripts/__tests__/insert-header.test.ts`、`assets/article-v1.md`、`SKILL.md`、`references/evaluate-article-prompt.md`
+  - 原因：声明信息分散且文末 note 与开头重复；实际产物里意外之声复述正文、毫不"意外"；标题与标题语言逐次漂移；standout 多字段转 HTML 塌行——根因分别是规范自相矛盾 + 候选源含 active + EN 标签语义偏移 + 省略门槛无约束力 + blockquote 缺空行
+- **0.2.5**（2026-08-03）：02-filtered 瘦身（去 contentMarkdown，正文按 id 从 01 join）
+  - `preprocess.ts`：`slim()` 从 active/outlierPool 输出中剥离 `contentMarkdown`——`02-filtered.json` 变成精简索引（id/author/parentId/childIds/depth/isOP），不再重复正文（每条 body 是 `01-raw-data.json` 的逐字副本，约占单条 90%）
+  - SKILL.md Step 5/6/7：需要评论正文时按 id 从 `01-raw-data.json` join（6.4 standout 与 Step 7 生成）
+  - `filter.ts` / `check-coverage.ts` 不变（过滤从不读 contentMarkdown）
+  - `preprocess.test.ts`：新增 slim 契约断言（outlierPool + 带子树 active 路径）
+  - 改动文件：`scripts/preprocess.ts`、`scripts/__tests__/preprocess.test.ts`、`SKILL.md`
+  - 原因：`02-filtered.json` 与 `01-raw-data.json` 正文逐字重复，是死重；瘦身为只留索引，正文单一来源
 - **0.2.4**（2026-07-29）：移除正文每节覆盖标记，改为文末单句覆盖说明
   - 去掉每个 `###` 小节 / roundup 项末尾的 `（N / M 条）` 比值标记——该比值是内部覆盖指标，读者无法解读，且与编辑型正文语体冲突
   - 改为文末（`## 参考资料` 之后）一行 `<small>` 覆盖说明：`本摘要基于该 Hacker News 帖子的 {inputCount} 条评论，按"回复数与讨论深度"选取 {activeCount} 条代表性观点归纳，不同立场的比重反映其在原讨论中的份量，而非编辑倾向。`（计数取自 `02-filtered.json` `meta`，跟随 config.lang）
