@@ -31,7 +31,7 @@ summarize what HN is saying in this post
 
 ## 工作流程
 
-1. 解析输入 → 2. 加载配置 → 3. 抓取数据 → 4. 准备输出并校验 → 5. 过滤评论 → 6. 分组 → 7. 生成文章（最多 3 轮 generate-evaluate）→ 8. AI 语气检查 → 9. 翻译腔检查（条件）→ 10. 可读性检查 + 读者审计 + 最终输出 → 11. 推荐摘要 → `03-article.md` + `recommendation-*.md`
+1. 解析输入 → 2. 加载配置 → 3. 抓取数据 → 4. 准备输出并校验 → 5. 过滤评论 → 6. 分组 → 7. 生成文章（最多 3 轮 generate-evaluate）→ 8. AI 语气检查 → 9. 翻译腔检查（条件）→ 10. 可读性检查 + 读者审计 + 最终输出（注入声明）→ 11. 推荐摘要 → `final-*.md`（注入后交付件）+ `recommendation-*.md`
 
 主流程见 [SKILL.md](./SKILL.md)。
 
@@ -40,10 +40,11 @@ summarize what HN is saying in this post
 每个帖子在 `{outputDir}/{postId}-{slug}/` 下生成：
 
 ```
-01-raw-data.json              # 原始统一 JSON（顶层含 latestCommentAt 时间戳）
-02-filtered.json              # Step 5 过滤结果（active + outlierPool + outlierBatches）
+01-raw-data.json              # 原始统一 JSON（顶层含 latestCommentAt；post 含 postScore）
+02-filtered.json              # Step 5 过滤结果（active + outlierPool + outlierBatches，精简索引无正文）
 02-grouped.json               # 分组结果
-03-article.md                 # 最终文章
+03-article.md                 # 定稿文章（注入声明前）
+final-{slug}-{postId}.md      # 最终交付：03-article.md 经 insert-header.ts 在 H1 后注入声明段落（disclaimer + 方法论 + 快照：时间戳/分数/评论数）
 recommendation-{slug}-{postId}.md  # 多风格推荐摘要
 article-draft-round{N}.md     # 各轮草稿（可观测性）
 evaluation-*.md               # 各评估报告（可观测性）
@@ -96,7 +97,7 @@ hn-digest/                     # 产物输出目录
 bun test
 ```
 
-当前规模：8 个测试文件，107 个 pass / 5 个 skip（需网络的集成测试） / 0 个 fail。
+当前规模：9 个测试文件，120 个 pass / 5 个 skip（需网络的集成测试） / 0 个 fail。
 
 ## 设计决策
 
