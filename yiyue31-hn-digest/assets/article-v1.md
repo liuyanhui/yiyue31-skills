@@ -8,12 +8,12 @@ Generation constraints (read before writing the article):
   - Event / obituary / reflection (no central controversy) → what people remember. Do NOT fabricate a 争议点 — an empty controversy reads as formula.
   - Scattered Q&A (no through-line) → honest loose roundup. Forced narrative on scattered threads = fabricated coherence = fidelity violation.
   争议点 is mandatory ONLY for the controversy type. For other types, include it only if a real split surfaces.
-- Section names follow config.lang (see the language table below).
+- Section names are MONOLINGUAL — follow config.lang (zh article uses zh names only; en uses en only; never bilingual "zh / en" headings). See the mapping table below.
 
 Citation:
 - No commenter usernames as attribution — use generic references ("有评论者认为……""支持方认为……").
 - Name a commenter only when quoting their exact, key-insight words, prefixed with context ("一位金融背景的评论者 augstein 引用 Hedgeye 分析称……").
-- The 意外之声 / Standout takes section is the canonical case for naming: it quotes each pick's exact words, so the author handle is shown there as 作者/Author (do NOT use a generic reference in that section).
+- The 意外之声 (en: Surprising takes) section is the canonical case for naming: it quotes each pick's exact words, so the author handle is shown there as 作者/Author (do NOT use a generic reference in that section).
 
 Jargon:
 - Explain financial/technical terms on first use with a brief parenthetical/appositive ("S&P 500（标普500指数）""401k（美国个人退休账户）"), or replace with plain language if meaning is preserved.
@@ -38,9 +38,9 @@ Aggregation voice (anti-AI-texture — the strongest tells in a multi-viewpoint 
 - Do NOT stack "pendulum" sentences that symmetrically recite opposing sides ("有评论者认为……另一方则指出……" / "Some think X, while others argue Y."). Land on the concrete disagreement instead of a balanced restatement.
 - Do NOT open group sections with meta-narration ("第一组讨论了……" / "Group A discusses..."). The heading names the topic — open with the viewpoint itself. Vary how viewpoints are introduced across sections.
 
-Coverage note (one end-of-article line — no per-section markers):
+Coverage / declaration (injected header — NOT written by you, NOT at the end):
 - Keep the body editorially ordered; do NOT reorder by raw heat. Do NOT append `（N / M 条）` / `(N / M comments)` to section headings — the part/whole ratio is an internal coverage metric; readers cannot interpret it and it clashes with the editorial voice.
-- Instead state coverage ONCE as a `<small>` line at the very end of the article (after the `## 参考资料 / References` links): zh `本摘要基于该 Hacker News 帖子的 {inputCount} 条评论，按"回复数与讨论深度"选取 {activeCount} 条代表性观点归纳，不同立场的比重反映其在原讨论中的份量，而非编辑倾向。` en `This digest is based on {inputCount} comments from the Hacker News thread, distilled to {activeCount} representative viewpoints selected by reply volume and discussion depth; the weight given to each stance reflects its share of the original discussion, not editorial bias.` Pull `{inputCount}` and `{activeCount}` from `02-filtered.json` `meta`. State the selection principle in plain words; never expose raw params (depth / minReplies / maxComments) — readers cannot interpret them.
+- The disclaimer + methodology/neutrality + discussion snapshot (timestamp / post score / comment count) are injected as ONE `<small>` paragraph right after the H1 by `scripts/insert-header.ts`. Do NOT write any of them yourself, and do NOT add any coverage/methodology note at the end — the body ends after `## 参考资料` (en: `## References`).
 
 Sharp viewpoints & quotes:
 - Wrap sharp/counter-intuitive points in **bold** (1–3 per section, only when they genuinely reframe understanding).
@@ -52,7 +52,7 @@ Summary:
 - Vary the summary's opening across articles — do not default to "与其说…不如说…" every time; that recurrence is a tell.
 -->
 
-<!-- Section names by language (use the names that match your chosen skeleton):
+<!-- Section names — MONOLINGUAL. Use the name that matches config.lang (zh → zh name; en → en name); never output bilingual "zh / en" headings.
   zh → en
   背景 → Background
   核心观点 → Core Viewpoints
@@ -61,75 +61,88 @@ Summary:
   人们记住的 → What people remember
   要点 → Notable points
   争议点 → Controversies
-  意外之声 → Standout takes
+  意外之声 → Surprising takes
   总结 → Summary
+  参考资料 → References
+-->
+
+<!-- Title:
+- H1 = `[HN] {title in config.lang}`. HN titles are usually English, so a zh article's H1 is the CHINESE translation of post.title; an en article uses post.title as-is.
+- When post.title differs from the article language, add ONE small line with the original right after the H1 (the injected header sits between H1 and this line): zh `<small>原标题：{post.title}</small>`, en `<small>Original: {post.title}</small>`. Skip it when post.title is already in the article language.
 -->
 
 <!-- References rules:
-- Append a "参考资料 / References" section at the end of the article.
+- Append a 参考资料 (en: References) section at the end of the article — this is the LAST section; nothing follows it.
 - Always include the HN discussion link: https://news.ycombinator.com/item?id={postId}
 - If the post has an external URL (post.url), include it as the original article link.
 - IMPORTANT: Show the raw URL explicitly on a separate indented line after each Markdown link,
   so that URL information is preserved when converting to other formats (HTML, PDF, WeChat, etc.).
-- Format:
-  ## 参考资料 / References
-  - [原文章标题或"原文"](post.url)
+- Format (zh shown; en uses "References" / "Original"):
+  ## 参考资料
+  - [原文](post.url)
     post.url
   - [HN 讨论](https://news.ycombinator.com/item?id={postId})
     https://news.ycombinator.com/item?id={postId}
 -->
 
-# [Hacker News] {帖子标题 / Post Title}
+# [HN] {帖子标题（中文译名） / Post Title}
+<small>原标题：{post.title（原文，仅当与正文语言不同时）}</small>
 
-## 背景 / Background
+## 背景
 {读者钩子（1句）+ 让读者产生利害感的上下文（按需 3–5 句，不设 ~100 词上限）。若抓取到原文且有实质论点，在此或正文相应处用整段引用引出。}
 
-<!-- Body skeleton — pick EXACTLY ONE by thread type (rules above). Do NOT output more than one, and do NOT output the "=== TYPE ===" markers or this comment. Each type's section shape:
+<!-- Body skeleton — pick EXACTLY ONE by thread type (rules above). Do NOT output more than one, and do NOT output the "=== TYPE ===" markers or this comment. Headings shown in zh; for en use the mapping table above. Each type's section shape:
 
 === Controversy ===
-## 核心观点 / Core Viewpoints
+## 核心观点
 ### {中心问题本身作小标题，或"支持方 / 反对方"}
 {观点作为对该问题的回答逐层展开；最尖锐点加粗 + 评论原话片段。每段≤5句。}
 ### {另一方 / 另一切角}
 {过渡句 + 观点。每段≤5句。}
-## 争议点 / Controversies
+## 争议点
 {分歧的根源，而非"A 说 X、B 说 Y"的复述。}
 
 === Breakthrough / achievement ===
-## 怎么做到的 / How it was done
+## 怎么做到的
 {发生了什么 + 为什么难 + 关键方法。可整段引用原文的说明。}
-## 意味着什么 / What it means
+## 意味着什么
 {意义、局限、后续走向。}
-（仅当确有真实异议时，才加 `## 争议点 / Controversies`）
+（仅当确有真实异议时，才加 `## 争议点`）
 
 === Event / obituary / reflection ===
-## 人们记住的 / What people remember
+## 人们记住的
 {复数的个人回忆或反应，按主题松散组织。}
 （不要硬造 `## 争议点`；若讨论中确有分歧，再加。）
 
 === Scattered Q&A ===
-## 要点 / Notable points
+## 要点
 {相关但零散的看法 roundup，按粗略主题分组。}
 （老实的 roundup 优于强造叙事。）
 -->
 
 === 所有类型共用结尾 ===
-## 意外之声 / Standout takes
-{从 `02-grouped.json` 的 `standouts` 取 2–4 条最反共识 / 反直觉 / 尖锐 / 离谱的评论。每条渲染为：blockquote 引评论**源语言原话（不翻译 quote；zh 文章也引英文原话）**，其下三行标签——**作者/Author**（`author`）、**翻译/Translation**（`translation`；源语言 = config.lang 时省略此行）、**入选原因/Reason for inclusion**（`reason`，一句）。标签跟随 config.lang。`standouts` 为空则省略整个小节。本节是热点之外的冷门/离谱轨，制造反差与趣味；只引真实评论原话，不得生成或改写惊人之处。格式示例：
 
-> {the comment's exact source-language quote}
->
-> **作者**：{author}
-> **翻译**：{translation}（zh 模式；en 模式且源语言=英文时省略此行）
-> **入选原因**：{reason，一句话}
+## 意外之声
+<!-- 意外之声 (en: Surprising takes) — the SURPRISE track, separate from the heat-ranked body. The point of this section is surprise, not "best of".
+- Picks come from `02-grouped.json` `standouts`. The grouping step draws them PRIMARILY from the outlier pool (comments the activity filter dropped because of low reply volume), so they do NOT repeat what the body already covered. An `active` comment is allowed only when it contradicts its own group's mainstream stance.
+- Bar — each pick must be genuinely SURPRISING: counter-consensus, counter-intuitive, or outrageous-but-coherent. "Well argued", "I agree", or "clearly explained" do NOT qualify. If fewer than 2 picks clear the bar, the grouping step sets `standouts: []` and you OMIT this whole section (empty is the expected outcome for many threads, not a failure).
+- Render each pick as ONE blockquote: the comment's exact SOURCE-LANGUAGE words first (do NOT translate the quote — a zh article quotes the English original), then three labeled lines. Put a BLANK `>` line between EVERY field so each renders as its own paragraph in HTML (consecutive `>` lines collapse into one paragraph and the fields end up on a single line — that is the bug to avoid). Labels follow config.lang:
+  > {the comment's exact source-language quote}
+  >
+  > **作者**：{author}
+  >
+  > **翻译**：{translation}（zh 模式；当源语言 = config.lang 时省略此行）
+  >
+  > **入选原因**：{reason，一句话}
+  `author` / `quote` / `translation` / `reason` come from the standouts entry. Attribution is allowed here — the section is an exact-quote spotlight.
+-->
+{从 `02-grouped.json` 的 `standouts` 取 2–4 条，按上述 blockquote 格式逐条渲染（字段间务必留空 `>` 行）。`standouts` 为空则整节省略，不要写空标题。}
 
-}
-## 总结 / Summary
+## 总结
 {回应核心问题 + 超出复述的读者价值：未解答的关键问题 / 实际影响 / 趋势判断 / 一处可被原文或评论佐证的延伸观察。}
-## 参考资料 / References
+
+## 参考资料
 - [原文]({post.url})
   {post.url}
 - [HN 讨论](https://news.ycombinator.com/item?id={postId})
   https://news.ycombinator.com/item?id={postId}
-
-<small>{Coverage note：跟随 config.lang，计数取自 `02-filtered.json` `meta`（inputCount / activeCount），完整中英文措辞与"不暴露原始参数"规则见上方 Coverage note 约束}</small>

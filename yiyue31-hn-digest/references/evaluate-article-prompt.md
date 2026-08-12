@@ -1,6 +1,6 @@
 # Article Evaluation Prompt
 
-> Last updated: 2026-07-29
+> Last updated: 2026-08-12
 
 You are evaluating a generated article against the original source comments. Assess the article on the following five dimensions.
 
@@ -33,7 +33,7 @@ Check: read `02-grouped.json`. For each group, judge whether its IMPORTANT viewp
 Does the article use a skeleton appropriate to its thread type — rather than the same four-section mold every time?
 
 Required (all types):
-- `# [Hacker News] {Title}` (H1 heading — `[Hacker News] ` prefix is mandatory)
+- `# [HN] {title in config.lang}` (H1 — `[HN] ` prefix mandatory; for zh the title is the Chinese translation of post.title). When post.title differs from the article language, a `<small>原标题：{post.title}</small>` (en: `<small>Original: {post.title}</small>`) line must appear right after the H1.
 - Background section (zh: `## 背景`, en: `## Background`)
 - A body matching the thread type (see `assets/article-v1.md`): controversy → Core Viewpoints unfolding the central question; breakthrough → How-it-was-done / What-it-means; event or obituary → What-people-remember; scattered Q&A → Notable-points roundup.
 - Summary section (zh: `## 总结`, en: `## Summary`)
@@ -44,13 +44,17 @@ Conditional:
 OP marker check:
 - Every OP comment must be prefixed with the OP marker and placed first within its group/section. The marker follows the article language: zh `> **[楼主]** `, en `> **[OP]** `. A zh article carrying the untranslated `> **[OP]** ` is a defect.
 
-Coverage note check:
+Coverage / declaration check:
 - The article must NOT carry per-section `（N / M 条）` / `(N / M comments)` markers on headings — that ratio is internal and reader-opaque.
-- The article must end with ONE `<small>` coverage line after the `## 参考资料 / References` links: zh `本摘要基于该 Hacker News 帖子的 {inputCount} 条评论，按"回复数与讨论深度"选取 {activeCount} 条代表性观点归纳……`; en equivalent. Counts come from `02-filtered.json` `meta` (inputCount = `01-raw-data.json` comment count; activeCount = unique commentIds across `02-grouped.json` groups). It states the selection principle in plain words and exposes NO raw params (depth / minReplies / maxComments).
-  - Defects: any per-section `（N / M 条）` marker present; the end coverage note missing; the note leaking raw params; or a body reordered by raw heat.
+- The article must NOT end with a coverage/methodology `<small>` note after the references. The disclaimer + methodology/neutrality + discussion snapshot are injected as ONE `<small>` paragraph after the H1 by `insert-header.ts` (not written by the model), so the model-written body must end at the `## 参考资料` (en: `## References`) links with nothing after them.
+  - Defects: any per-section `（N / M 条）` marker present; a model-written end-of-article coverage note present (the injected header already carries it); a body reordered by raw heat.
 
-Standout section check:
-- When `02-grouped.json` `standouts` is non-empty, the article must include a `## 意外之声 / Standout takes` section (before 总结). Each pick is a blockquote of the comment's **exact SOURCE-LANGUAGE words** (a zh article still quotes the English original — translating the quote is a defect), followed by three labeled lines: 作者/Author, 翻译/Translation (omit only when source language = article language), 入选原因/Reason for inclusion. Labels follow the article language. Omit the section only when `standouts` is empty. Defects: section missing despite non-empty standouts; quote translated/paraphrased/fabricated instead of verbatim source-language; missing 作者 or 入选原因 label; missing 翻译 in a zh article (source ≠ zh); label still reads "为何意外" instead of 入选原因; section present but aimless.
+Standout section check (意外之声 / Surprising takes — the SURPRISE track):
+- When `02-grouped.json` `standouts` is non-empty, the article must include a `## 意外之声` (en: `## Surprising takes`) section (before 总结). Omit the section entirely when `standouts` is empty — do not emit an empty heading.
+- Picks must NOT repeat the body: standouts are drawn from the outlier pool (comments the activity filter dropped). A standout quoting a comment already featured in a body section is a defect.
+- The bar is surprise. Picks that are merely "well-argued" or "a clear explanation" with no counter-consensus / counter-intuitive / outrageous edge are defects.
+- Each pick is ONE blockquote of the comment's **exact SOURCE-LANGUAGE words** (a zh article still quotes the English original — translating the quote is a defect), followed by three labeled lines: 作者/Author, 翻译/Translation (omit only when source language = article language), 入选原因/Reason for inclusion. A BLANK `>` line MUST separate every field so each renders as its own paragraph in HTML (consecutive `>` lines collapse into one paragraph and the fields end up on one line — that is the bug to avoid). Labels follow the article language.
+- Defects: section missing despite non-empty standouts; empty heading when standouts is empty; picks that repeat the body; picks that are not actually surprising; quote translated/paraphrased/fabricated instead of verbatim source-language; fields collapsed onto one line (missing blank `>` lines between them); missing 作者 or 入选原因 label; missing 翻译 in a zh article (source ≠ zh).
 
 Formula check:
 - Any formula must use LaTeX (display $$...$$ on its own line, inline $...$). A formula written as plain prose that loses subscripts/superscripts (e.g. "St−1", "ktT") is a MINOR defect.
@@ -60,18 +64,18 @@ Citation format check:
 - Exception: naming is acceptable when quoting an exact, insightful comment AND providing context.
 
 Language consistency check:
-- Section headings follow `config.lang` (a zh article must not carry untranslated headings like `## Background`). Em-dash (——) mid-sentence use is deferred to the Translationese Check.
+- Section headings are MONOLINGUAL and follow `config.lang`: a zh article uses zh headings only (`## 背景`, not `## 背景 / Background` and not `## Background`); an en article uses en headings only. Em-dash (——) mid-sentence use is deferred to the Translationese Check.
 
 Title prefix check:
-- H1 heading must begin with `[Hacker News] `. Deduct 1-2 points if missing.
+- H1 heading must begin with `[HN] `. Deduct 1-2 points if missing or if it uses the old `[Hacker News]` form.
 
 References check:
-- A `## 参考资料 / References` section is present with the HN discussion link. If the post has an external URL, the original-article link is included AND its raw URL shown on a separate indented line (it must survive conversion to HTML/PDF/etc.). Defects: section missing, HN link missing, or a raw URL not on its own line.
+- A `## 参考资料` (en: `## References`) section is present with the HN discussion link, and it is the LAST section (nothing follows it). If the post has an external URL, the original-article link is included AND its raw URL shown on a separate indented line (it must survive conversion to HTML/PDF/etc.). Defects: section missing, HN link missing, content after the references, or a raw URL not on its own line.
 
 Score by severity, not defect count:
-- 10: All structure checks pass (skeleton matches type; OP markers; end coverage note; standout section when warranted; citations; title prefix; references).
-- 7–9: 1–2 MINOR defects (occasional username drop, a single missing/leaky coverage note, raw URL not indented).
-- 4–6: A MAJOR defect (wrong skeleton, OP markers missing, fabricated 争议点, missing References or HN link, per-section coverage markers present or end coverage note missing).
+- 10: All structure checks pass (skeleton matches type; OP markers; no model-written end coverage note; standout section when warranted; citations; title prefix; references last).
+- 7–9: 1–2 MINOR defects (occasional username drop, a model-written end coverage note left in, raw URL not indented).
+- 4–6: A MAJOR defect (wrong skeleton, OP markers missing, fabricated 争议点, missing References or HN link, per-section coverage markers present).
 - 0–3: Structure completely wrong.
 
 ### 4. Factual Correctness (事实正确性) — Weight: 15%

@@ -105,12 +105,26 @@ bun test
 
 ## Changelog
 
+- **0.2.7**（2026-08-12）：声明整合 + 标题/小标题统一 + 意外之声收敛（在 0.2.6 基线上重落此前被并发覆盖的改动）
+  - 声明：`insert-header.ts` 在 H1 后注入**单个** `<small>` 段落（disclaimer + 方法论/中立性 + 快照：时间戳/分数/评论数）；**删除文末 coverage note**（与开头重复）；SKILL 10.3 描述同步
+  - 标题：H1 前缀 `[Hacker News]` → `[HN]`；zh 文章 H1 改 post.title 中文译名 + 原标题 small 行
+  - 小标题：全部**单语**（跟随 config.lang），不再双语并列（修 SKILL.md 与模板/评估 prompt 的规范自相矛盾）
+  - 意外之声：单节，英文 `Standout takes` → **Surprising takes**；候选源 **outlierPool 优先**（active 仅罕见例外，不复述正文）；加硬意外门槛 + 不足 2 条输出空并省略；渲染沿用 0.2.6 的"源语言原话 + 作者/翻译/入选原因"标签，并**修正字段间空 `>` 行**（0.2.6 的连续 `>` 行在 HTML 仍会塌成一行）
+  - 改动文件：`SKILL.md`、`assets/article-v1.md`、`references/evaluate-article-prompt.md`（`insert-header.ts` 及其测试在 0.2.6 已存活，本次未动）
+  - 原因：0.2.6 在另一台机器未及时 push，导致本机 0.2.6 基于过时基线、rebase 后 1-5 点被整文件覆盖；本次在 0.2.6 之上重新落回，并合并两版 standout 设计（保留 0.2.6 的 schema 扩字段与标签格式 + 采用本机商定的改名/选材门槛/空行修正）
 - **0.2.6**（2026-08-05）：「意外之声」四段式 + 公式 LaTeX 化
   - 「意外之声 / Standout takes」每条改为：blockquote 引评论**源语言原话（不翻译 quote；zh 文章也引英文原话）** + 三行标签 **作者 / 翻译 / 入选原因**（「为何意外」改名「入选原因」；zh 模式带翻译，源语言 = config.lang 时省略翻译行）—— 根除此前 49085698 引中文、49089755 引英文的中英混用
   - `02-grouped.json` `standouts` schema 扩字段：`{ commentId, author, quote, translation?, reason }`（quote 始终源语言原话；translation 在源 ≠ config.lang 时必填）
   - 公式改 LaTeX 渲染：行间 `$$...$$`、行内 `$...$`，禁止纯散文丢下标（如 `$S_t = S_{t-1} + \beta_t(v_t - S_{t-1}k_t)k_t^T$`）；HTML 发布端加 MathJax/KaTeX 脚本渲染
   - 改动文件：`SKILL.md`（Step 6.4 / Step 7 Rule 8 + 新 Rule 10 / version）、`assets/{article-v1.md,grouped-example-v1.json}`、`references/evaluate-article-prompt.md`（Standout check + Formula check）、`scripts/__tests__/grouped-schema.test.ts`（author 必填 + translation 可选 + 负向用例）、`README.md`
   - 原因：用户指出「意外之声」引用语言不一致、缺作者/翻译、公式退化；统一为「原文 + 作者 + 翻译 + 入选原因」，公式专业化（LaTeX + MathJax）
+- **0.2.5**（2026-08-03）：02-filtered 瘦身（去 contentMarkdown，正文按 id 从 01 join）
+  - `preprocess.ts`：`slim()` 从 active/outlierPool 输出中剥离 `contentMarkdown`——`02-filtered.json` 变成精简索引（id/author/parentId/childIds/depth/isOP），不再重复正文（每条 body 是 `01-raw-data.json` 的逐字副本，约占单条 90%）
+  - SKILL.md Step 5/6/7：需要评论正文时按 id 从 `01-raw-data.json` join（6.4 standout 与 Step 7 生成）
+  - `filter.ts` / `check-coverage.ts` 不变（过滤从不读 contentMarkdown）
+  - `preprocess.test.ts`：新增 slim 契约断言（outlierPool + 带子树 active 路径）
+  - 改动文件：`scripts/preprocess.ts`、`scripts/__tests__/preprocess.test.ts`、`SKILL.md`
+  - 原因：`02-filtered.json` 与 `01-raw-data.json` 正文逐字重复，是死重；瘦身为只留索引，正文单一来源
 - **0.2.4**（2026-07-29）：移除正文每节覆盖标记，改为文末单句覆盖说明
   - 去掉每个 `###` 小节 / roundup 项末尾的 `（N / M 条）` 比值标记——该比值是内部覆盖指标，读者无法解读，且与编辑型正文语体冲突
   - 改为文末（`## 参考资料` 之后）一行 `<small>` 覆盖说明：`本摘要基于该 Hacker News 帖子的 {inputCount} 条评论，按"回复数与讨论深度"选取 {activeCount} 条代表性观点归纳，不同立场的比重反映其在原讨论中的份量，而非编辑倾向。`（计数取自 `02-filtered.json` `meta`，跟随 config.lang）
