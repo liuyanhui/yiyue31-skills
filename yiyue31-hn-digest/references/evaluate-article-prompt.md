@@ -35,7 +35,7 @@ Does the article use a skeleton appropriate to its thread type — rather than t
 Required (all types):
 - `# [HN] {title in config.lang}` (H1 — `[HN] ` prefix mandatory; for zh the title is the Chinese translation of post.title). When post.title differs from the article language, a `<small>原标题：{post.title}</small>` (en: `<small>Original: {post.title}</small>`) line must appear right after the H1.
 - Background section (zh: `## 背景`, en: `## Background`)
-- A body matching the thread type (see `assets/article-v1.md`): controversy → Core Viewpoints unfolding the central question; breakthrough → How-it-was-done / What-it-means; event or obituary → What-people-remember; scattered Q&A → Notable-points roundup.
+- A body matching the thread type (see `assets/article-v1.md`): controversy → Core Viewpoints unfolding the central question; breakthrough → How-it-was-done / What-it-means; event or obituary → What-people-remember; scattered Q&A → Notable-points roundup. Body sections are ordered by viewpoint logic, NOT by raw comment heat.
 - Summary section (zh: `## 总结`, en: `## Summary`)
 
 Conditional:
@@ -47,14 +47,12 @@ OP marker check:
 Coverage / declaration check:
 - The article must NOT carry per-section `（N / M 条）` / `(N / M comments)` markers on headings — that ratio is internal and reader-opaque.
 - The article must NOT end with a coverage/methodology `<small>` note after the references. The disclaimer + methodology/neutrality + discussion snapshot are injected as ONE `<small>` paragraph after the H1 by `insert-header.ts` (not written by the model), so the model-written body must end at the `## 参考资料` (en: `## References`) links with nothing after them.
-  - Defects: any per-section `（N / M 条）` marker present; a model-written end-of-article coverage note present (the injected header already carries it); a body reordered by raw heat.
 
 Standout section check (意外之声 / Surprising takes — the SURPRISE track):
 - When `02-grouped.json` `standouts` is non-empty, the article must include a `## 意外之声` (en: `## Surprising takes`) section (before 总结). Omit the section entirely when `standouts` is empty — do not emit an empty heading.
 - Picks must NOT repeat the body: standouts are drawn from the outlier pool (comments the activity filter dropped). A standout quoting a comment already featured in a body section is a defect.
 - The bar is surprise. Picks that are merely "well-argued" or "a clear explanation" with no counter-consensus / counter-intuitive / outrageous edge are defects.
 - Each pick is ONE blockquote of the comment's **exact SOURCE-LANGUAGE words** (a zh article still quotes the English original — translating the quote is a defect), followed by three labeled lines: 作者/Author, 翻译/Translation (omit only when source language = article language), 入选原因/Reason for inclusion. A BLANK `>` line MUST separate every field so each renders as its own paragraph in HTML (consecutive `>` lines collapse into one paragraph and the fields end up on one line — that is the bug to avoid). Labels follow the article language.
-- Defects: section missing despite non-empty standouts; empty heading when standouts is empty; picks that repeat the body; picks that are not actually surprising; quote translated/paraphrased/fabricated instead of verbatim source-language; fields collapsed onto one line (missing blank `>` lines between them); missing 作者 or 入选原因 label; missing 翻译 in a zh article (source ≠ zh).
 
 Formula check:
 - Any formula must use LaTeX (display $$...$$ on its own line, inline $...$). A formula written as plain prose that loses subscripts/superscripts (e.g. "St−1", "ktT") is a MINOR defect.
@@ -70,7 +68,7 @@ Title prefix check:
 - H1 heading must begin with `[HN] `. Deduct 1-2 points if missing or if it uses the old `[Hacker News]` form.
 
 References check:
-- A `## 参考资料` (en: `## References`) section is present with the HN discussion link, and it is the LAST section (nothing follows it). If the post has an external URL, the original-article link is included AND its raw URL shown on a separate indented line (it must survive conversion to HTML/PDF/etc.). Defects: section missing, HN link missing, content after the references, or a raw URL not on its own line.
+- A `## 参考资料` (en: `## References`) section is present with the HN discussion link, and it is the LAST section (nothing follows it). If the post has an external URL, the original-article link is included AND its raw URL shown on a separate indented line (it must survive conversion to HTML/PDF/etc.).
 
 Score by severity, not defect count:
 - 10: All structure checks pass (skeleton matches type; OP markers; no model-written end coverage note; standout section when warranted; citations; title prefix; references last).

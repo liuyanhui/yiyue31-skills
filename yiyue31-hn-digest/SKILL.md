@@ -144,7 +144,6 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 7. **Coverage (no end note, no per-section markers)**: do NOT append `（N / M 条）` / `(N / M comments)` to section headings, and do NOT write any coverage/methodology note at the end — that is injected as a `<small>` paragraph after the H1 by Step 10.3's `insert-header.ts`. Full generation constraints in `assets/article-{templateVersion}.md`.
 8. **Standout section**: render `## 意外之声` (en: `## Surprising takes`; all skeletons, before 总结) from `02-grouped.json` `standouts`; source and surprise bar are defined in Step 6.4. **Full format (blockquote shape, blank `>` line between fields, label set, omit-when-empty) in `assets/article-{templateVersion}.md`.**
 9. **Catch-all group**: if `02-grouped.json` contains an `其他观点`/`Other` group (the coverage safety net from Step 6.1), render it briefly as a short roundup or fold it into `## 要点` — never as a full body section. It exists to guarantee coverage, not to carry narrative weight.
-10. **Formulas & math**: render any formula with LaTeX (display `$$...$$`, inline `$...$`); HTML rendering needs a MathJax/KaTeX script. Detailed constraint + examples in `assets/article-{templateVersion}.md`.
 
 ---
 
@@ -179,22 +178,7 @@ Proceed to Step 10 regardless.
 
 ### 10.2 Reader Audit (max 3 rounds)
 
-Cold readers — who see ONLY `03-article.md`, never the raw comments or grouped data — read it sentence by sentence and report where they get stuck. They report **phenomena only, never fixes**. You then act as editor with full context to resolve every **blocking** comprehension problem. The loop ends when no reader reports a blocking problem.
-
-**Why article-only readers:** feeding readers the raw/grouped data lets them fill gaps from memory and miss the gaps a real reader hits; you (editor) get full context — `01-raw-data.json` + `02-grouped.json` — to fix correctly.
-
-**Distinguishing blocking vs look-up-able:** only blocking problems (the article's own ungrounded concepts) converge the loop; look-up-able domain vocabulary (tool names, jargon) is expected in a specialist digest and is ignored.
-
-**Loop procedure:**
-1. **Each round N (1..3)**:
-   - Spawn **3 cold readers in parallel**, each a subagent with `{skill-dir}/references/evaluate-reader-audit-prompt.md` and a distinct profile. Each receives ONLY `03-article.md`. Profiles follow `config.lang`:
-     - zh: `普通读者` / `略读读者` / `门外汉`
-     - en: `casual-reader` / `skim-reader` / `non-native`
-   - Save each report to `{outputDir}/{postId}-{slug}/evaluation-reader-audit-round{N}-{profile}.md`.
-   - **Aggregate:** collect and dedupe all **blocking** phenomena across the 3 reports (ignore look-up-able domain terms).
-   - No reader reports a blocking problem → **PASS** → proceed to 10.3.
-   - Otherwise: act as **editor**. For each blocking phenomenon, decide and apply a fix using full context — current `03-article.md` + `01-raw-data.json` + `02-grouped.json`. Overwrite `03-article.md`. Next round.
-2. **Rounds exhausted (3 rounds)**: keep `03-article.md`, output "部分读者体验问题可能残留".
+Dispatch cold-reader subagents and resolve their reports per `{skill-dir}/references/reader-audit-procedure.md` (read it now). Short version: 3 article-only readers report blocking comprehension problems each round; you (main agent, full context) fix them; loop until no blocking problem remains or 3 rounds exhausted.
 
 ### 10.3 Final Output
 
