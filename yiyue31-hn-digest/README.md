@@ -21,9 +21,9 @@ summarize what HN is saying in this post
 | `--minReplies N` | 3 | 单条评论最少需要的子评论数 |
 | `--maxComments N` | 80 | 入选评论上限（5–150） |
 | `--fetchDepth N` | 10 | Firebase 抓取深度（1–15），仅在 Algolia 失败时生效 |
-| `--maxFetchComments N` | 500 | Firebase 抓取评论数安全帽（2GB / 时间防护） |
+| `--maxFetchComments N` | 500 | Firebase 抓取评论数安全帽（1–2000，2GB / 时间防护） |
 | `--lang zh\|en` | `zh` | 输出文章语言 |
-| `--outputDir path` | `.` | 输出目录 |
+| `--outputDir path` | `hn-digest/` | 输出目录 |
 | `--with-original` | 关 | 同时抓取原文链接内容作为背景 |
 | `--groupBy topic,stance` | `topic,stance` | 分组维度 |
 | `--sort-groups relevance\|engagement` | `relevance` | 分组排序方式 |
@@ -37,7 +37,7 @@ summarize what HN is saying in this post
 
 ## 输出
 
-每个帖子在 `{outputDir}/{postId}-{slug}/` 下生成：
+每个帖子在 `{outputDir}/{postId}-{slug}/` 下生成（`outputDir` 默认 `hn-digest/`，项目级配置见运行时数据节）：
 
 ```
 01-raw-data.json              # 原始统一 JSON（顶层含 latestCommentAt；post 含 postScore）
@@ -62,6 +62,9 @@ hn-digest/
 │   ├── algolia.ts
 │   ├── firebase.ts
 │   ├── preprocess.ts         # Step 5 代码驱动过滤 + outlier 分批
+│   ├── check-coverage.ts     # Step 6.5 覆盖校验
+│   ├── insert-header.ts      # Step 10.3 声明注入
+│   ├── README.md             # scripts/ 详细文档
 │   ├── lib/utils.ts
 │   ├── lib/filter.ts         # Step 5 过滤实现（共享）
 │   └── __tests__/            # bun:test 测试套件
@@ -77,12 +80,9 @@ hn-digest/
 │   └── grouped-example-v1.json
 ├── package.json
 └── bun.lock
-
-# 运行时数据（写在项目根 / 运行目录，不在 skill 目录里）
-hn-digest.config.json          # 项目级配置（手动创建；不自动生成，避免冻结旧默认值）
-hn-digest/                     # 产物输出目录
-└── {postId}-{slug}/           # 单帖全部产物
 ```
+
+> 运行时数据（写在项目根 / 运行目录，不在 skill 目录里）：`hn-digest.config.json`（项目级配置，手动创建，不自动生成以避免冻结旧默认值）、`hn-digest/`（产物输出目录，含各 `{postId}-{slug}/` 子目录）。
 
 ## 依赖
 
@@ -101,8 +101,7 @@ bun test
 
 ## 设计决策
 
-- **抓取脚本**（`scripts/*.ts`）是可执行 TypeScript，单独调试时可直接 `bun scripts/algolia.ts <postId>`
-- **质量评估走 subagent 架构**：主 agent 负责生成和修复，评估 subagent 负责独立评估（只读文章、写报告、不修改文件）。详见 [SKILL.md](./SKILL.md)
+架构与设计决策见 [SKILL.md](./SKILL.md) 顶部（主 agent 执行全流程 + 只读评估 subagent；抓取脚本是可执行 TypeScript，可单独 `bun scripts/algolia.ts <postId>` 调试）。
 
 ## Changelog
 
@@ -111,26 +110,22 @@ bun test
   - 标题：H1 前缀 `[Hacker News]` → `[HN]`；zh 文章 H1 改 post.title 中文译名 + 原标题 small 行
   - 小标题：全部**单语**（跟随 config.lang），不再双语并列（修 SKILL.md 与模板/评估 prompt 的规范自相矛盾）
   - 意外之声：单节，英文 `Standout takes` → **Surprising takes**；候选源 **outlierPool 优先**（active 仅罕见例外，不复述正文）；加硬意外门槛 + 不足 2 条输出空并省略；渲染沿用 0.2.6 的"源语言原话 + 作者/翻译/入选原因"标签，并**修正字段间空 `>` 行**（0.2.6 的连续 `>` 行在 HTML 仍会塌成一行）
-  - 改动文件：`SKILL.md`、`assets/article-v1.md`、`references/evaluate-article-prompt.md`（`insert-header.ts` 及其测试在 0.2.6 已存活，本次未动）
   - 原因：0.2.6 在另一台机器未及时 push，导致本机 0.2.6 基于过时基线、rebase 后 1-5 点被整文件覆盖；本次在 0.2.6 之上重新落回，并合并两版 standout 设计（保留 0.2.6 的 schema 扩字段与标签格式 + 采用本机商定的改名/选材门槛/空行修正）
 - **0.2.6**（2026-08-05）：「意外之声」四段式 + 公式 LaTeX 化
   - 「意外之声 / Standout takes」每条改为：blockquote 引评论**源语言原话（不翻译 quote；zh 文章也引英文原话）** + 三行标签 **作者 / 翻译 / 入选原因**（「为何意外」改名「入选原因」；zh 模式带翻译，源语言 = config.lang 时省略翻译行）—— 根除此前 49085698 引中文、49089755 引英文的中英混用
   - `02-grouped.json` `standouts` schema 扩字段：`{ commentId, author, quote, translation?, reason }`（quote 始终源语言原话；translation 在源 ≠ config.lang 时必填）
   - 公式改 LaTeX 渲染：行间 `$$...$$`、行内 `$...$`，禁止纯散文丢下标（如 `$S_t = S_{t-1} + \beta_t(v_t - S_{t-1}k_t)k_t^T$`）；HTML 发布端加 MathJax/KaTeX 脚本渲染
-  - 改动文件：`SKILL.md`（Step 6.4 / Step 7 Rule 8 + 新 Rule 10 / version）、`assets/{article-v1.md,grouped-example-v1.json}`、`references/evaluate-article-prompt.md`（Standout check + Formula check）、`scripts/__tests__/grouped-schema.test.ts`（author 必填 + translation 可选 + 负向用例）、`README.md`
   - 原因：用户指出「意外之声」引用语言不一致、缺作者/翻译、公式退化；统一为「原文 + 作者 + 翻译 + 入选原因」，公式专业化（LaTeX + MathJax）
 - **0.2.5**（2026-08-03）：02-filtered 瘦身（去 contentMarkdown，正文按 id 从 01 join）
   - `preprocess.ts`：`slim()` 从 active/outlierPool 输出中剥离 `contentMarkdown`——`02-filtered.json` 变成精简索引（id/author/parentId/childIds/depth/isOP），不再重复正文（每条 body 是 `01-raw-data.json` 的逐字副本，约占单条 90%）
   - SKILL.md Step 5/6/7：需要评论正文时按 id 从 `01-raw-data.json` join（6.4 standout 与 Step 7 生成）
   - `filter.ts` / `check-coverage.ts` 不变（过滤从不读 contentMarkdown）
   - `preprocess.test.ts`：新增 slim 契约断言（outlierPool + 带子树 active 路径）
-  - 改动文件：`scripts/preprocess.ts`、`scripts/__tests__/preprocess.test.ts`、`SKILL.md`
   - 原因：`02-filtered.json` 与 `01-raw-data.json` 正文逐字重复，是死重；瘦身为只留索引，正文单一来源
 - **0.2.4**（2026-07-29）：移除正文每节覆盖标记，改为文末单句覆盖说明
   - 去掉每个 `###` 小节 / roundup 项末尾的 `（N / M 条）` 比值标记——该比值是内部覆盖指标，读者无法解读，且与编辑型正文语体冲突
   - 改为文末（`## 参考资料` 之后）一行 `<small>` 覆盖说明：`本摘要基于该 Hacker News 帖子的 {inputCount} 条评论，按"回复数与讨论深度"选取 {activeCount} 条代表性观点归纳，不同立场的比重反映其在原讨论中的份量，而非编辑倾向。`（计数取自 `02-filtered.json` `meta`，跟随 config.lang）
   - 只讲筛选原则，不暴露原始参数（depth / minReplies / maxComments）
-  - 改动文件：`SKILL.md`（Step 7 Rule 7 / Rule 9）、`assets/article-v1.md`（约束块 + 骨架占位 + 文末行）、`references/evaluate-article-prompt.md`（Heat marker check → Coverage note check + 评分锚点）
   - 原因：标记是操作者/QA 的覆盖审计产物，原样搬进读者文档造成语体割裂与歧义；文末单句既给规模感又化解"是否 cherry-pick"的疑虑，覆盖审计仍由 `check-coverage.ts` 保障
 - **0.2.3**（2026-07-29）：分组强制全覆盖 + 兜底组 + 确定性覆盖校验
   - SKILL.md Step 6：6.1 改为"每条 active 必归且仅归一组 + 不归主题的进兜底组 `其他观点`"(dimension topic),不再丢弃;overflow 合并改为并集 `commentIds` 不丢;新增 6.5 强制跑 `check-coverage.ts` 直到 clean 才进 Step 7
@@ -138,13 +133,10 @@ bun test
   - 新增 `scripts/check-coverage.ts`：确定性校验 active 是否全归组、有无跨组重复、有无引用非 active;clean 退出 0 否则 1;导出纯函数 `checkCoverage` 供单测
   - 新增 `scripts/__tests__/check-coverage.test.ts`：clean / 父组+同组子组非重复 / missing / duplicate / extra
   - 原因：诊断发现分组只归 depth 0-1 共 28 条,把全部 depth ≥2 丢弃,致文章分母 M 卡在 ~30,与 maxComments 无关;强制全覆盖 + 兜底组 + 校验三管齐下根治,校验脚本已在 49076057 产物上复现(52 missing + 1 duplicate)
-  - 改动文件：`SKILL.md`、`scripts/check-coverage.ts`(新)、`scripts/__tests__/check-coverage.test.ts`(新)、`README.md`
 - **0.2.2**（2026-07-29）：config 从全局 homedir 迁到项目内 + 消除默认值快照陷阱
   - SKILL.md Step 2：config 路径 `{homedir}/.hn-digest/config.json` → `{cwd}/hn-digest.config.json`（项目根，独立于 outputDir）；首次运行不再写默认值快照（文件缺失即用默认值、不创建文件）；新增运行时打印生效配置 + 来源；废弃全局 `~/.hn-digest/config.json`（不再读取，可删）
   - 优先级：`CLI args > config.json > defaults` → `CLI args > hn-digest.config.json > defaults`
   - 原因：全局 config 在首次运行时快照了旧默认值（depth=2, maxComments=30），后来默认值改 5/80 后被静默盖过，导致 `（N / 30 条）` 仍为 30；迁项目内 + 不快照 + 打印三处一并根治
-  - 测试：`error-scenarios.test.ts` Scenario 3 更新优先级断言，新增断言锁定项目内路径 / 无快照 / 无 homedir / 有打印
-  - 改动文件：`SKILL.md`、`scripts/__tests__/error-scenarios.test.ts`、`README.md`
 - **0.2.1**（2026-07-28）：评估完善 + 文档精简（subagent 评审跟进）
   - SKILL.md：Step 6 显式写 `02-grouped.json`；`active` 空 / outlier 非空 边界；Step 9 采样明确取 `active`；"terminate silently" 改明确报错；架构说明单数→复数；删 Jina 移除史 / 2GB note / 重复 2GB 短语 / 7.7 marker 复述 / 6.4 忠实度句 / Algolia 注（C1/C2/C4/C5/C6 + T1–T6）
   - evaluate-article-prompt.md：D3 加 References check + 语种一致性 check；D5 加原文引用 check；**空话双扣修复**——空话统一交 AI Tone Check、D5 不再扣；D1/D4 fabrication 划清观点/事实不双扣；D3/D5 锚点映射 major/minor 严重度；输出格式矛盾修正；D2 删复述；Heat marker check 拆行（P1/P2/P3/P4/P5/P6/P7 + S1/S2/S5）
@@ -155,18 +147,15 @@ bun test
   - outlier 池 > 60 时预分批（~40/批），standout pass 走 map-reduce（每批选候选 → 合并定 2–4），防单次 LLM 调用超上下文
   - SKILL.md Step 5 改为调用 preprocess.ts；Step 6 读 `02-filtered.json`
   - 2GB：单次读小 JSON 文本（<1MB），无需流式
-  - 改动文件：`scripts/{lib/filter.ts,preprocess.ts}`、`scripts/__tests__/{filter,preprocess}.test.ts`、`SKILL.md`、`README.md`、`scripts/README.md`
   - 原因：用户第 2 点要"程序辅助预处理/预分组"突破上下文上限；代码驱动让过滤确定性可测，分批让大线程 standout 不超上下文
 - **0.1.0**（2026-07-28）：数据覆盖 + 双轨产物重构
   - 抓取：移除评论链路的 Jina（完备性优先于可用性），方法链改 Algolia → Firebase；`firebase.ts` 抓取深度配置化（`--fetchDepth`，默认 10）并加 `--maxFetchComments` 安全帽（默认 500，2GB 防护）；保留 Step 4 抓原文的 Jina Reader URL
   - 过滤：Step 5 由"纯热度 top-N"改为多样性分层选择（OP + 每子树 ≥1 代表 + 热度补齐），低回复的离群评论保留供 standout 挑选；`maxComments` 默认 30→80（上限 150）、`depth` 默认 2→5（上限 10）
   - 产物：新增 standout 判定 pass，文章加跨类型 `## 意外之声 / Standout takes` 小节（冷门/离谱轨，与热点反差，提升趣味）；`02-grouped.json` 加 `standouts` 字段
   - 标记：`（精选 N 条）` 改为 `（N / M 条）` 比值（M = digest 实际分组的评论总数），消除"精选"措辞歧义
-  - 改动文件：`scripts/firebase.ts`、删 `scripts/jina.ts` + `jina-integration.test.ts`、`SKILL.md`、`assets/{article-v1.md,grouped-example-v1.json}`、`references/evaluate-article-prompt.md`、`scripts/__tests__/{filter,grouped-schema,fetchers,error-scenarios}.test.ts`、`README.md`、`scripts/README.md`
   - 原因：digest 原本只分析 ≤30 条热评，既丢冷门观点又让标记分母含义模糊；扩覆盖 + 双轨 + 比值标记一并解决。超大线程（500+）的 map-reduce 留待后续
 - **0.0.11**（2026-07-27）：正文可见热度标记
   - 每个 `###` 小节和 roundup 项末尾追加 `（精选 N 条）` / `(N selected comments)`（N = 该小节映射到的 `02-grouped.json` 分组去重评论数）；H1/背景/争议点/总结/参考资料不加
-  - 改动文件：`assets/article-v1.md`（约束块 + 骨架示例）、`SKILL.md`（Step 7 Generation Rule 7）、`references/evaluate-article-prompt.md`（Structure Adherence 增 Heat marker check）
   - 原因：正文按编辑判断排序而非纯热度（relevance 优于 engagement），但热度对读者不可见；标记让读者看见讨论热度，同时不动排序
   - 边界：标记是已按热度筛选后的精选评论数，非全帖评论数，用「精选/selected」字样避免在千楼帖里被误读为「只有 N 人讨论」
 - **0.0.10**（2026-07-13）：移除抓取缓存，每次运行重新抓取

@@ -120,7 +120,7 @@ Summary:
 （老实的 roundup 优于强造叙事。）
 -->
 
-=== 所有类型共用结尾 ===
+<!-- 所有类型共用结尾（意外之声 / 总结 / 参考资料，不区分线程类型） -->
 
 ## 意外之声
 <!-- 意外之声 (en: Surprising takes) — the SURPRISE track, separate from the heat-ranked body. The point of this section is surprise, not "best of".
