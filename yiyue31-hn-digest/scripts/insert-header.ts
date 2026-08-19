@@ -36,25 +36,34 @@ export function formatTimestamp(iso: string): string {
 }
 
 /** Snapshot data frozen at fetch time. Score and count always exist (default
- * 0); the timestamp may be absent if no comment carried a timestamp. */
+ * 0); the timestamp may be absent if no comment carried a timestamp.
+ * truncated/originalCommentCount are set by the fetchers when a fetch cap
+ * (maxFetchComments / maxFetchAlgolia) cut the thread short. */
 export interface Snapshot {
   latestCommentAt: string | null;
   score: number;
   commentCount: number;
+  truncated: boolean;
+  originalCommentCount: number;
 }
 
 interface RawData {
   latestCommentAt?: string | null;
   post?: { postScore?: number } | null;
   comments?: unknown[];
+  truncated?: boolean;
+  originalCommentCount?: number;
 }
 
 /** Extract the snapshot from the unified raw-data JSON. */
 export function snapshotFromRaw(raw: RawData): Snapshot {
+  const commentCount = Array.isArray(raw.comments) ? raw.comments.length : 0;
   return {
     latestCommentAt: raw.latestCommentAt ?? null,
     score: raw.post?.postScore ?? 0,
-    commentCount: Array.isArray(raw.comments) ? raw.comments.length : 0,
+    commentCount,
+    truncated: raw.truncated ?? false,
+    originalCommentCount: raw.originalCommentCount ?? commentCount,
   };
 }
 
@@ -68,9 +77,15 @@ function buildSnapshotTail(lang: "zh" | "en", snap: Snapshot): string {
   if (lang === "zh") {
     segments.push(`${snap.score} 分`);
     segments.push(`${snap.commentCount} 条评论`);
+    if (snap.truncated && snap.originalCommentCount > snap.commentCount) {
+      segments.push(`评论已按抓取上限截断（保留 ${snap.commentCount}/${snap.originalCommentCount} 条）`);
+    }
   } else {
     segments.push(`${snap.score} points`);
     segments.push(`${snap.commentCount} comments`);
+    if (snap.truncated && snap.originalCommentCount > snap.commentCount) {
+      segments.push(`comments truncated at fetch cap (kept ${snap.commentCount} of ${snap.originalCommentCount})`);
+    }
   }
   const label = lang === "zh" ? "快照" : "Snapshot";
   return `　${label} · ${segments.join(" · ")}`;

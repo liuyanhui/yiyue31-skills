@@ -1,7 +1,13 @@
-import { fetchWithTimeout, htmlToMarkdown, flattenCommentTree, parsePostId } from "./lib/utils";
-import type { CommentNode } from "./lib/utils";
+import { fetchWithTimeout, htmlToMarkdown, flattenCommentTree, parsePostId, writeJSON } from "./lib/utils";
+import type { CommentNode, FlatComment } from "./lib/utils";
 
 const ALGOLIA_API_BASE = "https://hn.algolia.com/api/v1";
+
+// Safety net for extreme threads (Algolia returns the whole tree in one
+// response, unlike Firebase's bounded recursive fetch). Normal threads stay
+// untouched; on truncation the raw data carries truncated/originalCommentCount
+// and the final article header discloses it.
+const DEFAULT_MAX_FETCH_ALGOLIA = 2000;
 
 interface AlgoliaChild {
   id: number;
@@ -50,10 +56,64 @@ function latestCommentAt(children: AlgoliaChild[]): string | null {
   return times.length ? (times.sort().pop() ?? null) : null;
 }
 
+// Keep the first `cap` comments in tree order (depth-first, so early subtrees
+// stay intact) and drop childIds that point past the cut — a truncated tree
+// must not reference comments it no longer contains.
+export function capComments(comments: FlatComment[], cap: number): {
+  kept: FlatComment[];
+  originalCount: number;
+  truncated: boolean;
+} {
+  if (comments.length <= cap) {
+    return { kept: comments, originalCount: comments.length, truncated: false };
+  }
+  const kept = comments.slice(0, cap);
+  const keptIds = new Set(kept.map((c) => c.id));
+  return {
+    kept: kept.map((c) => ({ ...c, childIds: c.childIds.filter((id) => keptIds.has(id)) })),
+    originalCount: comments.length,
+    truncated: true,
+  };
+}
+
+interface AlgoliaCliOptions {
+  postId: string;
+  outPath: string;
+  maxFetchAlgolia: number;
+}
+
+// Usage: bun scripts/algolia.ts <postId> --out <path> [--maxFetchAlgolia N]
+// Flags accept both "--flag value" and "--flag=value" forms.
+function parseArgs(argv: string[]): AlgoliaCliOptions {
+  let maxFetchAlgolia = DEFAULT_MAX_FETCH_ALGOLIA;
+  let outPath = "";
+  const positional: string[] = [];
+
+  const applyFlag = (name: string, raw: string | undefined): void => {
+    const v = Number(raw);
+    if (Number.isFinite(v) && v > 0) {
+      if (name === "maxFetchAlgolia") maxFetchAlgolia = Math.floor(v);
+    }
+  };
+
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--out") outPath = argv[++i] ?? "";
+    else if (a.startsWith("--out=")) outPath = a.slice(6);
+    else if (a === "--maxFetchAlgolia") applyFlag("maxFetchAlgolia", argv[++i]);
+    else if (a.startsWith("--maxFetchAlgolia=")) applyFlag("maxFetchAlgolia", a.split("=")[1]);
+    else positional.push(a);
+  }
+
+  return { postId: positional[0] ?? "", outPath, maxFetchAlgolia };
+}
+
 async function main(): Promise<void> {
-  const input = process.argv[2];
-  if (!input) {
-    process.stderr.write("Usage: bun scripts/algolia.ts <postId>\n");
+  const { postId: input, outPath, maxFetchAlgolia } = parseArgs(process.argv.slice(2));
+  if (!input || !outPath) {
+    process.stderr.write(
+      "Usage: bun scripts/algolia.ts <postId> --out <path> [--maxFetchAlgolia N]\n"
+    );
     process.exit(1);
   }
 
@@ -97,8 +157,7 @@ async function main(): Promise<void> {
 
   // Structural validation: post must have required fields
   if (!data.id || !data.title || !data.author) {
-    const output = { error: "missing_required_fields" };
-    process.stdout.write(JSON.stringify(output, null, 2) + "\n");
+    process.stderr.write("Missing required fields in Algolia response\n");
     process.exit(1);
   }
 
@@ -123,7 +182,10 @@ async function main(): Promise<void> {
     parentId: c.parentId === "__root__" ? null : c.parentId,
   }));
 
-  // Build unified output
+  const { kept, originalCount, truncated } = capComments(comments, maxFetchAlgolia);
+
+  // Build unified output. truncated/originalCommentCount let downstream
+  // (insert-header.ts) disclose the cut to the reader.
   const output = {
     source: "algolia",
     latestCommentAt: latestCommentAt(data.children || []),
@@ -135,10 +197,29 @@ async function main(): Promise<void> {
       postScore: data.points || 0,
       textContent: data.text ? htmlToMarkdown(data.text) : null,
     },
-    comments,
+    comments: kept,
+    truncated,
+    originalCommentCount: originalCount,
   };
 
-  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
+  // Write the full JSON to disk; stdout carries ONLY this one-line summary.
+  // The summary carries everything the agent needs (title for the slug,
+  // counts, snapshot fields) so the raw file never has to be read whole.
+  await writeJSON(outPath, output);
+  process.stdout.write(
+    JSON.stringify({
+      source: "algolia",
+      postId: String(data.id),
+      title: data.title,
+      author: data.author,
+      postScore: data.points || 0,
+      comments: kept.length,
+      originalCommentCount: originalCount,
+      truncated,
+      latestCommentAt: output.latestCommentAt,
+      out: outPath,
+    }) + "\n"
+  );
 }
 
 main().catch((err) => {

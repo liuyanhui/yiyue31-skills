@@ -1,8 +1,10 @@
 # Article Evaluation Prompt
 
-> Last updated: 2026-08-12
+> Last updated: 2026-08-19 09:30:00
 
 You are evaluating a generated article against the original source comments. Assess the article on the following five dimensions.
+
+**Large-source handling**: `01-raw-data.json` can hold hundreds of comments. Do NOT read it end-to-end — read the `post` object, then verify accuracy by sampling: the comments referenced in `02-grouped.json` (groups + standouts), plus a spread of top-level comments across the tree. Reading the whole file on a large thread can exhaust your context before the evaluation is written.
 
 ## Scoring Dimensions
 

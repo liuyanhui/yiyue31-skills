@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
-version: 0.2.7
+version: 0.3.0
 author: yiyue31
 ---
 
@@ -32,6 +32,7 @@ Extract the post ID from user input — either a full URL (`https://news.ycombin
 | `maxComments` | integer | 5–150 | 80 |
 | `fetchDepth` | integer | 1–15 | 10 |
 | `maxFetchComments` | integer | 1–2000 | 500 |
+| `maxFetchAlgolia` | integer | 100–10000 | 2000 |
 | `lang` | enum | `"zh"` / `"en"` | `"zh"` |
 | `outputDir` | string | valid directory path | `"hn-digest/"` |
 | `fetchOriginalPost` | boolean | — | false |
@@ -40,7 +41,7 @@ Extract the post ID from user input — either a full URL (`https://news.ycombin
 | `sortGroupsBy` | enum | `"relevance"` / `"engagement"` | `"relevance"` |
 | `templateVersion` | string | maps to assets/ files | `"v1"` |
 
-`depth` is the **analysis filter** (Step 5 keeps comments at depth ≤ `depth`). `fetchDepth` is the **Firebase fetch depth** (only matters when Algolia fails); fetch broadly, filter narrowly. `maxFetchComments` is a 2GB / time safety cap on Firebase's recursive fetch.
+`depth` is the **analysis filter** (Step 5 keeps comments at depth ≤ `depth`). `fetchDepth` is the **Firebase fetch depth** (only matters when Algolia fails); fetch broadly, filter narrowly. `maxFetchComments` is a 2GB / time safety cap on Firebase's recursive fetch. `maxFetchAlgolia` is the equivalent safety net on Algolia's single unbounded response; normal threads never hit it, and when it does cut, the raw data carries `truncated`/`originalCommentCount` and the final header discloses the cut to the reader.
 
 ### Config Location & Loading
 
@@ -68,8 +69,10 @@ For each method: output "正在获取数据... (使用 {Method} 方式)". On suc
 
 | Method | Script | Notes |
 |--------|--------|-------|
-| Algolia | `bun {skill-dir}/scripts/algolia.ts {postId}` | Single request, full comment tree. Preferred. |
-| Firebase | `bun {skill-dir}/scripts/firebase.ts {postId} --fetchDepth {config.fetchDepth} --maxFetchComments {config.maxFetchComments}` | Recursive per-comment fetch; fallback when Algolia fails. Bounded by `fetchDepth` and `maxFetchComments`. |
+| Algolia | `bun {skill-dir}/scripts/algolia.ts {postId} --out {outputDir}/raw-{postId}.json --maxFetchAlgolia {config.maxFetchAlgolia}` | Single request, full comment tree. Preferred. Writes the unified JSON straight to the file; stdout prints ONE summary line (title / author / score / comment counts / latestCommentAt / out path). |
+| Firebase | `bun {skill-dir}/scripts/firebase.ts {postId} --out {outputDir}/raw-{postId}.json --fetchDepth {config.fetchDepth} --maxFetchComments {config.maxFetchComments}` | Recursive per-comment fetch; fallback when Algolia fails. Bounded by `fetchDepth` and `maxFetchComments`. Same file-write + summary-line contract. |
+
+**Context rule (why: a large thread's raw JSON alone can approach the context window)**: the raw comment data moves through files and script summaries, never through your context. Do not cat/head/dump `raw-{postId}.json` or `01-raw-data.json` — the fetch stdout summary carries everything you need (title for the slug, counts, snapshot fields), and Steps 5-7 consume the raw data via scripts only.
 
 **`latestCommentAt`**: newest comment's ISO 8601 UTC timestamp, set by both fetch scripts.
 
@@ -79,11 +82,11 @@ All methods exhausted → output "所有抓取方式均失败: {methods + reason
 
 ## Step 4: Prepare Output & Validate
 
-1. Generate `{slug}` from `post.title`: lowercase, strip punctuation and stop words (articles, prepositions, auxiliary verbs, conjunctions, pronouns, negation), take first 4 remaining words, join with hyphens. Example: "Can the stockmarket swallow Anthropic, SpaceX and OpenAI?" → `stockmarket-swallow-anthropic-spacex`.
+1. Generate `{slug}` from the fetch summary line's `title`: lowercase, strip punctuation and stop words (articles, prepositions, auxiliary verbs, conjunctions, pronouns, negation), take first 4 remaining words, join with hyphens. Example: "Can the stockmarket swallow Anthropic, SpaceX and OpenAI?" → `stockmarket-swallow-anthropic-spacex`.
 2. Create `{outputDir}/{postId}-{slug}/` (fail → output "输出目录创建失败: {reason}" → terminate).
-3. Write unified JSON to `{outputDir}/{postId}-{slug}/01-raw-data.json` (fail → output "原始数据写入失败: {reason}" → terminate).
+3. Move the fetched file into place: `{outputDir}/raw-{postId}.json` → `{outputDir}/{postId}-{slug}/01-raw-data.json` (fail → output "原始数据写入失败: {reason}" → terminate).
 4. If `config.fetchOriginalPost === true` and `post.url` exists: fetch via Jina (`https://r.jina.ai/{post.url}`, fallback `https://r.jinaai.cn/{post.url}`). Extract (a) the first ~3 paragraphs as background, and (b) 1–2 core-argument paragraphs — the passages that carry the original's main claim or evidence — for use as in-body block quotes during generation. On failure → output "原文抓取失败，将从评论推断背景".
-5. If `comments` array is empty → output "该帖子暂无评论" → terminate.
+5. If the fetch summary reports `comments: 0` → output "该帖子暂无评论" → terminate.
 
 ---
 
@@ -93,7 +96,13 @@ Run the deterministic filter — it produces `02-filtered.json` next to the inpu
 
 `bun {skill-dir}/scripts/preprocess.ts {outputDir}/{postId}-{slug}/01-raw-data.json --depth {config.depth} --minReplies {config.minReplies} --maxComments {config.maxComments}`
 
-The script (`scripts/lib/filter.ts`) applies: (1) depth truncation, (2) activity partition → active set + outlier pool, (3) diversity-preserving selection to `maxComments` (OP + ≥1 representative per top-level subtree + heat fill), (4) OP mark. It writes `02-filtered.json` = `{ active, outlierPool, outlierBatches, meta }`. Each `active`/`outlierPool` entry is a **slim index** — `{ id, author, parentId, childIds, depth, isOP }` — with **no `contentMarkdown`** (the body is a verbatim duplicate of `01-raw-data.json`); join the body from `01-raw-data.json` by `id` whenever a comment's text is needed (Steps 6 and 7). When the outlier pool is large (`> 60`), it is pre-split into `outlierBatches` (~40 each, id-only) so the standout pass (Step 6.4) can map-reduce without any single LLM call going oversized.
+The script (`scripts/lib/filter.ts`) applies: (1) depth truncation, (2) activity partition → active set + outlier pool, (3) diversity-preserving selection to `maxComments` (OP + ≥1 representative per top-level subtree + heat fill), (4) OP mark. It writes `02-filtered.json` = `{ active, outlierPool, outlierBatches, meta }`. Each `active`/`outlierPool` entry is a **slim index** — `{ id, author, parentId, childIds, depth, isOP }` — with **no `contentMarkdown`** (the body is a verbatim duplicate of `01-raw-data.json`). When the outlier pool is large (`> 60`), it is pre-split into `outlierBatches` (~40 each, id-only) so the standout pass (Step 6.4) can map-reduce without any single LLM call going oversized.
+
+Then join the bodies back, by script:
+
+`bun {skill-dir}/scripts/join.ts {outputDir}/{postId}-{slug}/01-raw-data.json {outputDir}/{postId}-{slug}/02-filtered.json`
+
+`join.ts` writes `02-active-bodies.md` (every active comment's full body + a metadata header) and `02-outlier-bodies-g*.md` (the outlier pool's bodies, batches consolidated into ~4 files) next to its inputs. These are the ONLY body sources for Steps 6 and 7. **Do NOT read `02-filtered.json` or `01-raw-data.json` whole** — both can be large on big threads, and everything needed (counts, batch layout, bodies) is already in the script stdout summaries and the join outputs.
 
 If `meta.activeCount === 0 && meta.outlierCount === 0` → output "过滤后无符合条件的评论" → terminate. Otherwise pass `02-filtered.json` to Step 6 (AI groups inline, no subagent).
 
@@ -101,14 +110,14 @@ If `meta.activeCount === 0 && meta.outlierCount === 0` → output "过滤后无�
 
 ## Step 6: Comment Grouping → 02-grouped.json
 
-Read `02-filtered.json` (active + outlierPool + outlierBatches from Step 5) and `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for output structure (fallback to highest version if missing). `02-filtered.json` is a slim index — join each comment's `contentMarkdown` from `01-raw-data.json` by `id`. Section names follow `config.lang`.
+Read `02-active-bodies.md` (active bodies + metadata headers, from Step 5's join) and `{skill-dir}/assets/grouped-example-{config.templateVersion}.json` for output structure (fallback to highest version if missing). Counts and batch layout come from the Step 5 script summaries — do not read `02-filtered.json` whole. Section names follow `config.lang`.
 
 **If `active` is empty but `outlierPool` is not**: skip 6.1–6.3 (`groups` and `controversies` stay empty), still run 6.4 standouts; in Step 7 use the scattered-Q&A body with only `## 意外之声` (plus 总结 / 参考资料).
 
 1. **Nested grouping** (over `active`): Group by `config.groupBy` dimensions in order (e.g., `["topic","stance"]` → first by topic, then by stance). **Every comment in `active` MUST be assigned to exactly one group — none may be omitted** (the coverage marker M = total grouped comments; dropped comments silently shrink the digest and misrepresent how much of the thread was analyzed — depth ≥2 comments are routinely dropped if this is not enforced). Comments that don't fit a named topic go into a catch-all `其他观点`/`Other` group (dimension `topic`) rather than being dropped. OP comments first within their group.
 2. **sortGroupsBy**: `"relevance"` = rank by (total childIds.length, unique authors, OP presence) desc. `"engagement"` = rank by total childIds.length desc.
 3. **Controversies**: Scan `active` for opposing viewpoints → add to `controversies` with `topic` + `sides`.
-4. **Standout picks** (the surprise track — adds reader surprise, separate from the heat-ranked body): pick 2–4 comments that are genuinely counter-consensus, counter-intuitive, or outrageous-but-coherent. Source them PRIMARILY from `outlierPool` (comments the activity filter dropped because of low reply volume), so they do NOT repeat the body; an `active` comment is allowed only when it contradicts its own group's mainstream stance. The bar is SURPRISE — "well-argued", "I agree", or "clearly explained" do NOT qualify. **If `outlierBatches` is present** (large pool), map-reduce: pick surprising candidates from each batch, then pick the final 2–4 from the union — so no single call reads the whole oversized pool. Write to a top-level `standouts` array, each entry: `commentId`, `author` (the commenter's handle, from the slim index), `quote` = the comment's **exact words in the SOURCE language — never translate the quote** (HN comments are English, so a zh article still carries the English quote here), `translation` = a translation into `config.lang` (omit when the source language already equals `config.lang`), `reason` = why it was selected (入选原因), in `config.lang`. Set `standouts: []` when fewer than 2 picks clear the surprise bar — empty is the expected outcome for many threads, not a failure.
+4. **Standout picks** (the surprise track — adds reader surprise, separate from the heat-ranked body): pick 2–4 comments that are genuinely counter-consensus, counter-intuitive, or outrageous-but-coherent. Source them PRIMARILY from `outlierPool` (comments the activity filter dropped because of low reply volume), so they do NOT repeat the body; an `active` comment is allowed only when it contradicts its own group's mainstream stance. The bar is SURPRISE — "well-argued", "I agree", or "clearly explained" do NOT qualify. **If `outlierBatches` is present** (large pool), map-reduce: dispatch ~4 standout-scan subagents, each reading ONE `02-outlier-bodies-g*.md` file (`join.ts` has pre-consolidated the batches), pick surprising candidates from each, then pick the final 2–4 from the union — so no single call reads the whole oversized pool, and the scan does not become one dispatch per batch. Write to a top-level `standouts` array, each entry: `commentId`, `author` (the commenter's handle, from the slim index), `quote` = the comment's **exact words in the SOURCE language — never translate the quote** (HN comments are English, so a zh article still carries the English quote here), `translation` = a translation into `config.lang` (omit when the source language already equals `config.lang`), `reason` = why it was selected (入选原因), in `config.lang`. Set `standouts: []` when fewer than 2 picks clear the surprise bar — empty is the expected outcome for many threads, not a failure.
 
 **Overflow handling**: If `active` > 40 comments, batch into ~20, group each batch (assigning EVERY comment in the batch), merge by group name and union `commentIds` across batches — drop nothing. Re-verify with the coverage check (6.5).
 
@@ -126,9 +135,9 @@ Max 3 rounds. Passing threshold: Overall Score >= 8.0.
 
 Each round:
 
-1. Generate (round 1) or revise (rounds 2-3) the article using template from `{skill-dir}/assets/article-{templateVersion}.md`, grouped data, post metadata, filtered comments (bodies joined from `01-raw-data.json` by id), and original post content (if fetched).
+1. Generate (round 1) or revise (rounds 2-3) the article using template from `{skill-dir}/assets/article-{templateVersion}.md`, grouped data, post metadata, filtered comments (bodies from `02-active-bodies.md`), and original post content (if fetched).
 2. Write to `{outputDir}/{postId}-{slug}/article-draft-round{N}.md`.
-3. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-article-prompt.md`. Subagent reads: draft + `01-raw-data.json` + `02-grouped.json`. Writes: `evaluation-article-round{N}.md`.
+3. Dispatch evaluation subagent with prompt from `{skill-dir}/references/evaluate-article-prompt.md`. Subagent reads: draft + `01-raw-data.json` (sampled, not read whole, on large threads — per the evaluation prompt) + `02-grouped.json`. Writes: `evaluation-article-round{N}.md`.
 4. Overall Score >= 8.0 → PASS → copy draft to `03-article.md` → Step 8. Score < 8.0 → track as best candidate → next round.
 
 All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文章质量评分: {bestScore}/10".

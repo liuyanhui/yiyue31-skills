@@ -97,14 +97,21 @@ hn-digest/
 bun test
 ```
 
-当前规模：9 个测试文件，120 个 pass / 5 个 skip（需网络的集成测试） / 0 个 fail。
+当前规模：10 个测试文件，138 个 pass / 5 个 skip（需网络的集成测试） / 0 个 fail。
 
 ## 设计决策
 
-架构与设计决策见 [SKILL.md](./SKILL.md) 顶部（主 agent 执行全流程 + 只读评估 subagent；抓取脚本是可执行 TypeScript，可单独 `bun scripts/algolia.ts <postId>` 调试）。
+架构与设计决策见 [SKILL.md](./SKILL.md) 顶部（主 agent 执行全流程 + 只读评估 subagent；抓取脚本是可执行 TypeScript，可单独 `bun scripts/algolia.ts <postId> --out <path>` 调试）。
 
 ## Changelog
 
+- **0.3.0**（2026-08-19）：上下文溢出防护（fetcher 直写文件 + join 脚本化 + Algolia 安全帽）
+  - `algolia.ts` / `firebase.ts`：`--out` 必传，统一 JSON 直写文件，stdout 只输出**一行 JSON 摘要**（title/author/score/评论数/latestCommentAt/out）；大帖原始 JSON（数百 KB）不再进智能体上下文
+  - `algolia.ts` 新增 `--maxFetchAlgolia` 安全帽（config `maxFetchAlgolia`，默认 2000）：截断时按树序保留、清理悬空 childIds，raw 带 `truncated`/`originalCommentCount`
+  - 新增 `scripts/join.ts`：按 id 把正文从 `01-raw-data.json` join 回瘦索引，输出 `02-active-bodies.md`（active 全量）+ `02-outlier-bodies-g*.md`（outlier 批合并为 ~4 个文件）；SKILL.md Step 5/6/7 改为消费 join 产物，**禁止整读** `01-raw-data.json` / `02-filtered.json`
+  - Step 6.4 standout 扫描明确为 ~4 个 subagent 各读一个 outlier 正文文件（不再逐批派遣）；Step 7 评估 subagent 对大 raw 采样验证（`evaluate-article-prompt.md` 增采样指引）
+  - `insert-header.ts`：抓取帽截断时在快照行追加披露（zh「评论已按抓取上限截断（保留 N/M 条）」/ en 同义）
+  - 原因：2026-08-18 用 893 评论帖实测——按 SKILL.md 字面执行（读 raw join、读 filtered）约 10 万 token 必爆；此前靠执行智能体临场规避，本次全部落为确定性流程（详见 refined-stock `hn-digest-context-overflow-analysis.md`）
 - **0.2.7**（2026-08-12）：声明整合 + 标题/小标题统一 + 意外之声收敛（在 0.2.6 基线上重落此前被并发覆盖的改动）
   - 声明：`insert-header.ts` 在 H1 后注入**单个** `<small>` 段落（disclaimer + 方法论/中立性 + 快照：时间戳/分数/评论数）；**删除文末 coverage note**（与开头重复）；SKILL 10.3 描述同步
   - 标题：H1 前缀 `[Hacker News]` → `[HN]`；zh 文章 H1 改 post.title 中文译名 + 原标题 small 行

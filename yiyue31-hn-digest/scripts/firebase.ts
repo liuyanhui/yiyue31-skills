@@ -1,4 +1,4 @@
-import { fetchWithTimeout, delay, htmlToMarkdown, flattenCommentTree, parsePostId } from "./lib/utils";
+import { fetchWithTimeout, delay, htmlToMarkdown, flattenCommentTree, parsePostId, writeJSON } from "./lib/utils";
 import type { CommentNode } from "./lib/utils";
 
 const FIREBASE_API_BASE = "https://hacker-news.firebaseio.com/v0";
@@ -124,22 +124,29 @@ function convertTreeToCommentNodes(nodes: CommentTreeNode[]): CommentNode[] {
 
 interface FirebaseCliOptions {
   postId: string;
+  outPath: string;
   fetchDepth: number;
   maxFetchComments: number;
 }
 
-// Usage: bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]
+// Usage: bun scripts/firebase.ts <postId> --out <path> [--fetchDepth N] [--maxFetchComments N]
 // Flags accept both "--flag value" and "--flag=value" forms.
 function parseArgs(argv: string[]): FirebaseCliOptions {
   let fetchDepth = DEFAULT_FETCH_DEPTH;
   let maxFetchComments = DEFAULT_MAX_FETCH_COMMENTS;
+  let outPath = "";
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = argv[i + 1];
 
-    if (a === "--fetchDepth" || a === "--fetch-depth") {
+    if (a === "--out") {
+      outPath = next ?? "";
+      i++;
+    } else if (a.startsWith("--out=")) {
+      outPath = a.slice(6);
+    } else if (a === "--fetchDepth" || a === "--fetch-depth") {
       const v = Number(next);
       if (Number.isFinite(v) && v > 0) fetchDepth = Math.floor(v);
       i++;
@@ -158,13 +165,15 @@ function parseArgs(argv: string[]): FirebaseCliOptions {
     }
   }
 
-  return { postId: positional[0] ?? "", fetchDepth, maxFetchComments };
+  return { postId: positional[0] ?? "", outPath, fetchDepth, maxFetchComments };
 }
 
 async function main(): Promise<void> {
-  const { postId: input, fetchDepth, maxFetchComments } = parseArgs(process.argv.slice(2));
-  if (!input) {
-    process.stderr.write("Usage: bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]\n");
+  const { postId: input, outPath, fetchDepth, maxFetchComments } = parseArgs(process.argv.slice(2));
+  if (!input || !outPath) {
+    process.stderr.write(
+      "Usage: bun scripts/firebase.ts <postId> --out <path> [--fetchDepth N] [--maxFetchComments N]\n"
+    );
     process.exit(1);
   }
 
@@ -194,8 +203,7 @@ async function main(): Promise<void> {
 
   // Structural validation: post must have required fields
   if (!postItem.id || !postItem.title || !postItem.by) {
-    const output = { error: "missing_required_fields" };
-    process.stdout.write(JSON.stringify(output, null, 2) + "\n");
+    process.stderr.write("Missing required fields in Firebase response\n");
     process.exit(1);
   }
 
@@ -231,7 +239,14 @@ async function main(): Promise<void> {
       parentId: c.parentId === "__root__" ? null : c.parentId,
     }));
 
-  // Build unified output
+  // Build unified output. truncated/originalCommentCount let downstream
+  // (insert-header.ts) disclose the fetch cap to the reader; descendants is
+  // the thread's true total, which maxCommentsReached cuts short.
+  const truncated = meta.maxCommentsReached;
+  const originalCommentCount = truncated
+    ? postItem.descendants ?? comments.length
+    : comments.length;
+
   const output = {
     source: "firebase",
     latestCommentAt: meta.latestTime ? new Date(meta.latestTime * 1000).toISOString() : null,
@@ -244,6 +259,8 @@ async function main(): Promise<void> {
       textContent: postItem.text ? htmlToMarkdown(postItem.text) : null,
     },
     comments,
+    truncated,
+    originalCommentCount,
     meta: {
       totalFetched: meta.totalFetched,
       skippedDeleted: meta.skippedDeleted,
@@ -255,7 +272,24 @@ async function main(): Promise<void> {
     },
   };
 
-  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
+  // Write the full JSON to disk; stdout carries ONLY this one-line summary
+  // (title for the slug, counts, snapshot fields) so the raw file never has
+  // to be read whole.
+  await writeJSON(outPath, output);
+  process.stdout.write(
+    JSON.stringify({
+      source: "firebase",
+      postId: String(postItem.id),
+      title: postItem.title,
+      author: postItem.by,
+      postScore: postItem.score || 0,
+      comments: comments.length,
+      originalCommentCount,
+      truncated,
+      latestCommentAt: output.latestCommentAt,
+      out: outPath,
+    }) + "\n"
+  );
 }
 
 main().catch((err) => {

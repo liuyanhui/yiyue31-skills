@@ -6,6 +6,8 @@ hn-digest 的抓取器（fetcher）代码。每个 fetcher 是一个独立的可
 
 `preprocess.ts` 不是 fetcher，是 Step 5 的代码驱动过滤器：读 fetcher 产出的 `01-raw-data.json`，确定性过滤后写 `02-filtered.json`（active + outlierPool + outlierBatches）。
 
+`join.ts` 是 Step 5 的延迟装载配套：按 id 把正文从 `01-raw-data.json` join 回瘦索引，写 `02-active-bodies.md` 与 `02-outlier-bodies-g*.md`，让 Step 6/7 永不整读大 JSON。
+
 `check-coverage.ts`（Step 6.5）和 `insert-header.ts`（Step 10.3）也不是 fetcher：前者确定性校验分组覆盖率，后者把声明段落注入最终文章。
 
 ## 用法
@@ -13,22 +15,24 @@ hn-digest 的抓取器（fetcher）代码。每个 fetcher 是一个独立的可
 每个脚本独立调用：
 
 ```bash
-bun scripts/algolia.ts <postId>
-bun scripts/firebase.ts <postId> [--fetchDepth N] [--maxFetchComments N]
+bun scripts/algolia.ts <postId> --out <path> [--maxFetchAlgolia N]
+bun scripts/firebase.ts <postId> --out <path> [--fetchDepth N] [--maxFetchComments N]
 bun scripts/preprocess.ts <01-raw-data.json> [--depth N] [--minReplies N] [--maxComments N]
+bun scripts/join.ts <01-raw-data.json> <02-filtered.json> [--outlier-groups N]
 bun scripts/check-coverage.ts <02-filtered.json> <02-grouped.json>   # Step 6.5 覆盖校验；clean 退出 0
 bun scripts/insert-header.ts <target-md> <01-raw-data.json> [zh|en]   # Step 10.3 声明注入；幂等
 ```
 
-`<postId>` 是 HN 帖子的纯数字 ID（例如 `8863`）。脚本会输出统一 JSON 到 stdout，错误信息到 stderr，退出码 0 表示成功。
+`<postId>` 是 HN 帖子的纯数字 ID（例如 `8863`）。fetcher 把统一 JSON 直接写入 `--out` 文件，stdout 只输出**一行 JSON 摘要**（title / author / score / 评论数 / latestCommentAt / out 路径）——大帖的原始 JSON 可达数百 KB，绝不进智能体上下文。错误信息走 stderr，退出码 0 表示成功。
 
 ## 文件
 
 | 脚本 | 抓取方式 | 输出 |
 |------|---------|------|
-| `algolia.ts` | HN Algolia Search API (`hn.algolia.com/api/v1/items/<id>`) | 统一 JSON |
-| `firebase.ts` | HN Firebase API (`hn.firebaseio.com/v0/item/<id>`)，递归抓取子评论，受 `--fetchDepth` / `--maxFetchComments` 约束 | 统一 JSON |
+| `algolia.ts` | HN Algolia Search API (`hn.algolia.com/api/v1/items/<id>`)，受 `--maxFetchAlgolia`（默认 2000）安全帽约束 | 统一 JSON 写入 `--out`，stdout 单行摘要 |
+| `firebase.ts` | HN Firebase API (`hn.firebaseio.com/v0/item/<id>`)，递归抓取子评论，受 `--fetchDepth` / `--maxFetchComments` 约束 | 统一 JSON 写入 `--out`，stdout 单行摘要 |
 | `preprocess.ts` | Step 5 代码驱动过滤：读 `01-raw-data.json`，depth → activity → 分层选择；outlier 池 > 60 时分批 | `02-filtered.json` |
+| `join.ts` | Step 5 延迟装载：按 id join 正文，active 全量一个文件，outlier 批合并为 ~4 个文件（`--outlier-groups N` 可调） | `02-active-bodies.md` + `02-outlier-bodies-g*.md` |
 | `check-coverage.ts` | Step 6.5 确定性覆盖校验：active 是否全归组、有无跨组重复、有无引用非 active；clean 退出 0 否则 1 | stderr 报告 |
 | `insert-header.ts` | Step 10.3 声明注入：读 `01-raw-data.json` 的 `latestCommentAt`/`post.postScore`/`comments.length`，在 H1 后写入单个 `<small>` 段落（disclaimer + 方法论 + 快照）；幂等 | 原地改写目标 .md |
 | `lib/utils.ts` | 共享工具函数 | — |
@@ -61,6 +65,8 @@ bun scripts/insert-header.ts <target-md> <01-raw-data.json> [zh|en]   # Step 10.
     },
     // ...
   ],
+  truncated: boolean,             // 抓取帽（maxFetchComments / maxFetchAlgolia）是否截断了评论
+  originalCommentCount: number,   // 截断前的真实评论总数（未截断时 = comments.length）
   meta?: {
     totalFetched: number,        // 仅 firebase
     skippedDeleted: number,      // 仅 firebase
@@ -120,7 +126,8 @@ Step 5 过滤的实现，`preprocess.ts`（生产）与 `__tests__/filter.test.t
 | `filter.test.ts` | `lib/filter.ts` 过滤逻辑测试（Step 5） |
 | `preprocess.test.ts` | `preprocess.ts` 输出形状 + outlier 分批 + 参数解析 + slim 契约 |
 | `check-coverage.test.ts` | `check-coverage.ts` 覆盖校验（clean / missing / duplicate / extra） |
-| `insert-header.test.ts` | `insert-header.ts` 声明段落构建 + 注入 + 幂等 + 快照抽取 |
+| `insert-header.test.ts` | `insert-header.ts` 声明段落构建 + 注入 + 幂等 + 快照抽取 + 截断声明 |
+| `join.test.ts` | `join.ts` 正文渲染 + active/outlier 文件生成 + 缺失容错 + CLI |
 | `grouped-schema.test.ts` | 分组输出 schema 校验（含 standouts author/translation 字段） |
 | `e2e-output.test.ts` | 端到端输出测试 |
 
@@ -134,6 +141,7 @@ bun 默认递归发现 `*.test.ts`，包括 `scripts/__tests__/`。
 
 ## 实现备注
 
-- Algolia `/items/{id}` 端点单请求返回完整评论树，无截断，是主路径（最完备、内存最省）
+- Algolia `/items/{id}` 端点单请求返回完整评论树，是主路径（最完备、内存最省）；`--maxFetchAlgolia`（默认 2000）只是极端线程的安全帽，正常帖不触发，截断时 raw 带 `truncated`/`originalCommentCount` 并由 insert-header 向读者披露
+- fetcher 直写 `--out` 文件 + stdout 单行摘要：大帖原始 JSON（数百 KB）不进智能体上下文，标题等元数据从摘要行拿
 - Firebase 是递归抓取（一个请求拿一条评论），可拿全量，但请求量大；受 `--fetchDepth`（默认 10）与 `--maxFetchComments`（默认 500）约束，防止超大线程在低内存（2GB）机器上建全树失控或请求超时
 - 评论链路的 Jina 已移除；抓"原文"仍走 Jina Reader URL（见 SKILL.md Step 4）
