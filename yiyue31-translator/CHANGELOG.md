@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.5.0 (2026-08-25)
+
+### 过程真实性防线 + 边界规则（harness-v2 事故复盘落地）
+
+背景与决策记录：`docs/large-doc-autonomy-plan.md`（大文档加固类条目经评估否决，保留最小集 S1-S5）。本版实现 S1-S5。
+
+- **Step 12 新增 `scripts/verify-pipeline.js` 过程真实性终检**：从文件系统事实核验流程（完备性矩阵 / 模板占位符 / 同维度查重 / 尺寸下限 / 批量写入签名 / 时序 / 机械校验落盘），产出任务报告 + `verify-report.json`，FAIL 阻断交付。对抗两类已实际发生的失败：harness-v2 式伪造（87 份字节级相同的空壳报告 + 假 PASS）与 abc-legal 式静默跳过。诚实边界：抓过程伪造，不判内容质量；agent 汇报不可信，用户可一条命令独立复核。
+- **`verify-mechanical.js` 结果落盘**：CLI 运行结果追加 `verify-results.json`（translation 根目录），供终检交叉核验，杀"声称已跑"式伪证。
+- **审校纪律新增合法降级路径（S4）**：API 限流/资源不足可整维度跳过、无需事前报备，但须 pm-review 合规表 `⏭️ SKIPPED(原因)` 披露 + 交付回复明示；未披露的缺失由终检判 FAIL。"偏离须报备"保留用于其他偏离（报备在两次事故中均为死条款，资源约束场景以标准披露替代）。
+- **Step 1（S1/S2）**：目录碰撞规则改"相同原文→复用续跑"（修嵌套目录复发 bug，compaction-in-pi 7KB 单 chunk 亦复发过）；内容 >40KB 时入口提示"将走多 chunk 流程，建议分批或本机一次跑完，预计需人工监督"。
+- **Step 2（S3）**：glossary 一条一译，禁止"译法A/译法B"双选条目，拿不定直接裁定并注明——修"裁决债务入库"（事故 glossary 含 5+ 条双选，各 chunk 各翻各的）。
+- **Step 12 交付即止**：交付 `translated-{title}-zh.md` 后不自动运行下游 publish（harness-v2 曾因即兴执行 refined-stock 管线连败 4 次）。
+- **回放验证**：harness-v2 → FAIL（占位符 61 处、字节级重复 13×+36×、可读性 37 份未披露全缺、pm-review 缺失全中）；abc-legal → FAIL（Step 9 未披露缺失被抓；Step 5-7 已披露跳过正确识别为 WARN）；compaction-in-pi → PASS（干净运行零误报）；verify-mechanical 落盘 → 终检消费链路验证通过。附带发现：loop-engineering 缺 analysis 文件（真实缺失，终判正确）。
+
 ## v2.4.1 (2026-07-07)
 
 ### 验证驱动的脚本校准（重译 evolve-the-harness 摘要后修正）

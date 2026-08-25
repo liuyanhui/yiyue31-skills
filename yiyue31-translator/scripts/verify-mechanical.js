@@ -14,8 +14,14 @@
 //
 // CLI: node verify-mechanical.js <original.md> <translated.md> [--keep-list <path>] [--max-annotations N] [--json]
 // Module: const verify = require('./verify-mechanical.js')
+//
+// 结果落盘：CLI 模式下当 <translated.md> 位于 translated-chunks/ 子目录时，每次运行把结果
+// 追加到译文所在 translation 根目录的 verify-results.json（供 verify-pipeline.js 终检交叉核验，
+// 防"声称已跑"式伪证）。非该目录布局或写失败时静默跳过，不影响校验本身。
 
 const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
 
 // ---------- 文本抽取 ----------
 
@@ -218,6 +224,31 @@ function preview(s) {
   return one.length > 80 ? one.slice(0, 80) + "…" : one;
 }
 
+// ---------- 结果落盘 ----------
+
+// 追加一条运行记录到 translation 根目录的 verify-results.json。
+// 仅当译文位于 */translated-chunks/ 下时生效；任何异常静默跳过（落盘是旁路功能，不能拖垮校验）。
+function appendResultLog(translatedPath, record) {
+  try {
+    const dir = path.dirname(translatedPath);
+    if (path.basename(dir) !== "translated-chunks") return null;
+    const root = path.resolve(dir, "..");
+    const logPath = path.join(root, "verify-results.json");
+    let entries = [];
+    try {
+      entries = JSON.parse(fs.readFileSync(logPath, "utf-8"));
+      if (!Array.isArray(entries)) entries = [];
+    } catch (_e) {
+      entries = []; // 不存在或损坏 → 重建
+    }
+    entries.push(record);
+    fs.writeFileSync(logPath, JSON.stringify(entries, null, 2));
+    return logPath;
+  } catch (_e) {
+    return null;
+  }
+}
+
 // ---------- CLI ----------
 
 function parseArgs(argv) {
@@ -275,6 +306,17 @@ function runCli(args) {
     }
   }
   const result = verify(originalText, translatedText, { keepList, maxAnnotations: opts.maxAnnotations });
+  appendResultLog(pos[1], {
+    time: new Date().toISOString(),
+    original: path.basename(pos[0]),
+    translated: path.basename(pos[1]),
+    originalSha1: crypto.createHash("sha1").update(originalText).digest("hex").slice(0, 12),
+    translatedSha1: crypto.createHash("sha1").update(translatedText).digest("hex").slice(0, 12),
+    passed: result.passed,
+    failChecks: [...new Set(result.fails.map((f) => f.check))],
+    failCount: result.fails.length,
+    warnCount: result.warns.length,
+  });
   if (opts.json) {
     console.log(JSON.stringify(result, null, 2));
   } else {

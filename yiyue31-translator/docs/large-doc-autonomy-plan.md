@@ -1,7 +1,7 @@
 # 大文档自治能力改进方案（未实施，待决策）
 
 > **冷启动必读**：本文档自包含。新会话只读本文即可接续，无需原对话上下文。
-> **状态**：已决策并批准（2026-08-24）：大文档加固类条目否决；最小集 **S1-S5 待实施**（S1-S3 规则小改，S4 降级披露标记，S5 过程真实性终检脚本，设计见 §6/§6.1）。实施顺序见 §8。
+> **状态**：**S1-S5 已实施并通过回放验证（2026-08-25，v2.5.0）**。回放结果见 §8.1。后续仅剩 §7 范围外事项。
 > **日期**：2026-08-24。分析基于 harness-v2 翻译事故 + 三路独立 subagent 评估。
 
 ---
@@ -152,10 +152,17 @@ refined-stock 仓库共 8 次翻译运行，7 次单 chunk（7-25KB），**仅 h
 ## 8. 冷启动接续指引
 
 1. 读本文档全文，重点 §6 决策记录（已定并批准，勿重新论证）
-2. 待办：实施最小集 S1-S5
-   - S1/S2/S3/S4：SKILL.md 措辞改动（Step 1 碰撞规则、入口提示、Step 2 glossary 规则、pm-review 合规表标记规范），可一并提交
-   - S5：开发 `scripts/verify-pipeline.js` + `verify-mechanical.js` 落盘小改 + Step 12 改写
-3. 实施顺序：S1-S4 先行 → S5；S5 落地后**必须用 harness-v2 现场做回放验证**（37 chunks 目录含 87 份伪造报告 + abc-legal 目录含已披露跳过），脚本对前者应 FAIL、对后者应 WARN-SKIPPED
-4. 全部实施后更新 CHANGELOG（版本号递增）、SKILL.md、本文档状态行
-5. §4 的 P0/P1 全文保留仅作决策依据存档，**不再实施**（P0-5 例外，已复活为 S5，见 §6）；若未来大文档需求回升（如再次出现 ≥100KB 翻译且用户在意产出质量），按 §4 重启评估，P1-9 回归数据源：`refined-stock/harness-v2/translation/review-translationese-chunk-05.md`（36 条真报告）
-6. 事故现场目录保留（证据 + S5 回放验证素材 + 空壳 HTML 清理待 refined-stock 侧处理，见 §7）
+2. **S1-S5 已全部实施**（2026-08-25，v2.5.0），回放验证结果见 §8.1
+3. §4 的 P0/P1 全文保留仅作决策依据存档，**不再实施**（P0-5 例外，已复活为 S5，见 §6）；若未来大文档需求回升（如再次出现 ≥100KB 翻译且用户在意产出质量），按 §4 重启评估，P1-9 回归数据源：`refined-stock/harness-v2/translation/review-translationese-chunk-05.md`（36 条真报告）
+4. 事故现场目录保留（证据 + 回放验证素材 + 空壳 HTML 清理待 refined-stock 侧处理，见 §7）
+5. 日常使用：每次翻译交付时可选跑 `node {skill-dir}/scripts/verify-pipeline.js <title>/translation` 独立复核（Step 12 已要求 agent 跑，用户复核是最终锚点）
+
+### 8.1 回放验证结果（2026-08-25）
+
+| 现场 | 预期 | 实际 | 说明 |
+|---|---|---|---|
+| harness-v2 | FAIL | **FAIL**（exit 1） | 占位符 61 处、字节级重复 13×+36×、尺寸下限 11+10 处、可读性 37 份未披露全缺、pm-review 缺失（在嵌套错误目录）全部命中 |
+| abc-legal | WARN-SKIPPED | **FAIL** | 比预期更严且更正确：Step 5-7 已披露跳过被识别为 WARN（Step 区间解析生效），但 Step 9 可读性在 pm-review 中从未提及，属未披露缺失 → FAIL。这正是脚本该抓的静默跳过 |
+| compaction-in-pi | PASS | **PASS**（exit 0） | 干净运行零误报（仅机械校验落盘缺失 WARN，旧版本运行兼容） |
+| loop-engineering | （补充测试） | **FAIL** | analysis 文件真实缺失（ls 核实），终判准确——该次运行未保存 Step 2 产物 |
+| verify-mechanical 落盘链路 | — | **通过** | 临时副本上运行后 verify-results.json 正确生成，终检消费后 mechanical-log WARN 消失 |

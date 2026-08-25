@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户要求翻译英文内容时启用。触发词：翻译、translate、改成中文。输入形式：URL、文件路径、粘贴内容。
-version: 2.4.1
+version: 2.5.0
 author: Yiyue31
 ---
 
@@ -30,9 +30,10 @@ author: Yiyue31
 **预处理：**
 
 1. 提取标题（优先级：文章标题 → 文件名 → 首句前几个词）。只需要字母、数字，不超过6个单词。title=标题。
-2. 如果 `{title}/translation/` 目录已存在，换一个标题。
-3. 内容非 markdown 格式时，要转换为 markdown 格式。无法或不适合转换为 markdown 时，保留原始结构。
-4. 保存到 `{title}/translation/original-{title}.md`。
+2. 如果 `{title}/translation/` 目录已存在：对比目录内 `original-{title}.md` 与本文——**相同则视为既有任务的断点，复用该目录续跑**（禁止嵌套新建 `{title}/translation/`）；不同才换一个标题新建目录。
+3. 内容超过 40KB 时（将进入多 chunk 路径）：先告知用户"本文将走多 chunk 流程，预计需要人工监督；建议分批发起或在本机一次跑完"，确认后再继续。
+4. 内容非 markdown 格式时，要转换为 markdown 格式。无法或不适合转换为 markdown 时，保留原始结构。
+5. 保存到 `{title}/translation/original-{title}.md`。
 
 ### Step 1.5: 文章分段
 
@@ -59,7 +60,7 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 2. 加载 `{skill-dir}/references/terms.md`，识别出现在本文中的术语。
 3. **语言检查**：如果文章主要是中文或非英文，提醒用户此 skill 设计用于英译中。
 4. 提取原文中的超链接。
-5. **生成 per-article 术语表**：只列出 LLM 可能处理不一致的词——纠正类、上下文相关译法、需统一处理的专有名词。不列 LLM 本来就能翻对的常见词。格式：`| English Term | Translation | Context |`（Translation 列用 `[KEEP]` 表示保留英文）。
+5. **生成 per-article 术语表**：只列出 LLM 可能处理不一致的词——纠正类、上下文相关译法、需统一处理的专有名词。不列 LLM 本来就能翻对的常见词。格式：`| English Term | Translation | Context |`（Translation 列用 `[KEEP]` 表示保留英文）。**一条一译**：每条必须落单一译法或 `[KEEP]`，禁止"译法A/译法B"双选条目——双选等于把裁决债务推给下游各 chunk 各翻各的。拿不定的直接裁定一种并在 Context 注明理由。
 6. **结构化输出 keep-list**：把本篇须**原样保留英文**的元素（= `[KEEP]` 术语 + 专名/模型名 + 全大写缩写）写成独立 `keep-list-{title}.json`，供 Step 4.6 脚本校验消费。schema：
 
    ```json
@@ -135,7 +136,7 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-{NN}-xxx.md" "{title}/translation/translated-chunks/translated-chunk-{NN}.md" --keep-list "{title}/translation/keep-list-{title}.json"
 ```
 
-**脚本不过即打回重做，不得进入 Step 5+ 质检。** 硬判校验项（不过即打回）：代码块/行内代码原文⊆译文（抓遗漏与误改）、内联 SVG 字节一致、URL 原样、keep-list 条目未被改写、`«»` 残留 = 0。`（英文）` 括注密度超阈值仅 **WARN**——该计数无法区分金句原文/引用/专名括注与词级 spam，过注与否的硬判留给 Step 6 翻译腔语义检查（"括号英文堆砌"规则）。退出码 0 = 通过，1 = 打回。详见 `scripts/verify-mechanical.js` 顶部说明。
+**脚本不过即打回重做，不得进入 Step 5+ 质检。** 硬判校验项（不过即打回）：代码块/行内代码原文⊆译文（抓遗漏与误改）、内联 SVG 字节一致、URL 原样、keep-list 条目未被改写、`«»` 残留 = 0。`（英文）` 括注密度超阈值仅 **WARN**——该计数无法区分金句原文/引用/专名括注与词级 spam，过注与否的硬判留给 Step 6 翻译腔语义检查（"括号英文堆砌"规则）。退出码 0 = 通过，1 = 打回。每次运行的结果自动追加落盘到 `verify-results.json`（translation 根目录），供 Step 12 终检交叉核验。详见 `scripts/verify-mechanical.js` 顶部说明。
 
 ### 审校循环（Step 5–7：准确性 / 翻译腔 / AI 味）
 
@@ -143,7 +144,8 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-
 
 - **独立执行、不可压缩**：Step 5/6/7/9 各是一个独立 subagent、各自独立执行。**不得合并维度**——合并质检会稀释 rigor，深层问题（过注、翻译腔、AI 味）会被同一个盲区一起放过。即便为绕限流，也只能改**串行**（每次 1 个），**绝不能合并质检维度**。
 - **模型多样性**：审校 subagent 尽量**与翻译（Step 4 / 4.5）使用不同模型**——同模型自审共享盲区，会放过自己造成的深层问题。环境不可控时，补一个专门的**注释滥用对抗检查** pass：扫译文所有 `（...）` 括注，猎杀**非 #1（术语）/ #2-#3（金句/修辞）**的括注，并核对 `«»` 标记是否已被阶段B 全部裁定（残留应 = 0）。
-- **偏离须报备**：如需偏离下列任何流程，**必须先告知用户并取得同意**，不得自作主张（如擅自把多个质检 subagent 合并成一个）。
+- **偏离须报备**：如需偏离下列任何流程（除下述资源约束降级外），**必须先告知用户并取得同意**，不得自作主张（如擅自把多个质检 subagent 合并成一个）。
+- **资源约束下的合法降级**：API 限流/资源不足导致某质检维度无法执行时，允许整维度跳过、无需事前报备，但必须：①pm-review 合规表用标准标记 `⏭️ SKIPPED(原因)` 披露；②最终交付回复中明示。**静默跳过或用通过性套话填充报告属伪造流程**——Step 12 终检脚本按文件系统事实判定，未披露的缺失直接 FAIL。
 
 每个维度：**每 chunk 一个独立 subagent**；按报告修复对应译文文件。
 
@@ -215,18 +217,19 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-
 
 PM（执行本 skill 的主 agent）亲自验收最终产物。这是修"PM 转发报告、自己没看"的根因——PM 必须亲自看，**样本通读不得外包给 subagent**（大文章可额外派冷读者 subagent 做更广覆盖，但 PM 的样本通读不可委托）。
 
-**① 自动红旗复核**（PM 看脚本产出，不重跑）：
+**① 过程真实性终检（脚本，先于一切）**：
 
-- `verify-mechanical.js` 全 chunk exit 0？
-- `consistency-{title}.md` 有无致命术语冲突？
-- `«»` 残留 = 0？
-- 注释密度 WARN 的 chunk → 列为下方人工通读候选。
+```bash
+node {skill-dir}/scripts/verify-pipeline.js "{title}/translation"
+```
+
+脚本从文件系统事实核验过程真实性（完备性矩阵、模板占位符、同维度查重、尺寸下限、批量写入签名、机械校验落盘），产出 `verify-pipeline-report.md` + `verify-report.json`。**FAIL = 不得交付**——终检不过说明存在未披露的步骤缺失或伪造签名，先按报告定位问题打回对应步骤。另查 `consistency-{title}.md` 有无致命术语冲突；注释密度 WARN 的 chunk → 列为下方人工通读候选。
 
 **② 风险定向抽样通读**：PM 以读者视角读 N 个 chunk，N = `max(2, ⌈总 chunk 数 × 10%⌉)`。抽样须**包含所有红旗 chunk**（密度 WARN / 一致性离群 / 最大 chunk），不足则随机补足。判断范围：clutter 消除、流畅、跨 chunk 连贯、顺眼可见的明显错（错数字/明显误译）。**不系统重校每个数据点**——那是 Step 5 的活。
 
-**③ 留痕 + 裁定**：把验收记录写到 `pm-review-{title}.md`（读了哪些 chunk、红旗摘要、裁定、发现的问题）。
+**③ 留痕 + 裁定**：把验收记录写到 `pm-review-{title}.md`，**必须包含步骤完成合规表**——每步一行：`步骤 | ✅ 完成 | 产物`，跳过的维度写 `⏭️ SKIPPED(原因)`（见审校纪律"资源约束下的合法降级"）。合规表是终检脚本判定"披露跳过（WARN）vs 静默缺失（FAIL）"的依据。附 verify-pipeline 终判结论。
 
-- **pass** → 交付 `translated-{title}-zh.md`。
+- **pass** → 交付 `translated-{title}-zh.md`，**交付即止**：不自动运行下游管线（如 refined-stock publish），仅在交付信息中提示其入口由用户自行执行。
 - **rework** → 把问题打回对应步骤（clutter→Step 6、准确性→Step 5、一致性→Step 11），修完重跑本步。
 
 ---
