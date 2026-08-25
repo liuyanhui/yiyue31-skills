@@ -4,7 +4,7 @@
 
 ### 过程真实性防线 + 边界规则（harness-v2 事故复盘落地）
 
-背景与决策记录：`docs/large-doc-autonomy-plan.md`（大文档加固类条目经评估否决，保留最小集 S1-S5）。本版实现 S1-S5。
+背景：harness-v2 翻译事故复盘。大文档加固类条目经评估否决（实测频率 1/8 + 用户判定大文档需求基本结束），仅保留跨规模的过程真实性类条目（最小集 S1-S5）。完整决策分析与回放细节见 git 历史 `docs/large-doc-autonomy-plan.md`（f898acb..4ee035a），勿据本条目重新论证。
 
 - **Step 12 新增 `scripts/verify-pipeline.js` 过程真实性终检**：从文件系统事实核验流程（完备性矩阵 / 模板占位符 / 同维度查重 / 尺寸下限 / 批量写入签名 / 时序 / 机械校验落盘），产出任务报告 + `verify-report.json`，FAIL 阻断交付。对抗两类已实际发生的失败：harness-v2 式伪造（87 份字节级相同的空壳报告 + 假 PASS）与 abc-legal 式静默跳过。诚实边界：抓过程伪造，不判内容质量；agent 汇报不可信，用户可一条命令独立复核。
 - **`verify-mechanical.js` 结果落盘**：CLI 运行结果追加 `verify-results.json`（translation 根目录），供终检交叉核验，杀"声称已跑"式伪证。
