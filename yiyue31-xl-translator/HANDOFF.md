@@ -21,7 +21,7 @@
 
 - 本机 1.87GB 内存：**不起 subagent**；测试串行（`node --test` 单文件，文件内默认串行）
 - 全部产物在 `~/skills/yiyue31-skills/yiyue31-xl-translator/`；文件/目录名短（Windows 260；segment 已内置路径防护，阈值 240）
-- **status.mjs 已在 §5.2 表内，勿新增表外文件**（测试夹具程序化生成进临时目录，M1a 惯例）
+- **status.mjs 已在 §5.2 表内，勿新增表外文件**（测试套件已独立至 `scripts/test/`：`unit/` 程序化夹具 + `regression/` git 管理真实文档夹具（三类，固定评估标准 S1-S8），入口 `bash scripts/test/run.sh` 串行跑全部；status.mjs 的测试按 `scripts/test/README.md` 维护规约入 `unit/status.test.mjs`——2026-08-31 Yiyue 裁决，夹具契约与标准详见该 README）
 - 注释/文档中文；`agent`（AI 义）译"智能体"、`token`（AI 义）译"词元"
 - fork 纪律：translator 仓只读参考，零共享零回写
 - 源仓不 commit（Yiyue 未要求时）

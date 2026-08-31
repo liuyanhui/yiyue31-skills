@@ -8,8 +8,8 @@
 //   - 产物：chunk 文件命名 / manifest.md（heading 树）/ progress.json（缓存非事实源注明）
 //   - CLI：退出码与 --json
 //
-// 运行：node --test scripts/segment/test/segment.test.mjs
-// 夹具全部程序化生成（确定性），不落盘提交。
+// 运行：node --test scripts/test/unit/segment.test.mjs
+// 夹具全部程序化生成（确定性），不落盘提交；真实文档回归层见 test/regression/。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -32,10 +32,10 @@ import {
   packChunks,
   makeSlug,
   safeChunkPath,
-} from "../segment.mjs";
+} from "../../segment/segment.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.join(__dirname, "..", "segment.mjs");
+const SCRIPT = path.join(__dirname, "..", "..", "segment", "segment.mjs");
 
 // ---------- 夹具生成 ----------
 
@@ -292,8 +292,17 @@ test("路径超长防护：缩 slug 保 NN 唯一性，目录超限报错，正�
   assert.equal(normal.fileName, "chunk-01-intro.md");
   assert.equal(normal.shrunk, false);
 
-  // 深目录 + 长 slug：缩到 ≤240，NN 前缀保留
-  const longDir = "C:\\" + "d".repeat(200); // \chunks 后 ~210 字符
+  // 构造指定总长的目录（机器无关）：dirFor(n) 的绝对路径长度恰为 n。
+  // 旧版用字面 "C:\dd…" 假目录，path.resolve 落到运行时 cwd 上，长度随运行处漂移——
+  // 搬进 scripts/test/ 后暴露为间歇失败。现以 os.tmpdir() 为基确定性构造。
+  const dirFor = (n) => {
+    const base = os.tmpdir();
+    return path.join(base, "d".repeat(Math.max(1, n - base.length - 1)));
+  };
+
+  // 深目录 + 长 slug：目录 219 + "/chunks/"（9）+ 空 slug 名（12）= 240 ≤ 240，
+  // 全 slug 名（38）= 266 > 240 → 触发缩且恰缩得进
+  const longDir = dirFor(219);
   const r1 = safeChunkPath(longDir, "chunk-01-internationalization-workflow.md");
   assert.ok(r1.filePath.length <= 240, `缩后仍超限：${r1.filePath.length}`);
   assert.equal(r1.shrunk, true);
@@ -303,8 +312,8 @@ test("路径超长防护：缩 slug 保 NN 唯一性，目录超限报错，正�
   const r2 = safeChunkPath(longDir, "chunk-02-internationalization-workflow.md");
   assert.notEqual(r1.fileName, r2.fileName);
 
-  // 目录本身超限（无 slug 可救）→ 报错并给可操作建议
-  assert.throws(() => safeChunkPath("C:\\" + "d".repeat(250), "chunk-01-x.md"), /路径超长.*缩短/);
+  // 目录本身超限（无 slug 可救）：目录 225 + 9 + 最短名 12 = 246 > 240 → 报错并给可操作建议
+  assert.throws(() => safeChunkPath(dirFor(225), "chunk-01-x.md"), /路径超长.*缩短/);
 });
 
 // ---------- CLI ----------

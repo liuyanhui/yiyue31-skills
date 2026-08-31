@@ -6,7 +6,7 @@
 //   - 新四项各有单测：数字保真 / 散文残留英文 / 中英间距 / 防空洞化
 //   - CLI 冒烟：退出码 / --json / verify-results.json 落盘（含 _note 与译文 sha）/ brief 阈值生效
 //
-// 运行：node --test scripts/verify-mech.test.mjs
+// 运行：node --test scripts/test/unit/verify-mech.test.mjs
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,14 +16,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-import { verify, parseBrief, numberVariants, extractNumbers, englishRuns, spacingViolations, paragraphUnits, stripMechanical } from "./verify-mech.mjs";
+import { verify, parseBrief, numberVariants, extractNumbers, englishRuns, spacingViolations, paragraphUnits, stripMechanical } from "../../verify-mech.mjs";
 
 const require = createRequire(import.meta.url);
 // fork 源只读引用（对照测试用；绝不回写）。路径：scripts/ → 上两级到 skills 根 → 兄弟 skill
-const forkVerify = require("../../yiyue31-translator/scripts/verify-mechanical.js").verify;
+// fork 源对照（translator 仓只读纪律）：scripts/test/unit/ 上溯 4 级到 yiyue31-skills 根
+const forkVerify = require("../../../../yiyue31-translator/scripts/verify-mechanical.js").verify;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.join(__dirname, "verify-mech.mjs");
+const SCRIPT = path.join(__dirname, "..", "..", "verify-mech.mjs");
 
 // ---------- 共用夹具 ----------
 
