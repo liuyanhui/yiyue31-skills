@@ -67,7 +67,7 @@
 
 ## 7. 完成后的下一步（向 Yiyue 汇报时建议）
 
-**M1c 交付门**（`final-gate.mjs` + `probe.mjs`，依赖 M1b）：重执行一切确定性检查、新鲜度豁免 glob、探针命中比对、原子改名。届时一并落 **R15**（pm-review merged-draft sha 内容锚）与 **G3/G4 终检侧**（括注双向对账、精选表兑现硬判本体、冷读覆盖矩阵核验、pm-review 选样核对）。**另开新会话**。
+**M1c 交付门**（`final-gate.mjs` + `probe.mjs`，依赖 M1b）：重执行一切确定性检查、新鲜度豁免 glob、探针命中比对、原子改名。届时一并落 **R15**（pm-review merged-draft sha 内容锚）、**G3/G4 终检侧**（括注双向对账、精选表兑现硬判本体、冷读覆盖矩阵核验、pm-review 选样核对）与**标题双语锚硬判**（2026-08-31 Yiyue 裁决：brief 默认开/次行斜体/全级别——规格见 DESIGN §2 Step 2 + Step 10，分母 = 原文 fence 感知标题扫描）。**另开新会话**。
 
 ## 8. 可选深查索引（非必需）
 
