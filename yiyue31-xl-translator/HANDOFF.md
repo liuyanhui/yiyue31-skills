@@ -1,79 +1,77 @@
-# HANDOFF：M1b 状态机开工（新会话冷启动用）
+# HANDOFF：M1c 交付门开工（新会话冷启动用）
 
 > **给新会话执行者**：本文件自足——读完即可开工，不需要先读其他文档。文末索引仅供可选深查。
-> **任务来源**：Yiyue 2026-08-31 指令"更新 HANDOFF.md"。上一里程碑 **M1a 已收口**（segment/ + verify-mech.mjs，40 项单测串行全过）；同日裁决均已回写 DESIGN：R11-B、R3（冷读计入统稿轮 ≤2）、R8（术语回流三件套全采纳）、R16（样张入口采纳）、GAN 对抗审查 R21-R31（G1-G10 全按建议执行，A10 维持案 a）。**R18 六项已于 2026-08-31 全部裁决**（六项全按建议，已回写 DESIGN §2 横切 R18-①~⑥）——**本任务直接写码，无待裁决项**。
+> **任务来源**：M1b 已于 2026-09-01 收口（status.mjs + 15 单测，全套 63 项串行全过）。R18 六项已于 2026-08-31 全部裁决（无待裁决项）。本任务 = **M1c：final-gate.mjs + probe.mjs + merge.mjs**。
+> **仓库状态**：master 干净，M1b 及此前全部交付均已提交。`scripts/test/` 为独立测试目录（unit/ + regression/ + run.sh 串行入口），新测试按其 README 维护规约入对应层。
 
 ---
 
 ## 0. 你的任务
 
-在 `~/skills/yiyue31-skills/yiyue31-xl-translator/scripts/` 下产出 **`status.mjs`**（DESIGN §5.2 B 表已登记此名）：resume oracle（冷启动入口/断点续跑）+ 状态推导 + 探针队列注入 + 统一物化派发 + 用户动词响应 + PENDING-USER 菜单 + 双段契约输出。
+在 `~/skills/yiyue31-skills/yiyue31-xl-translator/scripts/` 下产出三件（均已在 DESIGN §5.2 B 表登记，勿新增表外文件）：
 
-**执行顺序**：先与 Yiyue 逐条过 R18 六项（§4）并把语义记回 DESIGN §2 横切，再写码。全程主 agent 直接写码 + 自测，**不起 subagent**（低内存纪律）；测试串行。
+1. **`merge.mjs`**（Step 8 本体，2026-08-31 裁决补登记）——确定性组装
+2. **`probe.mjs`**（源侧）——探针样本生成 + ground truth
+3. **`final-gate.mjs`**（Step 10 交付门）——重执行一切 + 原子改名
 
-**仓库状态**：master 干净——M1a 交付、四项裁决与对抗审查回写、本文件均已在 `a1c27e9` 提交。新会话无需考古未提交改动，直接从本文件开工。
+**执行序**：merge → probe → final-gate（final-gate 依赖前两者的导出函数）。全程主 agent 直接写码 + 自测，**不起 subagent**（低内存纪律）；测试串行（`bash scripts/test/run.sh`）。
 
 ## 1. 背景一段话
 
-`yiyue31-xl-translator` 是把 **>40KB 英文大文档**译成专业中文的 Claude Code skill，完全独立于 `yiyue31-translator`（≤40KB 用）。源于真实事故：64KB 文档被碎成 53 片、212 份审校不可达成、执行智能体系统性造假。当前状态：需求 v0.4 + 设计 v2（§9 三方评审 R1-R20 + §9.3 对抗审查 R21-R31 全部裁决回写完毕）+ SKILL.md v0.2.0-skeleton（M2 走查对象，本任务**不改动**）+ M1a 已交付 `segment/`（fence 感知分段，8-15KB 带，R11-B，路径防护）与 `verify-mech.mjs`（原五+新四硬判，brief clamp，40 单测）。里程碑序：**M1b（本任务）** → M1c final-gate → M2 走查 → M3 试跑标定 → M4 验收 → M5 部署。
+`yiyue31-xl-translator` 是把 >40KB 英文大文档译成专业中文的 Claude Code skill。已交付：需求 v0.4 + 设计 v2（全部裁决回写完毕，零待裁决项）+ M1a（segment + verify-mech，真实文档回归层）+ M1b（status.mjs：文件系统推导、status.md 唯一续跑文档、staging/ 统一物化、events.jsonl 计数器、六动词）。里程碑序：**M1c（本任务）** → M2 走查 → M3 试跑标定 → M4 验收 → M5 部署。
 
 ## 2. 硬约束（环境，不可违背）
 
-- 本机 1.87GB 内存：**不起 subagent**；测试串行（`node --test` 单文件，文件内默认串行）
-- 全部产物在 `~/skills/yiyue31-skills/yiyue31-xl-translator/`；文件/目录名短（Windows 260；segment 已内置路径防护，阈值 240）
-- **status.mjs 已在 §5.2 表内，勿新增表外文件**（测试套件已独立至 `scripts/test/`：`unit/` 程序化夹具 + `regression/` git 管理真实文档夹具（三类，固定评估标准 S1-S8），入口 `bash scripts/test/run.sh` 串行跑全部；status.mjs 的测试按 `scripts/test/README.md` 维护规约入 `unit/status.test.mjs`——2026-08-31 Yiyue 裁决，夹具契约与标准详见该 README）
+- 本机 1.87GB 内存：**不起 subagent**；测试串行（`bash scripts/test/run.sh`，逐文件）
+- 全部产物在 `~/skills/yiyue31-skills/yiyue31-xl-translator/`；新文件先入 §5.1/§5.2 表再编码（本任务三件均已在表）
 - 注释/文档中文；`agent`（AI 义）译"智能体"、`token`（AI 义）译"词元"
 - fork 纪律：translator 仓只读参考，零共享零回写
 - 源仓不 commit（Yiyue 未要求时）
 
-## 3. status.mjs 规格（权威出处 DESIGN §2 横切 + §5.1；此处摘录）
+## 3. merge.mjs 规格（权威出处 DESIGN §2 Step 8 + scripts/test/README.md「行为场景类回归契约」）
 
-- **resume oracle**：一条状态命令 = 冷启动入口；同文件再触发自动检测进行中并续跑；**状态纯推导自文件系统**，推导结果**整体重写**进**唯一续跑文档 `status.md`（固定名，2026-08-31 Yiyue 裁决：断点续跑只要一个文档）**——物化视图非事实源，删掉它仍须能推导重建（证明测试）；头部记推导锚（原文 sha/覆盖产物 sha 集/推导时间）。**随本任务移除 progress.json**：segment.mjs 停写 + 测试对账目标改 manifest/status.md（regression S4 的 progress.total_chunks 断言同步改）；`pending.md` 保留为用户挂起旗标（不随 status.md 重写抹除）；多项目无书名 resume = 扫 `xl-translator/*/status.md` 出清单（R18-2 入口方案）
-- **双段契约输出（R13）**：人话一行（当前 X/Y、阶段、已耗时、按 M3 基线的剩余预估、下次该说的话）+ 动作指令（主 agent 视角：step / inputs[] / outputs[]）；**探针在动作指令中与真单元不可区分**
-- **探针注入 + 统一物化（R25/G5）**：所有送审单元（真半块 + 探针）以**同构暂存命名/同通道**物化后派发；`probes/` 路径不出现在派发指令与新鲜度豁免 glob；探针与真单元的差别只存在于源侧 ground truth；物化暂存件的生命周期（谁清理、终检不认为产物）本任务定死
-- **stale 半块级分类**：内容 sha 实际变化的半块 × 全部 4 维报告 stale；a 修复仅触发 a、b 不级联；re-keying 冻结语义（R1）：仅内容 sha 变更的 chunk 作废重翻、N+1 邻 chunk 的 handoff②/串行增强失效重生成、全局阶段（merge/统稿/冷读/终检）整体作废重走
-- **PENDING-USER**：`pending.md` 标记（存在即挂起态）+ 选项菜单（R2：①继续=系统侧换模型/调参并记录 ②手修后说"继续翻译"按新 sha 重审 ③终止）；**菜单②手修路径 G7 条款**：间距类违规由脚本自动补空格（diff 披露）后重跑，手修 chunk **永不自动重翻**
-- **计数器（§7.5 已冻结，G6）**：升级后该 chunk 计数器清零；每轮修复循环升级至多一次；**累计升级 ≥2（跨轮累计不随清零重置）转 PENDING-USER**；同 chunk 机械打回 ≤2（R4）；重审 ≤3 轮
-- **用户动词表**：`继续翻译 <title>` / `翻译进度`（人话进度）/ `停止翻译 <title>`（封存）/ `重翻第 N 章`（执行前披露章↔chunk 映射，R5）/ **`先翻第 N 章出样张`（R16 新增，确认风格后放全量）**
-- **会话预算**：unit = 一次 subagent 调用（R14）；每会话 N 单元干净退出（N 工作值先取 **DESIGN §4 预算账表**口径 ~88/64KB，M3 标定后定）
-- 路径与命名全按 §5.1：chunk 级文件名必含 `chunk-<NN>` 段、全局文档禁含（分辨规则）；NN 按数值排序禁字典序（R29）；`adjudication-chunk-<NN>.md`（已改名）
+- **确定性组装**：chunk 按 **NN 数值序**（禁字典序 R29）拼接；只收"最新机械校验 passed"chunk（依据 verify-results.json）；清 «» 临时标记（残留必须 0 且清标有记录）→ **临时名** `merged-draft.md` 落盘（不命中任何发布模式）
+- **固定判据 M1-M7**（测试即按此写，契约已在 `scripts/test/README.md` 登记）：
+  M1 拼接字节保真 / M2 收录集合恰 = 最新 passed / M3 «» 清零有记录 / M4 临时名不命中 deliverable / M5 同输入重跑字节相同 / M6 输入损坏（缺 chunk/乱序/sha 不符）非零退出报错绝不静默拼残稿 / M7 零改写（无 BOM/EOL 改写/无 `"\n\n"` 插入）
+- **导出纯函数**供 final-gate"从 translated-chunks 重导出 merged 做 diff"复用（重执行 = 换调用点不重写逻辑）
+- 测试：`unit/merge.test.mjs` + `regression/fixtures/merge/{happy,partial,residue,broken}/case-NN/` 工作目录快照（译文文本用真实中文，场景装置合成；目录自动发现）
 
-## 4. R18 六项——✅ 已于 2026-08-31 会话内逐条过完（全按建议，语义已记回 DESIGN §2 横切；本节留档备查，**M1b 无需再过，直接写码**）
+## 4. probe.mjs 规格（源侧；DESIGN §2 Step 10 探针机制 + §5.1 统一物化）
 
-1. **brief 中途变更生效规则**：用户中途改 brief（如"换直译"），已过审 chunk 算不算数？只影响下游还是触发重翻？
-2. **多项目无书名仲裁**：多个进行中项目 / 用户未带 `<title>` 时 resume 挑哪个（报清单让用户选？）
-3. **封存后"继续翻译"转移**：`停止翻译` 封存后再说继续，语义是解封续跑还是新起？
-4. **translator↔xl 反向交接**：≤40KB 自动交接 translator 的运行时机制（怎么调用、失败兜底）
-5. **限流夜间挂起后推空转**：挂起到天亮无人推，恢复时如何自动推进/提示
-6. **交付后手改 vs 流程异常区分** + 全稿术语统一轻命令
+- 生成探针样本：`{ dim, half, text }[]`，写入**源侧** `probe/truth/<run>.json`（含 unit↔真假/缺陷类型/预期命中点）——**不落工作区**
+- 虚拟 NN ∈ 901-999（真实 chunk 上界 640，永不冲突）
+- 与 status.mjs 的接口已就位：`run(dir, { probeTruth: <file> })` 读取 truth 并把探针混入队列（M1b 已实现，实测同构不可分辨）
 
-## 5. M1b 侧一并落地的对抗审查项（均已回写 DESIGN，此处列实现责任）
+## 5. final-gate.mjs 规格（权威出处 DESIGN §2 Step 10）
 
-- **R22（G2）**：非默认 brief 阈值进 REPORT 首屏披露——status/final-gate 对账时读取生效阈值（verify-mech 已 clamp 并把 thresholds 记入 verify-results.json）
-- **R23（G3）**：精选表兑现硬判的**输入契约**（special-phrases 文件格式冻结）——硬判本体在 final-gate/verify-mech，格式归本任务定（先入 §5.1 表再编码）
-- **R25（G5）**：统一物化的暂存命名 schema 与生命周期（进 §5.1）
-- **R28（G8）**：status 复核 original 时 sha 按落盘文件字节算（original 落盘即归一 LF 是编排侧 Step 0 动作，M2 落 SKILL.md；本任务对齐 sha 语义即可）
+- **重执行一切确定性检查**（不信任何落盘日志）：机械校验全项重跑；从 translated-chunks 重导出 merged 做 diff（复用 merge.mjs 纯函数）；拼接 sha 复核；完备性矩阵（分母 = 原文钉死）
+- **括注双向对账（G3）**：译文最终括注集合 === 裁定台账"保留"集合（空集对非空台账即 FAIL）
+- **精选表兑现硬判（R23，格式已冻结 §5.1）**：`<英文原句> :: <既定中文>` 条目出现于该 chunk 原文者，译文须以 `中文（English）` 括注形态呈现
+- **标题双语锚硬判（2026-08-31 Yiyue 裁决）**：分母 = 原文 fence 感知标题扫描（segment.mjs 同款状态机）；逐标题核对中文标题行 + 次行锚逐字相等 + 级别序列一致；brief 关闭时披露跳过并记 REPORT
+- **冷读/pm-review 结构化核验（G4）**：冷读台账逐段覆盖矩阵 = 全稿；pm-review 选样清单全覆盖且逐样本有实质结论
+- **R15**：pm-review 头部 merged-draft sha 内容锚核对（不豁免）
+- **探针命中比对**：每维度每 run ≥1；探针单元缺报告 = 直接 FAIL；比对源侧 truth
+- **新鲜度**：豁免 glob 精确到文件（status.md / verify-results.json / staging/ / pm-review / REPORT / 终检报告自身；pm-review 的 sha 锚不豁免）；mtime 只作 WARN，硬判 = 内容 sha + 重执行
+- **PASS → 原子改名** `translated-<title>-zh.md` + 交付物 sha 内容锚入 REPORT（R18-⑥ 手改区分）；FAIL → 故障半径分级（C-7：单 chunk scoped 重做 / 全局作废重走）；连续 FAIL ≥3 转 PENDING-USER；**准确性维度缺失 = 无条件 FAIL**
+- 退出码约定沿用 verify-mech（0 成功 / 非零分类）
 
 ## 6. 完成判据（自查后再交）
 
-- [ ] 状态推导自文件系统：删掉 status.md 仍推导重建全部状态（物化视图非事实源的证明测试）；progress.json 已移除（segment 停写 + unit/regression 对账断言同步改）
-- [ ] 双段契约输出：人话 + 动作指令两段；探针与真单元在动作指令中不可区分（R25 物化测试）
-- [ ] stale 分类单测：半块 sha 变化 → 4 维 stale；N+1 handoff 重生成；全局作废语义（R1）
-- [ ] 动词响应单测：继续/进度/停止/重翻（含章↔chunk 披露）/样张（R16）
-- [ ] PENDING-USER 菜单 + 菜单②手修路径（间距补空格指令、永不自动重翻标记）
-- [ ] 计数器三条款 + 机械打回 ≤2 的计数与转挂起单测（G6/R4）
-- [x] R18 六项已与 Yiyue 逐条过完并记回 DESIGN §2 横切（§7 已划销）——**开工前已完成，M1b 免做**
-- [ ] 测试串行全过；未改 fork 源；无表外文件；汇报含自测清单与结果
+- [ ] merge M1-M7 全部有测试且过（含真实译文快照回归）
+- [ ] final-gate：重执行一切、豁免 glob、探针命中判定、原子改名、G3 括注对账、R23 精选表兑现、标题双语锚、G4 覆盖矩阵、R15 锚——各有单测
+- [ ] probe truth 只存源侧（工作区无 probes/、staging 同构不可分辨——已有 M1b 测试延伸）
+- [ ] 全套串行全过（`bash scripts/test/run.sh`，现 63 项 + 新增）
+- [ ] 未改 fork 源；无表外文件；汇报含自测清单与结果
 
 ## 7. 完成后的下一步（向 Yiyue 汇报时建议）
 
-**M1c 交付门**（`final-gate.mjs` + `probe.mjs` + **`merge.mjs`**（Step 8 本体，2026-08-31 Yiyue 裁决补登记 §5.2——NN 数值序/只收 passed/清 «»/临时名，固定判据 M1-M7 契约已登记 `scripts/test/README.md`，测试随脚本落地），依赖 M1b）：重执行一切确定性检查、新鲜度豁免 glob、探针命中比对、原子改名。届时一并落 **R15**（pm-review merged-draft sha 内容锚）、**G3/G4 终检侧**（括注双向对账、精选表兑现硬判本体、冷读覆盖矩阵核验、pm-review 选样核对）与**标题双语锚硬判**（2026-08-31 Yiyue 裁决：brief 默认开/次行斜体/全级别——规格见 DESIGN §2 Step 2 + Step 10，分母 = 原文 fence 感知标题扫描）。**另开新会话**。
+**M2 编排层走查**（SKILL.md v0.2.0-skeleton + references prompts + §5.2 对照表；同步点：SKILL.md 内 progress.json 表述移除、brief 默认值加"标题双语锚开"）。**另开新会话**。
 
 ## 8. 可选深查索引（非必需）
 
 | 文件 | 用途 |
 |---|---|
-| `DESIGN.md` v2（含 §9.3） | §2 横切 / §5.1 命名与物化 / §5.2 封闭集 / §7 收口状态 / §9+§9.3 全部裁决记录 |
-| `SKILL.md` v0.2.0-skeleton | 编排骨架（M2 走查对象，本任务不改动） |
-| `scripts/segment/segment.mjs` | M1a 交付：manifest/命名 schema 实例（progress.json 写出随 M1b 按 status.md 裁决移除） |
-| `scripts/verify-mech.mjs` | M1a 交付：brief clamp（G2）、thresholds 落盘、退出码约定 |
+| `DESIGN.md` v2 | §2 Step 8/10（merge/final-gate 权威规格）、§5.1（命名/物化/格式冻结）、§6 里程碑、§9+§9.3 全部裁决 |
+| `scripts/status.mjs` | M1b 交付：staging 物化、probeTruth 接口、events.jsonl、verify-results 读法 |
+| `scripts/verify-mech.mjs` | 硬判同源（final-gate 重执行复用其 verify）；brief clamp（G2） |
+| `scripts/test/README.md` | 两层分工、merge M1-M7 契约、维护规约 |

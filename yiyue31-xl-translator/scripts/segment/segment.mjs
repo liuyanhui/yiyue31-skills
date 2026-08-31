@@ -16,8 +16,9 @@
 //
 // 产物（落 --out 目录）：
 //   chunks/chunk-<NN>-<slug>.md   常规 chunk；超限原子块用 chunk-<NN>X-<slug>.md
-//   manifest.md                   heading 树 → chunk 映射 + chunk 表 + 分布自检记录
-//   progress.json                 缓存非事实源（文件内明文注明），state 字段供 M1b status.mjs 续用
+//   manifest.md                   heading 树 → chunk 映射 + chunk 表 + 分布自检记录（分段唯一事实记录）
+//   （progress.json 已移除——2026-08-31 Yiyue 裁决：续跑状态统一进唯一文档 status.md，
+//    由 status.mjs 从文件系统推导重写；本脚本不再写任何状态文件）
 //
 // CLI: node segment.mjs <original.md> --out <dir> [--min 8] [--max 15] [--json]
 // 退出码: 0 = 成功；1 = 用法错；2 = 文件缺失或超 5MB；3 = 拼接 sha 不符（理论不可达，仍防）；
@@ -469,7 +470,7 @@ export function safeChunkPath(outDir, fileName, maxPath = MAX_PATH) {
   return { filePath: abs, fileName: name, shrunk };
 }
 
-// 固定名产物（manifest.md/progress.json）：无 slug 可缩，目录超限直接报错。
+// 固定名产物（manifest.md）：无 slug 可缩，目录超限直接报错。
 function fixedPath(outDir, rel) {
   const abs = path.resolve(outDir, rel);
   if (abs.length > MAX_PATH) {
@@ -534,25 +535,7 @@ export function writeOutputs(result, outDir) {
   }
   fs.writeFileSync(fixedPath(outDir, "manifest.md"), L.join("\n") + "\n", "utf-8");
 
-  // progress.json：缓存非事实源，明文注明（M1b status.mjs 以扫描文件系统为准）
-  const progress = {
-    _note: "缓存非事实源：进度事实以 status.mjs 扫描 chunks/、translated-chunks/、reviews/ 为准；本文件仅加速 resume，损坏/缺失可安全重建",
-    source_file: result.sourceFile ?? null,
-    source_sha1: result.sourceSha ?? null,
-    source_size_kb: Math.round((index.totalBytes / 1024) * 100) / 100,
-    band_kb: [result.minKB, result.maxKB],
-    total_chunks: rows.length,
-    chunks: rows.map((r) => ({
-      index: r.nn,
-      filename: r.name,
-      sha1: r.sha,
-      size_kb: Math.round((r.bytes / 1024) * 100) / 100,
-      atomic: r.atomic,
-      state: "pending",
-    })),
-  };
-  fs.writeFileSync(fixedPath(outDir, "progress.json"), JSON.stringify(progress, null, 2), "utf-8");
-  return { rows, progress };
+  return { rows };
 }
 
 // ---------- 关卡 + 入口 ----------
@@ -600,7 +583,7 @@ export function run(filePath, outDir, opts = {}) {
     for (const a of result.attempts) console.log(`   自检 unitTarget=${a.unitTarget}KB → ${a.note}`);
     for (const op of result.ops.slice(0, 10)) console.log(`   ⚙ [${op.op}] ${op.detail}`);
     if (result.ops.length > 10) console.log(`   ⚙ …另有 ${result.ops.length - 10} 条操作记录`);
-    console.log(`   产物：${path.join(outDir, "chunks")} + manifest.md + progress.json（缓存非事实源）`);
+    console.log(`   产物：${path.join(outDir, "chunks")} + manifest.md`);
   }
   return { exitCode: 0, result, rows };
 }
@@ -638,7 +621,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
   - 散文巨块强制再切（段界→行界→字符界三级回退），永不超限
   - 关卡：拼接 sha === 原文 sha
 
-产物: <out>/chunks/chunk-<NN>[-X]-<slug>.md + manifest.md + progress.json（缓存非事实源）
+产物: <out>/chunks/chunk-<NN>[-X]-<slug>.md + manifest.md
 路径防护: 产物路径 >240 字符自动缩 slug；目录本身超限退出码 4
 退出码: 0 成功 / 1 用法 / 2 文件问题 / 3 sha 关卡失败 / 4 路径超长`);
     process.exit(pos.length < 1 || !opts.out ? 1 : 0);

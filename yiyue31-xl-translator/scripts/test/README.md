@@ -10,6 +10,7 @@ scripts/test/
 ├── README.md                       # 本文件
 ├── unit/                           # 单元层：程序化合成夹具（确定性，不落盘），钉死算法行为
 │   ├── segment.test.mjs            #   分段算法：fence 感知/拼接 sha/落带/R11-B/产物/CLI
+│   ├── status.test.mjs             #   状态机（M1b）：推导/双段契约/统一物化/stale/动词/计数器/预算
 │   └── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
 └── regression/                     # 回归层：git 管理的真实文档夹具，钉死真实世界回归
     ├── segment.regression.test.mjs

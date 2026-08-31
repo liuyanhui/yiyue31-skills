@@ -191,17 +191,13 @@ test("综合样例：sha 关卡 + 落带 + R11-B 巨块路径 + 产物三件套"
       }
     }
 
-    // ⑥ 产物：manifest + progress
+    // ⑥ 产物：manifest（分段唯一事实记录）；progress.json 已移除（2026-08-31 裁决，status.md 吸收）
     const manifest = fs.readFileSync(path.join(outDir, "manifest.md"), "utf-8");
     assert.ok(manifest.includes("## Heading 树 → chunk 映射"));
     assert.ok(manifest.includes("# Integration Specification"));
     assert.ok(!manifest.includes("Fake"), "manifest 树不得混入围栏内伪标题");
     assert.ok(/落带 \d+\/\d+/.test(manifest), "manifest 应记录分布自检结果");
-    const progress = JSON.parse(fs.readFileSync(path.join(outDir, "progress.json"), "utf-8"));
-    assert.ok(progress._note.includes("非事实源"), "progress.json 须明文注明缓存非事实源");
-    assert.equal(progress.total_chunks, files.length);
-    assert.ok(progress.chunks.every((c) => files.includes(c.filename) && c.state === "pending"));
-    assert.ok(progress.chunks.every((c) => /^[0-9a-f]{12}$/.test(c.sha1)));
+    assert.ok(!fs.existsSync(path.join(outDir, "progress.json")), "progress.json 必须不再写出（续跑状态统一进 status.md）");
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }

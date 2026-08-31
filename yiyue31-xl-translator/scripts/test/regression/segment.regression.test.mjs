@@ -14,7 +14,7 @@
 //   S1 关卡退出码 = 0（含拼接 sha === 原文 sha 硬关卡，exit 3 防线）
 //   S2 分母保真：测试独立复读全部 chunk 文件按 NN 序拼接，字节级 === 归一化原文
 //   S3 命名：全部匹配 chunk-<NN>[X]-<slug>.md；NN 从 01 连续递增无跳号
-//   S4 产物一致：磁盘 chunk 数 === manifest/progress 登记；两文件落盘存在
+//   S4 产物一致：磁盘 chunk 数 === manifest chunk 表登记；manifest 落盘存在；progress.json 不再写出（status.md 吸收，2026-08-31）
 //   S5 上界：非原子 chunk ≤ max（R11-B 散文永不超限）；原子 X 免（其形态即超限）
 //   S6 反碎片地板：非原子 chunk ≥ min；唯一豁免 = 末 chunk 且并入前包超 max（结构性不可合并）
 //   S7 数量角色：single = 1；few ∈ [2,10]；many ≥ 11
@@ -69,13 +69,14 @@ function checkDoc(filePath, role) {
       assert.equal(Number(x.name.slice(6, 8)), i + 1, `${filePath}：NN 跳号/乱序于 ${x.name}`);
     });
 
-    // S4 产物一致
+    // S4 产物一致（manifest 为分段唯一事实记录）
     const onDisk = fs.readdirSync(path.join(tmp, "chunks")).filter((f) => f.endsWith(".md"));
     assert.equal(onDisk.length, rows.length, `${filePath}：磁盘 chunk 数与登记不符`);
     const manifest = fs.readFileSync(path.join(tmp, "manifest.md"), "utf-8");
-    const progress = JSON.parse(fs.readFileSync(path.join(tmp, "progress.json"), "utf-8"));
-    assert.equal(progress.total_chunks, rows.length, `${filePath}：progress.total_chunks 不符`);
+    const tableRows = manifest.split("\n").filter((l) => /^\| \d{2}/.test(l)).length;
+    assert.equal(tableRows, rows.length, `${filePath}：manifest chunk 表行数不符`);
     for (const x of rows) assert.ok(manifest.includes(x.name), `${filePath}：manifest 缺 ${x.name}`);
+    assert.ok(!fs.existsSync(path.join(tmp, "progress.json")), `${filePath}：progress.json 必须不再写出`);
 
     // S5 上界 + S6 反碎片地板（末块结构性不可合并豁免）
     rows.forEach((x, i) => {
