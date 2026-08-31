@@ -136,7 +136,7 @@
 
 ### Step 1 分段 `[脚本]`
 - fork doc_segmenter 改造：目标 8-15KB、跨级别合并、code block/表格原子不可切。**巨块条件收紧（R11-B 裁决 2026-08-31）**：仅 fence/表格**原子块**可超限单 chunk 并以 X 标记；散文巨块强制再切（段落边界切，落回目标带）——翻译单元与审校半块同落甜点区。
-- 产物：`chunks/` + `manifest.md`（heading 树）+ `progress.json`（**缓存非事实源**，明文注明）。
+- 产物：`chunks/` + `manifest.md`（heading 树）；~~progress.json~~ **M1b 起移除**（续跑状态统一进唯一文档 `status.md`——2026-08-31 Yiyue 裁决，见横切；segment.mjs 停写 + 测试同步）。
 - 关卡：**拼接 sha === 原文 sha**（钉死分母，防偷删）；chunk 尺寸分布落目标带，否则自动调参重分段（附录 A #1 闭环）。
 
 ### Step 2 译前分析 `[主+subagent×1]`（分析本地生成；>64KB 分段提取）
@@ -203,13 +203,13 @@
 ### Step 10 终检与交付（交付门） `[脚本]` ——**流程真正的最后一个动作**
 - **重执行一切确定性检查**（不信任何落盘日志）：对最终产物重跑机械校验全项；从 translated-chunks 重导出 merged 做 diff；拼接 sha 复核；完备性矩阵（分母=原文钉死）；报告签名扫描（阈值随送审单元缩放）；**植入缺陷能力核验**。**括注对账双向相等（G3，2026-08-31）**：译文最终括注集合 === 裁定台账"保留"集合（空集对非空台账即 FAIL——堵"全删 «» 零工作量合规"）；**精选表兑现硬判**：special-phrases 精选表条目出现于该 chunk 原文者，必须以括注形态出现在译文（输入为落盘文件，机械可判；实现随 M1b 契约冻结）。**标题双语锚硬判（2026-08-31 Yiyue 裁决新增，实现随 M1c）**：分母 = 原文 fence 感知标题扫描（segment 同款状态机）；逐标题核对译文——中文标题行存在、次行锚逐字等于原文对应标题、级别序列一致（标题数+锚文本双向对账，锚行本身就是标题奇偶校验）；brief 关闭双语锚时此判随 brief 披露跳过并在 REPORT 记录。**冷读/pm-review 结构化核验（G4，2026-08-31）**：冷读台账须逐段记覆盖（段号/起止 sha/发现数接力），终检机械核对覆盖矩阵 = 全稿（"无发现"自述不算数）；pm-review 选样清单由脚本落盘，终检核对样本集全覆盖且逐样本有实质结论。
 - **探针注入机制**（2026-08-30 评审冻结）：探针作为**伪审校单元由 status 队列注入**——路径形态与真 chunk 无差别，主 agent 照单派发（不靠自觉混入，守零信任）；**每维度每 run（run = final-gate 一次完整执行——R20）≥1**；**探针单元缺报告 = 终检直接 FAIL**；ground truth（缺陷类型+预期命中点）由源侧 probe 脚本生成（manifest 不落工作区），终检比对报告是否实际命中。威胁模型边界：防偷懒型造假，不防能读源仓的对抗型伪造（签名/undersize 兜底）。
-- **新鲜度**：产物集合与豁免清单**精确到 glob**（豁免 mtime 检查：pm-review、REPORT.md、progress.json/状态文件、verify-results.json、探针中间件（= `probes/` 目录）、终检报告自身；**pm-review 的 merged-draft sha 内容锚不豁免**——R15/R20）；固定顺序 = 冷读发现清零 → pm-review 最后写（记 sha 锚）→ **终检最后跑** → PASS 时脚本**原子改名**为正式交付名 → REPORT 定稿；mtime 只作 WARN，硬判锚 = 内容 sha + 重执行结果。
+- **新鲜度**：产物集合与豁免清单**精确到 glob**（豁免 mtime 检查：pm-review、REPORT.md、**status.md（唯一续跑文档，每次推导整体重写）**、verify-results.json、探针中间件（= `probes/` 目录）、终检报告自身；**pm-review 的 merged-draft sha 内容锚不豁免**——R15/R20）；固定顺序 = 冷读发现清零 → pm-review 最后写（记 sha 锚）→ **终检最后跑** → PASS 时脚本**原子改名**为正式交付名 → REPORT 定稿；mtime 只作 WARN，硬判锚 = 内容 sha + 重执行结果。
 - 判定：**PASS** → 交付物正式落盘（SessionEnd/Stop hook 自然发布，零介入闭环）+ REPORT 定稿 + **交付摘要内联到聊天输出**（含交付物绝对路径；**回显原文 sha1 与 chunk 数供用户对照 Step 0 预算公告——分母外锚的对照端（G1）**；明示"本会话退出时将自动发布，请现在抽查，不满意可'重翻第 N 章'"——R17/R20）；**FAIL** → 自动定位打回，**故障半径分级（干跑 C-7 裁决）**：①根因限单 chunk（报告 stale/签名）= scoped 重做——该 chunk 回退 Step 6/7 + 接缝复查 + pm-review 重生成，其余成果与冷读台账保留；②全局性根因（拼接 sha/完备性/探针未命中）= 全局阶段整体作废重走。连续 FAIL ≥3 次转 PENDING-USER，不无限空转。**准确性维度缺失 = 无条件 FAIL**（不可降级）。URL 源终检可选重取比对原文（仅 WARN——重取失败不阻塞交付，披露即可）。
 - `REPORT.md` 体检报告：**首屏一句人话结论**（如"可发布；第 3 章数字密度高，建议人工抽查 5 分钟"）+ 四维各一句 + 覆盖明细 + **章↔chunk 映射对账**（R5）+ **消耗对账（预估 vs 实际，含"用户开口次数/会话接力次数"）** + 异常与升级记录 + 遗留问题 + audit 使用说明；内部术语（探针/半块/stale 等）附人话括注，如"探针 4 次 = 故意埋 4 处错看审校能否全抓到"（R20）。
 - audit 命令：用户可随时运行（指向源仓库只读脚本，M5 落地），输出人话 PASS/FAIL——可选项，不阻塞。
 
 ### 横切：状态机与续跑 `[脚本]`
-- 一条状态命令 = resume oracle（冷启动入口；同文件再触发自动检测进行中并续跑）；**输出含用户视角人话一行**（当前 X/Y、阶段、已耗时、按 M3 基线的剩余预估、下次该说的话）——一物两用，同时就是干净退出提示。状态纯推导自文件系统。**输出双段契约**：人话一行（用户视角）+ **动作指令**（主 agent 视角：step / inputs[] / outputs[]）——探针在动作指令中与真单元不可区分，主 agent 照单派发（R13）。
+- 一条状态命令 = resume oracle（冷启动入口；同文件再触发自动检测进行中并续跑）；**输出含用户视角人话一行**（当前 X/Y、阶段、已耗时、按 M3 基线的剩余预估、下次该说的话）——一物两用，同时就是干净退出提示。状态纯推导自文件系统。**输出双段契约**：人话一行（用户视角）+ **动作指令**（主 agent 视角：step / inputs[] / outputs[]）——探针在动作指令中与真单元不可区分，主 agent 照单派发（R13）。**唯一续跑文档 `status.md`（固定名，2026-08-31 Yiyue 裁决：断点续跑只需要一个文档）**：状态命令把推导结果**整体重写**进 `xl-translator/<title>/status.md`，断点续跑只看这一个文件；它是**物化视图非事实源**——事实源仍是文件系统产物（零信任不变：删掉可重建、伪造被下次推导覆盖），头部记推导锚（原文 sha / 覆盖产物 sha 集 / 推导时间）供陈旧检测；内容即双段契约。**progress.json 缓存角色被吸收，M1b 起移除**（segment.mjs 停写 + 测试对账目标改 manifest/status.md）。`pending.md` 保留为**用户挂起旗标**——用户可写控制信号，不随 status.md 机器重写抹除（status.mjs 推导其存在性并入 status.md 呈现菜单）。**多项目无书名 resume = 扫 `xl-translator/*/status.md` 出项目清单让用户选**（R18-2 入口方案）。
 - **原文变更 re-keying**：chunk **按内容 sha 匹配**（非序号）——未变内容的 chunk 即使换号也保留成果；原文 sha 变更 → **仅内容 sha 实际变更的 chunk 作废重翻**（未变更 chunk 一律保留成果，绝不因位置/序号重翻——"下游"冻结语义，R1），全局阶段（merge/统稿/冷读/终检）**整体作废重走**。**handoff 与 Step-2 产物失效规则（干跑 C-5 补）**：受影响 chunk 及其 **N+1 下游邻 chunk（仅此一个）** 的 handoff ②摘要与串行追加段失效重生成；map.md 对应条目更新；chunk 文件按新 manifest 重排命名（内容 sha 匹配保的是**成果**，文件名随新序号）；glossary/style-card/anchor 保留，仅当原文变更面积 >30% 时触发重新预检。
 - **用户动词表**（全部挂 resume oracle，触发词写进 SKILL.md description）：`继续翻译 <title>`（续跑）、`翻译进度 / <title> 翻到哪了`（人话进度）、`停止翻译 <title>`（封存标记 + 一行总结，不再提示继续）、`重翻 <title> 第 N 章`（执行前一行披露章↔chunk 映射，如"第 3 章 = chunk 05-06"；作废范围按 re-keying 冻结语义：仅命中 chunk 重翻、N+1 handoff 重生成、全局阶段重走——R1/R5）。**小文档（≤40KB）自动交接** translator，不让用户重发。
 - 会话预算：每会话处理 N 单元后干净退出；每单元幂等；N 同时约束内存与主会话上下文增长（默认值 M3 标定）；**单元 = 一次 subagent 调用**（与 §4 预算表 ~88/64KB 口径对齐——R14）。
@@ -315,15 +315,16 @@ xl-translator/<title>/
 ├── consistency-<title>.md                       # 统稿清单
 ├── cold-read-<title>.md                         # 冷读者接力台账
 ├── pm-review-<title>.md                         # 含步骤合规表
-├── verify-results.json / progress.json          # 流水/状态缓存（非事实源）
-├── pending.md                                   # PENDING-USER 标记（存在即挂起态）
+├── status.md                                    # ★ 唯一断点续跑文档（固定名；status.mjs 推导后整体重写——物化视图非事实源，删掉可重建、伪造被覆盖；2026-08-31 Yiyue 裁决）
+├── verify-results.json                          # 流水缓存（非事实源）；progress.json 已被 status.md 吸收，M1b 起移除
+├── pending.md                                   # PENDING-USER 挂起旗标（用户可写控制信号，非状态文档——不随 status.md 重写抹除；存在即挂起，菜单入 status.md 呈现）
 ├── REPORT.md                                    # 交付体检报告
 └── translated-<title>-zh.md                     # ★ 唯一正式交付物：final-gate PASS 时原子改名产生
 ```
 
 **命名规则**：
 - `<title>` slug：字母/数字/连字符，≤6 词（继承 translator 规则）；`<NN>` **两位起、自然增长**（三位自然扩展，`padStart(2)` 已兼容——G9，2026-08-31；status/final-gate 一律按 NN **数值解析排序，禁字典序**，防 5MB 级 600+ chunk 时 `chunk-100` 错排）；`<dim>` 四个固定值；`<h>` ∈ a|b
-- **全局/chunk 分辨规则（2026-08-31 Yiyue 要求）**：chunk 级文件名必含 `chunk-<NN>` 段（`chunk-`/`chunk-<NN>X-`/`translated-chunk-`/`review-<dim>-chunk-`/`handoff/chunk-`/`adjudication-chunk-`）；全局文档文件名禁含 `chunk-`（`original-`/`analysis-`/`glossary-`/`style-card`/`map`/`anchor`/`manifest`/`progress`/`merged-draft`/`REPORT` 等）——仅凭文件名（不看所在目录）即可判定作用域；status.mjs/final-gate.mjs 的 glob 与分类以此为准。`probe-<dim>-<k>` 为 run 级样本，不属 chunk 域
+- **全局/chunk 分辨规则（2026-08-31 Yiyue 要求）**：chunk 级文件名必含 `chunk-<NN>` 段（`chunk-`/`chunk-<NN>X-`/`translated-chunk-`/`review-<dim>-chunk-`/`handoff/chunk-`/`adjudication-chunk-`）；全局文档文件名禁含 `chunk-`（`original-`/`analysis-`/`glossary-`/`style-card`/`map`/`anchor`/`manifest`/`status`/`merged-draft`/`REPORT` 等）——仅凭文件名（不看所在目录）即可判定作用域；status.mjs/final-gate.mjs 的 glob 与分类以此为准。`probe-<dim>-<k>` 为 run 级样本，不属 chunk 域
 - **路径超长防护（2026-08-31 Yiyue 要求）**：Windows 260 上限不依赖系统长路径开关；segment 产物路径 >240 先缩 `<slug>`（唯一性由 `<NN>` 保证，缩名记入 manifest 操作日志），目录本身超限报错（退出码 4）并提示缩短 `--out`/`<title>`
 - **发布安全红线**：PASS 前全目录**唯一**允许命中发布模式的文件名是最终交付物；任何中间文件禁止以 `-zh.md` 结尾或以 `summary-` / `talk-` / `merge-` / `final-` / `recommendation-` 开头
 - 审校报告元信息记**文件内容头部**（非文件名）：`sha:`（被审半块译文 sha1）、`model:`（模型 id）、`time:`——终检按内容解析
@@ -381,7 +382,7 @@ xl-translator/<title>/
 | **M1a 脚本层·先行** ✅（2026-08-31 完成：segment/ + verify-mech.mjs + 40 项单测全过；R11-B 已按裁决实现——散文巨块强制再切、仅原子块超限 X 标记；含路径超长防护与全局/chunk 命名分辨规则，见 §5.1；**反例回归实测 2026-08-31**：53 碎片事故原文（64KB playbook）重跑 → **5 chunk、5/5 落带 8-15KB、0 原子超限、拼接 sha 关卡过**——旧 doc_segmenter 同文 56 chunk/均值 1.1KB 的病灶对照；**测试套件独立化 2026-08-31（Yiyue 裁决）**：迁至 `scripts/test/`（git mv 保历史）——`unit/` 程序化合成层 + `regression/` 真实文档层 + `run.sh` 串行入口；回归夹具三类 git 管理（single 无需切 / few ≤10 / many ≥11，每类可多文档、目录自动发现、加文档零改码），**固定评估标准 S1-S8**（结构性判据：拼接保真/命名/带宽上界/反碎片地板/数量角色/碎片区间上界——换文档加文档不变），契约见 `scripts/test/README.md`；搬迁暴露并修复 M1a 遗留缺陷：CLI 测试 SCRIPT 相对路径、超长路径测试 cwd 敏感（改 tmpdir 确定性构造）；全套 48 测试串行通过（unit 40 + regression 8） | fork+改造 segment、verify-mech 扩展 | 单元自测：拼接 sha、原五+新四硬判、修复重跑、**fence 感知**（标题解析跳过代码围栏——干跑实测 30 个标题行 11 个在围栏内，正是 53 碎片同源病灶） |
 | **M1b 状态机** | status.mjs：stale 分类/升级态/PENDING-USER/原文 re-keying（内容 sha 匹配）/探针队列注入/用户动词表/进度人话 | 单元自测：各状态转移、断点重入、动词响应 |
 | **M1c 交付门** | final-gate.mjs + probe + **merge.mjs**（Step 8 本体，2026-08-31 Yiyue 裁决补登记——M3 试跑前必须就位，见 §5.2）（依赖 M1b） | 单元自测：重执行、新鲜度豁免 glob、探针命中判定、原子改名、标题双语锚硬判（§2 Step 10）；**merge 双层测试**（unit + 真实译文快照回归，固定判据 M1-M7，契约已先行登记于 `scripts/test/README.md`，测试本体随脚本交付落地） |
-| **M2 编排层** | SKILL.md + references prompts + 目录结构 | 走查评审：每步关卡/预算计费/零介入路径齐全 |
+| **M2 编排层** | SKILL.md + references prompts + 目录结构 | 走查评审：每步关卡/预算计费/零介入路径齐全；**同步点**：v0.2.0-skeleton 内 progress.json 表述随 status.md 裁决移除（§2 横切，2026-08-31） |
 | **M3 标定实验** | ~20KB 文档全流程试跑 | 8-15KB 粒度质量验证、四维度审校有效性抽查、**上下文溢出/断点续跑实测**、单次耗时记录（对账基线，非约束） |
 | **M4 全量验收** | playbook 重跑 + 验收 10 条 + 红队 4 场景（植入缺陷/篡改 sha/偷删 chunk/违规命名中间产物半泄漏——全被捕获或 git 历史可追溯，R12 边界复审补）+ 中断续跑演练 + **上下文溢出/compact 恢复实测** + 限流退避演练 + **中途 SessionEnd 演练（含 Step 9↔10 之间退出：未验收内容推不出去）** + **"用户 12 小时不在场"场景**（停等时状态/回来第一屏/一句话能否推进） | 全绿 + REPORT 对账 |
 | **M5 部署收尾** | refined-stock CLAUDE.md 表加 xl 条目；translator description 加边界互指；中间态 gitignore 复核（规则已随 R12 提前落 refined-stock）；两 skill 触发测试 | 小文章仍走旧 skill |

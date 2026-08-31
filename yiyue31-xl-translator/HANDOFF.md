@@ -28,7 +28,7 @@
 
 ## 3. status.mjs 规格（权威出处 DESIGN §2 横切 + §5.1；此处摘录）
 
-- **resume oracle**：一条状态命令 = 冷启动入口；同文件再触发自动检测进行中并续跑；**状态纯推导自文件系统**——progress.json 只是缓存非事实源（segment 已在文件内明文注明），删掉它仍须能推导全部状态
+- **resume oracle**：一条状态命令 = 冷启动入口；同文件再触发自动检测进行中并续跑；**状态纯推导自文件系统**，推导结果**整体重写**进**唯一续跑文档 `status.md`（固定名，2026-08-31 Yiyue 裁决：断点续跑只要一个文档）**——物化视图非事实源，删掉它仍须能推导重建（证明测试）；头部记推导锚（原文 sha/覆盖产物 sha 集/推导时间）。**随本任务移除 progress.json**：segment.mjs 停写 + 测试对账目标改 manifest/status.md（regression S4 的 progress.total_chunks 断言同步改）；`pending.md` 保留为用户挂起旗标（不随 status.md 重写抹除）；多项目无书名 resume = 扫 `xl-translator/*/status.md` 出清单（R18-2 入口方案）
 - **双段契约输出（R13）**：人话一行（当前 X/Y、阶段、已耗时、按 M3 基线的剩余预估、下次该说的话）+ 动作指令（主 agent 视角：step / inputs[] / outputs[]）；**探针在动作指令中与真单元不可区分**
 - **探针注入 + 统一物化（R25/G5）**：所有送审单元（真半块 + 探针）以**同构暂存命名/同通道**物化后派发；`probes/` 路径不出现在派发指令与新鲜度豁免 glob；探针与真单元的差别只存在于源侧 ground truth；物化暂存件的生命周期（谁清理、终检不认为产物）本任务定死
 - **stale 半块级分类**：内容 sha 实际变化的半块 × 全部 4 维报告 stale；a 修复仅触发 a、b 不级联；re-keying 冻结语义（R1）：仅内容 sha 变更的 chunk 作废重翻、N+1 邻 chunk 的 handoff②/串行增强失效重生成、全局阶段（merge/统稿/冷读/终检）整体作废重走
@@ -56,7 +56,7 @@
 
 ## 6. 完成判据（自查后再交）
 
-- [ ] 状态推导自文件系统：删掉 progress.json 仍推导出全部状态（缓存非事实源的证明测试）
+- [ ] 状态推导自文件系统：删掉 status.md 仍推导重建全部状态（物化视图非事实源的证明测试）；progress.json 已移除（segment 停写 + unit/regression 对账断言同步改）
 - [ ] 双段契约输出：人话 + 动作指令两段；探针与真单元在动作指令中不可区分（R25 物化测试）
 - [ ] stale 分类单测：半块 sha 变化 → 4 维 stale；N+1 handoff 重生成；全局作废语义（R1）
 - [ ] 动词响应单测：继续/进度/停止/重翻（含章↔chunk 披露）/样张（R16）
@@ -75,5 +75,5 @@
 |---|---|
 | `DESIGN.md` v2（含 §9.3） | §2 横切 / §5.1 命名与物化 / §5.2 封闭集 / §7 收口状态 / §9+§9.3 全部裁决记录 |
 | `SKILL.md` v0.2.0-skeleton | 编排骨架（M2 走查对象，本任务不改动） |
-| `scripts/segment/segment.mjs` | M1a 交付：progress.json 结构（含缓存注记）、manifest/命名 schema 实例 |
+| `scripts/segment/segment.mjs` | M1a 交付：manifest/命名 schema 实例（progress.json 写出随 M1b 按 status.md 裁决移除） |
 | `scripts/verify-mech.mjs` | M1a 交付：brief clamp（G2）、thresholds 落盘、退出码约定 |
