@@ -69,9 +69,40 @@ node --test scripts/test/regression/segment.regression.test.mjs
 
 S6/S8 的豁免与上界都是**结构性**的（由贪心装包 + 尾块回收的算法性质决定），不是对某篇文档调出来的魔法数——所以标准可以固定不变。
 
+## 行为场景类回归契约（merge 型，M1c 落地）
+
+**契约先行登记（2026-08-31 Yiyue 裁决），测试本体随 `merge.mjs` 交付落地——不为不存在的脚本写死代码。**
+
+与切割层两点适配：
+
+1. **类别按输入形态（行为场景），不按尺寸**——合并的正确性取决于输入集合的形态，不是文档大小；
+2. **夹具 = 真实译文 + 合成脚手架**——译文文本用真实中文（refined-stock 既有译文，含真实围栏/表格/术语形态）；场景装置（verify-results.json 等筛选依据）天然只能合成——它就是被测对象。
+
+```
+regression/fixtures/merge/
+├── happy/case-NN/      ← 全 passed 快照 → 正常合并
+├── partial/case-NN/    ← 部分 stale/未过审 → 只收 passed
+├── residue/case-NN/    ← «» 残留 → 必须拒绝
+└── broken/case-NN/     ← 缺 chunk/乱序/sha 不符 → 非零退出报错
+```
+
+每个 case 是一个微型工作目录快照（`translated-chunks/` + `manifest.md` + `verify-results.json` 等），目录自动发现，加 case 零改码——与切割夹具同契约。
+
+**固定评估标准 M1-M7**（结构性判据，换 case 不变）：
+
+| # | 判据 | 防什么 |
+|---|---|---|
+| M1 | merged 字节 === passed chunk 按 NN **数值序**拼接（禁字典序，R29） | 顺序错乱 |
+| M2 | 收录集合恰好 = 最新 verify passed（多一少一都 FAIL） | 带病混入 / 漏收 |
+| M3 | «» 残留 = 0，且清标动作有记录 | 临时标记漏进交付物 |
+| M4 | 产物名不命中 deliverable 模式 | R12 半泄漏 |
+| M5 | 同输入重跑字节相同（无时间戳 / 无随机） | 不可复现 |
+| M6 | 输入损坏（缺 chunk/乱序号/sha 不符）→ 非零退出 + 可操作报错，绝不静默拼残稿 | 静默残稿（最恶） |
+| M7 | 合并零改写：无 BOM / 无 EOL 改写 / 无 `"\n\n"` 插入（旧 doc_segmenter 同款拼接病） | 组装即篡改 |
+
 ## 维护规约
 
-1. 新脚本的测试进对应层：算法行为 → `unit/<模块>.test.mjs`；真实文档回归 → `regression/<模块>.regression.test.mjs`（夹具放 `regression/fixtures/`，如需新类别目录按 `<类>/<类>-NN.md` 命名）。
+1. 新脚本的测试进对应层：算法行为 → `unit/<模块>.test.mjs`；真实文档回归按被测对象选型——**尺寸角色型**（segment 类）→ `regression/fixtures/<类>/<类>-NN.md` 单文件夹具；**行为场景型**（merge/final-gate 类）→ `regression/fixtures/<模块>/<场景>/case-NN/` 工作目录快照夹具。两者都目录自动发现、固定判据表先登记后编码（首个场景型 = merge，M1-M7，见上节）。
 2. 夹具是**数据不是代码**：不改写内容；真实事故原文优先（回归价值最高）。
 3. 评估标准修改 = 设计变更，须先改 DESIGN 再动测试（防"改标准凑通过"）。
 4. 本目录是开发期资产，不属 SKILL.md §5.2 引用封闭集（该集合只管运行时引用文件）。

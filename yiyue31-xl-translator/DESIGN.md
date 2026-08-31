@@ -190,7 +190,7 @@
 - **升级重翻附随**（2026-08-30 评审补充）：重翻 prompt 必附邻 chunk 实际中文首末段 + 文风基准卡；重翻后对该接缝做 scoped 统稿 + 可读性 seam 复查；下游（仅 N+1 邻 chunk 的 handoff②/串行增强段，见横切 re-keying 冻结语义——R1）stale 级联按 sha 机制处理。
 
 ### Step 8 合并与统稿 `[脚本+subagent×1]`
-- merge **只由脚本执行**：manifest 顺序、只收"最新机械校验 passed"chunk；清临时标记（残留必须 0）→ **临时名**落盘（不命中 deliverable 模式）。
+- merge **只由 `merge.mjs` 执行**（§5.2 B 表，2026-08-31 裁决补登记）：manifest 顺序（NN 数值序，R29）、只收"最新机械校验 passed"chunk；清临时标记（残留必须 0）→ **临时名**落盘（不命中 deliverable 模式）；final-gate"从 translated-chunks 重导出 merged"复用其导出的同一纯函数（重执行 = 换调用点，不重写逻辑）。
 - 统稿 pass：fork consistency-checklist.js 全量扫描（术语/密度离群/标题译法/间距/接缝/**文风基准遵从**）→ 决策 subagent 只读清单下结论 → 机械应用 → 重跑受影响 chunk 的 Step 5。
 - **译文变更分类 → stale 规则**（2026-08-30 评审冻结）：①**修复类**变更 = 相关维度报告 stale 重审（Step 7 既有规则）；②**统稿类**变更 = 仅限术语表驱动的机械替换，逐条 diff 清单落盘，consistency 清单重扫代替四维重审，REPORT 披露；句式级统稿改写仍走四维重审。**统稿轮 ≤2**，超限转 PENDING-USER——统稿↔修复循环有终止条件。
 
@@ -353,7 +353,7 @@ xl-translator/<title>/
 | delivery-template.md | Step 10 | REPORT 元信息模板（fork） |
 | terms.md | Step 2 | 种子术语表（一次性拷贝起点，与 translator 零共享） |
 
-**B. `scripts/`（8 个）**
+**B. `scripts/`（9 个）**
 
 | 文件 | 引入位置 | 职责 |
 |---|---|---|
@@ -361,6 +361,7 @@ xl-translator/<title>/
 | verify-mech.mjs | Step 5（Step 10 重执行同源） | 原五+新四硬判、修复后强制重跑；R8-c 术语兑现硬判已裁决采纳（2026-08-31），随 M1b 投影格式冻结后实现 |
 | status.mjs | 横切（每动作前必跑） | resume oracle：状态推导、探针队列注入、用户动词响应 |
 | final-gate.mjs | Step 10 | 重执行一切、新鲜度豁免 glob、探针命中比对、原子改名 |
+| merge.mjs | Step 8 | 确定性组装：NN 数值序（R29）拼接、只收最新 verify passed、清 «» 标记、临时名落盘；fixed 判据 M1-M7（见 `scripts/test/README.md`）；final-gate"重导出 merged"复用其导出纯函数（**2026-08-31 Yiyue 裁决补登记**——原封闭集漏登 merge 本体，属 Step 8 两职责拆分：组装归 merge，扫描归 consistency） |
 | consistency.mjs | Step 8 | 统稿清单全量扫描（含文风遵从） |
 | probe.mjs | 源侧（配合 status/final-gate） | 探针样本生成；ground truth 只存源侧 probe/truth/，不落工作区 |
 | word-counter.mjs | Step 0 | 规模预检与预算公告数据源 |
@@ -379,7 +380,7 @@ xl-translator/<title>/
 |---|---|---|
 | **M1a 脚本层·先行** ✅（2026-08-31 完成：segment/ + verify-mech.mjs + 40 项单测全过；R11-B 已按裁决实现——散文巨块强制再切、仅原子块超限 X 标记；含路径超长防护与全局/chunk 命名分辨规则，见 §5.1；**反例回归实测 2026-08-31**：53 碎片事故原文（64KB playbook）重跑 → **5 chunk、5/5 落带 8-15KB、0 原子超限、拼接 sha 关卡过**——旧 doc_segmenter 同文 56 chunk/均值 1.1KB 的病灶对照；**测试套件独立化 2026-08-31（Yiyue 裁决）**：迁至 `scripts/test/`（git mv 保历史）——`unit/` 程序化合成层 + `regression/` 真实文档层 + `run.sh` 串行入口；回归夹具三类 git 管理（single 无需切 / few ≤10 / many ≥11，每类可多文档、目录自动发现、加文档零改码），**固定评估标准 S1-S8**（结构性判据：拼接保真/命名/带宽上界/反碎片地板/数量角色/碎片区间上界——换文档加文档不变），契约见 `scripts/test/README.md`；搬迁暴露并修复 M1a 遗留缺陷：CLI 测试 SCRIPT 相对路径、超长路径测试 cwd 敏感（改 tmpdir 确定性构造）；全套 48 测试串行通过（unit 40 + regression 8） | fork+改造 segment、verify-mech 扩展 | 单元自测：拼接 sha、原五+新四硬判、修复重跑、**fence 感知**（标题解析跳过代码围栏——干跑实测 30 个标题行 11 个在围栏内，正是 53 碎片同源病灶） |
 | **M1b 状态机** | status.mjs：stale 分类/升级态/PENDING-USER/原文 re-keying（内容 sha 匹配）/探针队列注入/用户动词表/进度人话 | 单元自测：各状态转移、断点重入、动词响应 |
-| **M1c 交付门** | final-gate.mjs + probe（依赖 M1b） | 单元自测：重执行、新鲜度豁免 glob、探针命中判定、原子改名、标题双语锚硬判（§2 Step 10，2026-08-31 新增） |
+| **M1c 交付门** | final-gate.mjs + probe + **merge.mjs**（Step 8 本体，2026-08-31 Yiyue 裁决补登记——M3 试跑前必须就位，见 §5.2）（依赖 M1b） | 单元自测：重执行、新鲜度豁免 glob、探针命中判定、原子改名、标题双语锚硬判（§2 Step 10）；**merge 双层测试**（unit + 真实译文快照回归，固定判据 M1-M7，契约已先行登记于 `scripts/test/README.md`，测试本体随脚本交付落地） |
 | **M2 编排层** | SKILL.md + references prompts + 目录结构 | 走查评审：每步关卡/预算计费/零介入路径齐全 |
 | **M3 标定实验** | ~20KB 文档全流程试跑 | 8-15KB 粒度质量验证、四维度审校有效性抽查、**上下文溢出/断点续跑实测**、单次耗时记录（对账基线，非约束） |
 | **M4 全量验收** | playbook 重跑 + 验收 10 条 + 红队 4 场景（植入缺陷/篡改 sha/偷删 chunk/违规命名中间产物半泄漏——全被捕获或 git 历史可追溯，R12 边界复审补）+ 中断续跑演练 + **上下文溢出/compact 恢复实测** + 限流退避演练 + **中途 SessionEnd 演练（含 Step 9↔10 之间退出：未验收内容推不出去）** + **"用户 12 小时不在场"场景**（停等时状态/回来第一屏/一句话能否推进） | 全绿 + REPORT 对账 |
