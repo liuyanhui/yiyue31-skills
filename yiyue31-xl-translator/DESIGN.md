@@ -203,7 +203,7 @@
 ### Step 10 终检与交付（交付门） `[脚本]` ——**流程真正的最后一个动作**
 - **重执行一切确定性检查**（不信任何落盘日志）：对最终产物重跑机械校验全项；从 translated-chunks 重导出 merged 做 diff；拼接 sha 复核；完备性矩阵（分母=原文钉死）；报告签名扫描（阈值随送审单元缩放）；**植入缺陷能力核验**。**括注对账双向相等（G3，2026-08-31）**：译文最终括注集合 === 裁定台账"保留"集合（空集对非空台账即 FAIL——堵"全删 «» 零工作量合规"）；**精选表兑现硬判**：special-phrases 精选表条目出现于该 chunk 原文者，必须以括注形态出现在译文（输入为落盘文件，机械可判；实现随 M1b 契约冻结）。**标题双语锚硬判（2026-08-31 Yiyue 裁决新增，实现随 M1c）**：分母 = 原文 fence 感知标题扫描（segment 同款状态机）；逐标题核对译文——中文标题行存在、次行锚逐字等于原文对应标题、级别序列一致（标题数+锚文本双向对账，锚行本身就是标题奇偶校验）；brief 关闭双语锚时此判随 brief 披露跳过并在 REPORT 记录。**冷读/pm-review 结构化核验（G4，2026-08-31）**：冷读台账须逐段记覆盖（段号/起止 sha/发现数接力），终检机械核对覆盖矩阵 = 全稿（"无发现"自述不算数）；pm-review 选样清单由脚本落盘，终检核对样本集全覆盖且逐样本有实质结论。
 - **探针注入机制**（2026-08-30 评审冻结）：探针作为**伪审校单元由 status 队列注入**——路径形态与真 chunk 无差别，主 agent 照单派发（不靠自觉混入，守零信任）；**每维度每 run（run = final-gate 一次完整执行——R20）≥1**；**探针单元缺报告 = 终检直接 FAIL**；ground truth（缺陷类型+预期命中点）由源侧 probe 脚本生成（manifest 不落工作区），终检比对报告是否实际命中。威胁模型边界：防偷懒型造假，不防能读源仓的对抗型伪造（签名/undersize 兜底）。
-- **新鲜度**：产物集合与豁免清单**精确到 glob**（豁免 mtime 检查：pm-review、REPORT.md、**status.md（唯一续跑文档，每次推导整体重写）**、verify-results.json、探针中间件（= `probes/` 目录）、终检报告自身；**pm-review 的 merged-draft sha 内容锚不豁免**——R15/R20）；固定顺序 = 冷读发现清零 → pm-review 最后写（记 sha 锚）→ **终检最后跑** → PASS 时脚本**原子改名**为正式交付名 → REPORT 定稿；mtime 只作 WARN，硬判锚 = 内容 sha + 重执行结果。
+- **新鲜度**：产物集合与豁免清单**精确到 glob**（豁免 mtime 检查：pm-review、REPORT.md、**status.md（唯一续跑文档，每次推导整体重写）**、verify-results.json、**统一物化暂存（= `staging/` 目录，每轮推导先清后写）**、终检报告自身；**pm-review 的 merged-draft sha 内容锚不豁免**——R15/R20）；固定顺序 = 冷读发现清零 → pm-review 最后写（记 sha 锚）→ **终检最后跑** → PASS 时脚本**原子改名**为正式交付名 → REPORT 定稿；mtime 只作 WARN，硬判锚 = 内容 sha + 重执行结果。
 - 判定：**PASS** → 交付物正式落盘（SessionEnd/Stop hook 自然发布，零介入闭环）+ REPORT 定稿 + **交付摘要内联到聊天输出**（含交付物绝对路径；**回显原文 sha1 与 chunk 数供用户对照 Step 0 预算公告——分母外锚的对照端（G1）**；明示"本会话退出时将自动发布，请现在抽查，不满意可'重翻第 N 章'"——R17/R20）；**FAIL** → 自动定位打回，**故障半径分级（干跑 C-7 裁决）**：①根因限单 chunk（报告 stale/签名）= scoped 重做——该 chunk 回退 Step 6/7 + 接缝复查 + pm-review 重生成，其余成果与冷读台账保留；②全局性根因（拼接 sha/完备性/探针未命中）= 全局阶段整体作废重走。连续 FAIL ≥3 次转 PENDING-USER，不无限空转。**准确性维度缺失 = 无条件 FAIL**（不可降级）。URL 源终检可选重取比对原文（仅 WARN——重取失败不阻塞交付，披露即可）。
 - `REPORT.md` 体检报告：**首屏一句人话结论**（如"可发布；第 3 章数字密度高，建议人工抽查 5 分钟"）+ 四维各一句 + 覆盖明细 + **章↔chunk 映射对账**（R5）+ **消耗对账（预估 vs 实际，含"用户开口次数/会话接力次数"）** + 异常与升级记录 + 遗留问题 + audit 使用说明；内部术语（探针/半块/stale 等）附人话括注，如"探针 4 次 = 故意埋 4 处错看审校能否全抓到"（R20）。
 - audit 命令：用户可随时运行（指向源仓库只读脚本，M5 落地），输出人话 PASS/FAIL——可选项，不阻塞。
@@ -316,8 +316,9 @@ xl-translator/<title>/
 │   └── anchor.md                                # 范文锚点（chunk 1 过审后生成；文体分化的书按部分节存多锚点——R19）
 ├── translated-chunks/translated-chunk-<NN>.md   # 阶段A+B 后译文（当前版）
 ├── adjudications/adjudication-chunk-<NN>.md     # 阶段B 裁定台账
-├── reviews/review-<dim>-chunk-<NN><h>.md        # dim∈accuracy|translationese|ai-tone|readability；h∈a|b（半块）
-├── probes/probe-<dim>-<k>.md                    # 探针样本（ground truth 只存源侧 probe/truth/，不落工作区）
+├── reviews/review-<dim>-chunk-<NN><h>.md        # dim∈accuracy|translationese|ai-tone|readability；h∈a|b（半块）；探针报告用虚拟 NN∈901-999 同路径形态（真实 chunk 上界 640 = 5MB/8KB，永不冲突；映射只存源侧 truth）
+├── staging/review-<dim>-unit-<seq>.md           # ★ 统一物化暂存（R25/G5，M1b 定死）：所有送审单元（真半块+探针）同构命名同通道派发；每轮推导先清后写；final-gate 不计产物——工作区**无 probes/ 目录**（样本亦经 staging 物化）
+├── events.jsonl                                 # 追加式事件流水（M1b）：dispatch/reject/escalate/suspend/session-end 等一行一事件——计数器（机械打回≤2/重审≤3/累计升级≥2）、会话预算、耗时全部由此推导（文件系统即事实源）
 ├── merged-draft.md                              # Step 8 合并稿（临时名，不命中任何发布模式）
 ├── consistency-<title>.md                       # 统稿清单
 ├── cold-read-<title>.md                         # 冷读者接力台账
@@ -337,8 +338,10 @@ xl-translator/<title>/
 - 审校报告元信息记**文件内容头部**（非文件名）：`sha:`（被审半块译文 sha1）、`model:`（模型 id）、`time:`——终检按内容解析
 - status.mjs / final-gate.mjs 按本表 glob 约定工作；新增文件类型必须先入本表再编码
 - **半块切片规格（干跑 C-1 冻结，2026-08-30；G5 修订 2026-08-31）**：半块 = `translated-chunk-NN.md` 按**字节中点向最近段落边界取整**切两份（a=前段，b=后段）；半块 sha = 该字节区间的 sha1，**由 status/final-gate 从译文文件重算**（半块**不以最终形态落盘**——派发时经统一物化暂存，见 C-6，防输入形态差暴露探针）；Step 7"相关报告"量化 = **内容 sha 实际变化的半块 × 全部 4 维**（a 修复仅触发 a 的报告 stale，b 不级联）
-- **探针落位（干跑 C-6 裁决；G5 统一物化 2026-08-31）**：探针**报告**落 `reviews/`（与真单元同路径形态）；`probes/` 只放样本输入，**且不出现在派发指令与新鲜度豁免 glob**——所有送审单元（真半块 + 探针）由 status 以**同构暂存命名/同通道物化后派发**，探针与真单元的差别只存在于源侧 ground truth，不存在于被审者可见的任何输入形态（防"识别探针→只对探针认真、真单元盖章"）；完备性矩阵分母不含探针（探针由 final-gate 单独核对命中）；**run = final-gate 一次完整执行，`<k>` = run 内序号，每维度每 run ≥1 由 final-gate 核对（R20）**
+- **探针落位（干跑 C-6 裁决；G5 统一物化 2026-08-31；R25 定死 M1b）**：探针**报告**落 `reviews/`（虚拟 NN 901-999，与真单元同路径形态）；**工作区无 probes/ 目录**（样本亦经 staging 物化）——所有送审单元（真半块 + 探针）由 status 以**同构暂存命名/同通道物化后派发**（staging/ 见命名规则），探针与真单元的差别只存在于源侧 ground truth，不存在于被审者可见的任何输入形态（防"识别探针→只对探针认真、真单元盖章"）；完备性矩阵分母不含探针（探针由 final-gate 单独核对命中）；**run = final-gate 一次完整执行，`<k>` = run 内序号，每维度每 run ≥1 由 final-gate 核对（R20）**
 - **slug 规则（干跑 C-9）**：`<slug>` = chunk 首 heading 前 3-4 个词、连字符连接、≤30 字符；签名/undersize 阈值缩放公式 M1c 具体化（初值 base × unitKB/4）
+- **统一物化命名与生命周期（R25 定死，M1b）**：`staging/review-<dim>-unit-<seq>.md`，`<seq>` = 当前派发队列内全局递增序号（真半块与探针**混排同构**，被派发者不可分辨）；**生命周期**：status.mjs 每轮推导**先清空 staging/ 再物化当前队列**（派发中快照），会话干净退出时清空；final-gate 新鲜度豁免 glob 含 `staging/` 且不计数为产物；ground truth（unit↔真假/缺陷类型/预期命中点）只存源侧 `probe/truth/<run>.json`，不落工作区
+- **special-phrases 格式冻结（R23/G3，M1b）**：`special-phrases-<title>.md` 每条一行 `<英文原句> :: <既定中文>`；`#` 注释行与空行忽略；兑现硬判（M1c 本体）：chunk 原文含左值 → 该 chunk 译文须以 `中文（English）` 括注形态呈现右值
 
 ---
 
