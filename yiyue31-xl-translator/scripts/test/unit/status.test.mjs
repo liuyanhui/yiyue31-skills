@@ -20,6 +20,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { run as segRun } from "../../segment/segment.mjs";
 import {
   run,
@@ -35,6 +37,7 @@ import {
 } from "../../status.mjs";
 
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
+const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "status.mjs");
 
 // ---------- 夹具 ----------
 
@@ -163,6 +166,11 @@ test("审校队列统一物化：探针与真单元同构混排，工作区无�
     const staging = fs.readdirSync(path.join(dir, "staging"));
     assert.equal(staging.length, 10, "staging 全量物化");
     for (const f of staging) assert.match(f, /^review-[\w-]+-unit-\d{3}\.md$/, "同构命名");
+    // M1c 延伸：探针真实样本文本须落 staging（占位符退场——审校者读到的是真缺陷样本）
+    const stagedAll = staging.map((f) => fs.readFileSync(path.join(dir, "staging", f), "utf-8"));
+    assert.ok(stagedAll.some((s) => s === "探针样本内容（含植入缺陷）"), "探针文本一已物化");
+    assert.ok(stagedAll.some((s) => s === "探针样本内容二"), "探针文本二已物化");
+    assert.ok(!stagedAll.some((s) => s.includes("__PROBE_BODY__")), "占位符不得再出现");
     const md = fs.readFileSync(path.join(dir, "status.md"), "utf-8");
     assert.ok(!/probe/.test(md), "status.md 不得出现 probe 字样（不可分辨）");
     assert.ok(!fs.existsSync(path.join(dir, "probes")), "工作区无 probes/ 目录");
@@ -365,6 +373,20 @@ test("chapterMap：H2 章结构解析；全局阶段推进", () => {
     const r = run(dir, {});
     assert.equal(r.state.global, "ready-merge");
     assert.equal(r.queue.action.step, "merge");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------- CLI 冒烟（守卫真实性：Windows pathname 坑曾使 M1b CLI 静默空转、退出码 0） ----------
+
+test("CLI：真实执行（status.md 落盘 + stdout 输出），非静默空转", () => {
+  const dir = makeWorkdir();
+  try {
+    const r = spawnSync(process.execPath, [SCRIPT, dir], { encoding: "utf-8" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(r.stdout.includes("status —"), "CLI 应输出 status.md 内容");
+    assert.ok(fs.existsSync(path.join(dir, "status.md")), "status.md 由 CLI 落盘");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

@@ -70,15 +70,20 @@ export function extractUrls(text) {
   return urls;
 }
 
-// 统计（英文）括注：半角 ( ) 与全角（ ）都计入，括注内须含 ≥2 个连续 ASCII 字母。
-export function countEnglishAnnotations(text) {
+// 括注（英文）定义：半角 ( ) 与全角（ ）都计入，括注内须含 ≥2 个连续 ASCII 字母。
+// final-gate G3 括注对账复用同一匹配（同源——两处口径不一致时对账必误伤）。
+export function englishAnnotationMatches(text) {
+  const out = [];
   const re = /[（(]([^()（）]*?)[)）]/g;
-  let count = 0;
   let m;
   while ((m = re.exec(text)) !== null) {
-    if (/[a-zA-Z]{2,}/.test(m[1])) count++;
+    if (/[a-zA-Z]{2,}/.test(m[1])) out.push(m[1]);
   }
-  return count;
+  return out;
+}
+
+export function countEnglishAnnotations(text) {
+  return englishAnnotationMatches(text).length;
 }
 
 // ---------- 相似度（bag-of-chars Dice，用于判定"误改" vs "遗漏"） ----------
@@ -491,6 +496,8 @@ function preview(s) {
 // ---------- 结果落盘 ----------
 
 // 追加一条运行记录到 translation 根目录的 verify-results.json。
+// 格式 = { results: [...] } 包装（M1b status.mjs 冻结接口：按 nn 取每 chunk 末条为"最新"）；
+// M1a 旧裸数组格式读入时收编为 results（向后兼容）。nn 从译文文件名解析（translated-chunk-NN.md）。
 // 仅当译文位于 */translated-chunks/ 下时生效；任何异常静默跳过（落盘是旁路功能，不能拖垮校验）。
 function appendResultLog(translatedPath, record) {
   try {
@@ -498,15 +505,17 @@ function appendResultLog(translatedPath, record) {
     if (path.basename(dir) !== "translated-chunks") return null;
     const root = path.resolve(dir, "..");
     const logPath = path.join(root, "verify-results.json");
-    let entries = [];
+    let data = { results: [] };
     try {
-      entries = JSON.parse(fs.readFileSync(logPath, "utf-8"));
-      if (!Array.isArray(entries)) entries = [];
+      const parsed = JSON.parse(fs.readFileSync(logPath, "utf-8"));
+      data = Array.isArray(parsed) ? { results: parsed } : parsed;
+      if (!Array.isArray(data.results)) data.results = [];
     } catch (_e) {
-      entries = []; // 不存在或损坏 → 重建
+      data = { results: [] }; // 不存在或损坏 → 重建
     }
-    entries.push(record);
-    fs.writeFileSync(logPath, JSON.stringify(entries, null, 2));
+    const nnM = path.basename(translatedPath).match(/chunk-(\d+)\.md$/);
+    data.results.push(nnM ? { ...record, nn: Number(nnM[1]) } : record);
+    fs.writeFileSync(logPath, JSON.stringify(data, null, 2));
     return logPath;
   } catch (_e) {
     return null;

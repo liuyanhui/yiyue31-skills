@@ -310,7 +310,7 @@ test("CLI：通过退出码 0 / 打回退出码 1 / --json 可解析", () => {
   }
 });
 
-test("CLI：译文在 translated-chunks/ 下 → verify-results.json 落盘（含 sha 与 _note）", () => {
+test("CLI：译文在 translated-chunks/ 下 → verify-results.json 落盘（{results} 包装 + nn，status.mjs 同口径）", () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vmlog-"));
   try {
     const root = path.join(tmp, "demo");
@@ -325,13 +325,14 @@ test("CLI：译文在 translated-chunks/ 下 → verify-results.json 落盘（�
     assert.equal(run.status, 0, run.stdout + run.stderr);
     const logPath = path.join(root, "verify-results.json");
     assert.ok(fs.existsSync(logPath), "verify-results.json 应落盘");
-    const entries = JSON.parse(fs.readFileSync(logPath, "utf-8"));
-    assert.equal(Array.isArray(entries), true);
-    assert.equal(entries.length, 1);
-    assert.equal(entries[0].translated, "translated-chunk-01.md");
-    assert.match(entries[0].translatedSha1, /^[0-9a-f]{12}$/);
-    assert.ok(entries[0]._note.includes("终检不信任"));
-    assert.ok(entries[0].thresholds && entries[0].thresholds.maxEnRun === 6);
+    const data = JSON.parse(fs.readFileSync(logPath, "utf-8"));
+    assert.equal(Array.isArray(data.results), true, "M1b 冻结格式 = { results: [...] } 包装");
+    assert.equal(data.results.length, 1);
+    assert.equal(data.results[0].nn, 1, "记录须带 nn（status/merge 按此取每 chunk 末条为最新）");
+    assert.equal(data.results[0].translated, "translated-chunk-01.md");
+    assert.match(data.results[0].translatedSha1, /^[0-9a-f]{12}$/);
+    assert.ok(data.results[0]._note.includes("终检不信任"));
+    assert.ok(data.results[0].thresholds && data.results[0].thresholds.maxEnRun === 6);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

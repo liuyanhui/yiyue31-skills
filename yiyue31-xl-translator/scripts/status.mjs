@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 // ---------- 常量 ----------
 
@@ -341,9 +342,10 @@ export function buildQueue(state, inv, opts = {}) {
       if (rep !== c.halves[h]) q.push({ dim, nn: c.nn, half: h, kind: "real" });
     }
   }
-  // 探针注入（源侧 truth 存在时）：混排在真单元之后，命名同构
+  // 探针注入（源侧 truth 存在时）：混排在真单元之后，命名同构；text 随行携带（M1c 起
+  // probe.mjs 生成的真实样本文本经 staging 物化派发，缺陷只存源侧 truth）
   const truth = opts.probeTruth ? JSON.parse(safeRead(opts.probeTruth) ?? "[]") : [];
-  truth.forEach((p, i) => q.push({ dim: p.dim, nn: VIRTUAL_NN_MIN + i, half: p.half ?? "a", kind: "probe" }));
+  truth.forEach((p, i) => q.push({ dim: p.dim, nn: VIRTUAL_NN_MIN + i, half: p.half ?? "a", kind: "probe", text: p.text }));
   return { q, action: null };
 }
 
@@ -358,7 +360,7 @@ export function materialize(dir, q) {
     const name = `review-${u.dim}-unit-${seq}.md`;
     const body = u.kind === "real"
       ? halfText(dir, u.nn, u.half)
-      : "__PROBE_BODY__"; // 真实内容由源侧 probe.mjs 生成（M1c）；此处仅占位保同构
+      : u.text ?? "__PROBE_BODY__"; // 探针样本文本来自源侧 truth（probe.mjs 生成）；缺 text 的旧 truth 退占位
     fs.writeFileSync(path.join(sdir, name), body ?? "", "utf-8");
     dispatch.push({
       input: `staging/${name}`,
@@ -576,7 +578,9 @@ const __help = `status.mjs — xl-translator 状态机与续跑（M1b）
 
 退出码: 0 正常 / 1 用法或动词错 / 2 工作目录异常`;
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
+// CLI 守卫用 fileURLToPath：new URL().pathname 在 Windows 是 /D:/... 形态，path.resolve
+// 拼出 D:\D:\... 与 argv[1] 恒不等——M1c 实测抓到的 M1b 潜伏 bug（CLI 静默空转、退出码 0）
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const { pos, opts } = parseArgs(process.argv.slice(2));
   if (opts.help || pos.length < 1) {
     console.log(__help);

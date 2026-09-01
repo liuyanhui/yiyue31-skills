@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "nn": 1,
+      "passed": true,
+      "translationSha": "e824dfafab9f"
+    },
+    {
+      "nn": 2,
+      "passed": true,
+      "translationSha": "4305858877f9"
+    },
+    {
+      "nn": 3,
+      "passed": true,
+      "translationSha": "5811a023a8b6"
+    },
+    {
+      "nn": 4,
+      "passed": true,
+      "translationSha": "9e91746bab6d"
+    }
+  ]
+}

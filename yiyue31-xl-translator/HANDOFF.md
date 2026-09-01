@@ -1,5 +1,8 @@
 # HANDOFF：M1c 交付门开工（新会话冷启动用）
 
+> ⚠️ **状态更新（2026-09-01，第二次）**：M2 编排层已交付（references/ 10 件 + SKILL.md v0.3.0；走查纪要与发现清单见 DESIGN §6 M2 行、待裁决项见 §7 第 0 条）。**下一步 = M3 标定实验（前置五件：①交付物元信息头前置（§7-0 裁决 B）、②consistency.mjs + word-counter.mjs 交付、③R8-c 投影格式冻结、④handoff 生成器落点、⑤probe accuracy 模板改自可见缺陷——详见 DESIGN §6 M3 行），另开新会话**；本文件正文保留作 M1c 交付时的规格存档。
+> 结构化解析契约四件已随 M1c 代码冻结（final-gate.mjs 头注）：裁定台账行 `- «en» → 保留|删除`、精选表 `en :: zh`、冷读覆盖行 `- chunk NN: sha <12hex>`、pm-review `merged-sha:` 锚 + `- chunk NN: 结论` 选样行——M2 写 references prompts 时须与之一致。
+
 > **给新会话执行者**：本文件自足——读完即可开工，不需要先读其他文档。文末索引仅供可选深查。
 > **任务来源**：M1b 已于 2026-09-01 收口（status.mjs + 15 单测，全套 63 项串行全过）。R18 六项已于 2026-08-31 全部裁决（无待裁决项）。本任务 = **M1c：final-gate.mjs + probe.mjs + merge.mjs**。
 > **仓库状态**：master 干净，M1b 及此前全部交付均已提交。`scripts/test/` 为独立测试目录（unit/ + regression/ + run.sh 串行入口），新测试按其 README 维护规约入对应层。

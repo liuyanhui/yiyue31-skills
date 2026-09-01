@@ -10,14 +10,19 @@ scripts/test/
 ├── README.md                       # 本文件
 ├── unit/                           # 单元层：程序化合成夹具（确定性，不落盘），钉死算法行为
 │   ├── segment.test.mjs            #   分段算法：fence 感知/拼接 sha/落带/R11-B/产物/CLI
-│   ├── status.test.mjs             #   状态机（M1b）：推导/双段契约/统一物化/stale/动词/计数器/预算
-│   └── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
+│   ├── status.test.mjs             #   状态机（M1b）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI
+│   ├── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
+│   ├── merge.test.mjs              #   合并（M1c）：M1-M7 纯函数与病态输入、CLI 冒烟
+│   ├── probe.test.mjs              #   探针生成（M1c）：四维覆盖/虚拟 NN/确定性/truth 落盘与防覆盖
+│   └── final-gate.test.mjs         #   交付门（M1c）：重执行/完备性/G3/R23/标题锚/G4/R15/探针/改名/半径
 └── regression/                     # 回归层：git 管理的真实文档夹具，钉死真实世界回归
     ├── segment.regression.test.mjs
+    ├── merge.regression.test.mjs   #   M1c：真实译文快照 × 合成场景装置（M1-M7）
     └── fixtures/
         ├── single/  single-NN.md   # 无需切割（总长 ≤ max，单 chunk 是正确形态）
         ├── few/     few-NN.md      # 切成 2-10 个 chunk
-        └── many/    many-NN.md     # 切成 ≥11 个 chunk
+        ├── many/    many-NN.md     # 切成 ≥11 个 chunk
+        └── merge/                 # 行为场景型（M1c）：happy/partial/residue/broken/case-NN 工作目录快照
 ```
 
 ## 怎么跑
@@ -62,7 +67,7 @@ node --test scripts/test/regression/segment.regression.test.mjs
 | S1 | 关卡退出码 = 0（含拼接 sha === 原文 sha 硬关卡） | 任何路径静默失败 |
 | S2 | 测试独立复读全部 chunk 按 NN 序拼接，字节级 === 归一化原文 | 偷删/改写分母（只信 run 内部关卡 = 既当运动员又当裁判） |
 | S3 | 命名全部匹配 `chunk-<NN>[X]-<slug>.md`，NN 从 01 连续无跳号 | 命名漂移破坏 status/final-gate 的 glob 分辨规则 |
-| S4 | 磁盘 chunk 数 === manifest 表 === progress.total_chunks，两产物存在 | 产物间不一致 |
+| S4 | 磁盘 chunk 数 === manifest 表登记；manifest 落盘存在；progress.json 不再写出（status.md 吸收，2026-08-31） | 产物间不一致 |
 | S5 | 非原子 chunk ≤ max（15KB）；原子 X 免（超限即其形态，R11-B） | 散文超限（审校半块甜点区被破坏） |
 | S6 | 非原子 chunk ≥ min（8KB）；唯一豁免 = 末 chunk 且并入前包超 max（结构性不可合并） | **碎片病**（旧方案 66 字节 chunk 的直接死因） |
 | S7 | 数量角色：single = 1；few ∈ [2,10]；many ≥ 11 | 类别判据 + 粗粒度总量回归 |
