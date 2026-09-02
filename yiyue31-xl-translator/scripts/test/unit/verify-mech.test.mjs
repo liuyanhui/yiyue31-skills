@@ -16,7 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-import { verify, parseBrief, numberVariants, extractNumbers, englishRuns, spacingViolations, paragraphUnits, stripMechanical } from "../../verify-mech.mjs";
+import { verify, parseBrief, parseProjection, numberVariants, extractNumbers, englishRuns, spacingViolations, paragraphUnits, stripMechanical } from "../../verify-mech.mjs";
 
 const require = createRequire(import.meta.url);
 // fork 源只读引用（对照测试用；绝不回写）。路径：scripts/ → 上两级到 skills 根 → 兄弟 skill
@@ -353,6 +353,53 @@ test("CLI：--brief 阈值生效（max-en-run 收紧到安全域下界 4，4 词
     const parsed = JSON.parse(run.stdout);
     assert.ok(parsed.fails.some((f) => f.check === "en-residue"), JSON.stringify(parsed.fails));
     assert.equal(parsed.thresholds.maxEnRun, 4); // clamp 后生效值
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ---------- 10. 术语兑现硬判（R8-c，M3 前置③） ----------
+
+test("parseProjection：`en :: zh [| 别名]` 冻结格式（# 注释/空行忽略）", () => {
+  const es = parseProjection("# 机器生成——勿手改\n\nagent :: 智能体\nharness :: 外壳 | 客户端\n坏行没有分隔符\n");
+  assert.deepEqual(es, [
+    { en: "agent", zh: "智能体", aliases: [] },
+    { en: "harness", zh: "外壳", aliases: ["客户端"] },
+  ]);
+});
+
+test("R8-c：投影译名兑现——主译名命中过 / 别名命中过（放宽）/ 双缺打回 / 无投影跳过", () => {
+  const proj = "agent :: 智能体\nharness :: 外壳 | 客户端\npipeline :: 管线\n";
+  const o = "The agent and harness use pipelines.";
+  // 主译名命中（智能体 + 外壳 + 管线全在）
+  const ok = verify(o, "智能体与外壳使用管线。", { projectionText: proj });
+  assert.ok(ok.passed, JSON.stringify(ok.fails));
+  // 别名命中（客户端）也过——R8-c 别名放宽
+  const alias = verify(o, "智能体与客户端使用管线。", { projectionText: proj });
+  assert.ok(alias.passed, JSON.stringify(alias.fails));
+  // pipeline 译名缺失 → term-fidelity 打回
+  const miss = verify(o, "智能体与外壳使用通道。", { projectionText: proj });
+  assert.ok(!miss.passed);
+  assert.ok(miss.fails.some((f) => f.check === "term-fidelity" && f.message.includes("pipeline")));
+  // 无投影输入 → 本判不空转（不产生任何 term-fidelity）
+  const none = verify(o, "智能体与外壳使用通道。", {});
+  assert.ok(none.passed || !none.fails.some((f) => f.check === "term-fidelity"), "缺省跳过");
+});
+
+test("CLI：--projection 传入生效（缺译名退出 1，failChecks 含 term-fidelity）", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vmproj-"));
+  try {
+    const o = path.join(tmp, "o.md");
+    const t = path.join(tmp, "t.md");
+    const proj = path.join(tmp, "projection.md");
+    fs.writeFileSync(o, "The agent uses pipelines.");
+    fs.writeFileSync(t, "智能体使用通道。");
+    fs.writeFileSync(proj, "# 投影\npipeline :: 管线\n");
+    const { spawnSync } = require("node:child_process");
+    const run = spawnSync(process.execPath, [SCRIPT, o, t, "--projection", proj, "--json"], { encoding: "utf-8" });
+    assert.equal(run.status, 1);
+    const parsed = JSON.parse(run.stdout);
+    assert.ok(parsed.fails.some((f) => f.check === "term-fidelity"));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

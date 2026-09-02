@@ -14,6 +14,10 @@
 //      视为整句漏译。括注不算：阶段B 合法产物「中文（English）」里的英文不是漏译。
 //   8. 中英间距（新）：中文表意字符与 ASCII 字母/数字直接相邻 = 违规（排版硬判，修完重跑即过）。
 //   9. 防空洞化（新）：译文段落数 / 散文长度相对原文低于下限 → 疑似整段漏译或缩写。
+//  10. 术语兑现硬判（R8-c，2026-08-31 裁决采纳；M3 前置③实现）：该 chunk 投影条目
+//      （handoff.mjs 生成，格式 `English :: 中文 [| 别名]`，# 注释/空行忽略）的既定译名或
+//      登记别名未在译文出现即打回（别名放宽防变体写法误伤）。无投影输入（--projection
+//      缺省/文件不存在）→ 跳过——投影属逐 chunk 阶段产物，未生成时本判不空转。
 //
 // 单次判定语义：本脚本只做一次判定 + 明确退出码（0=过 / 1=打回+FAIL 清单）。
 // 「同 chunk 机械打回 ≤2 次升级」的计数归 status.mjs（M1b），本脚本不读不写计数。
@@ -348,6 +352,21 @@ export function parseBrief(text) {
   return out;
 }
 
+// 投影解析（R8-c 输入；格式与 handoff.mjs renderProjection / 精选表同风格）：
+// 每行 `English :: 中文 [| 别名]…`；`#` 注释行与空行忽略
+export function parseProjection(text) {
+  const out = [];
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const i = t.indexOf("::");
+    if (i <= 0) continue;
+    const parts = t.slice(i + 2).split("|").map((s) => s.trim()).filter(Boolean);
+    if (parts.length) out.push({ en: t.slice(0, i).trim(), zh: parts[0], aliases: parts.slice(1) });
+  }
+  return out;
+}
+
 export function loadBrief(p) {
   if (!p) return {};
   let raw;
@@ -455,7 +474,22 @@ export function verify(originalText, translatedText, opts = {}) {
     fails.push({ check: "structure", message: `译文过短：散文长度 ${lenO}B → ${lenT}B（比值 ${lenRatio.toFixed(2)} < ${th.minLenRatio}），疑似缩写漏译`, detail: { lenO, lenT } });
   }
 
-  // 10. 注释密度（仅 WARN，不硬判）
+  // 10. 术语兑现硬判（R8-c）：投影条目既定译名/别名未在译文出现即打回；无投影输入跳过
+  const projectionEntries = opts.projectionText != null ? parseProjection(opts.projectionText) : null;
+  if (projectionEntries) {
+    for (const e of projectionEntries) {
+      const hit = [e.zh, ...e.aliases].some((v) => v && translatedText.includes(v));
+      if (!hit) {
+        fails.push({
+          check: "term-fidelity",
+          message: `术语兑现缺失（R8-c）：投影条目 ${e.en} → 「${e.zh}」${e.aliases.length ? `（别名 ${e.aliases.join("/")}）` : ""}未在译文出现`,
+          detail: e,
+        });
+      }
+    }
+  }
+
+  // 11. 注释密度（仅 WARN，不硬判）
   //    计数无法区分"金句原文括注 / 引用 / 专名括注 / 数据列表"与真正的"词级 spam"；
   //    能机械硬判的已在上面的 FAIL；过注与否的硬判留给语义层（审校 + 阶段B）。
   const annCount = countEnglishAnnotations(translatedText);
@@ -526,11 +560,12 @@ function appendResultLog(translatedPath, record) {
 
 function parseArgs(argv) {
   const pos = [];
-  const opts = { keepListPath: null, briefPath: null, maxAnnotations: null, json: false };
+  const opts = { keepListPath: null, briefPath: null, projectionPath: null, maxAnnotations: null, json: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--keep-list") opts.keepListPath = argv[++i];
     else if (a === "--brief") opts.briefPath = argv[++i];
+    else if (a === "--projection") opts.projectionPath = argv[++i];
     else if (a === "--max-annotations") opts.maxAnnotations = parseInt(argv[++i], 10);
     else if (a === "--json") opts.json = true;
     else if (a === "-h" || a === "--help") opts.help = true;
@@ -543,7 +578,7 @@ function printHelp() {
   console.log(`verify-mech.mjs — xl-translator 翻译后机械校验（单次判定）
 
 用法:
-  node verify-mech.mjs <original.md> <translated.md> [--keep-list <path>] [--brief <path>] [--max-annotations N] [--json]
+  node verify-mech.mjs <original.md> <translated.md> [--keep-list <path>] [--brief <path>] [--projection <path>] [--max-annotations N] [--json]
 
 校验项（FAIL 退出码 1）:
   1. 代码块 / 行内代码：原文 ⊆ 译文（抓遗漏与误改）
@@ -555,7 +590,8 @@ function printHelp() {
   7. 散文残留英文：剥离机械元素后连续英文词 ≥ 6（--max-en-run 经 brief 调）
   8. 中英间距：中文与 ASCII 字母/数字间须有空格
   9. 防空洞化：段落计数比 < 0.6 或散文长度比 < 0.35（brief 可调）
-  10. （英文）注释密度超阈值 → 仅 WARN
+  10. 术语兑现（R8-c）：投影条目（--projection，handoff.mjs 生成）既定译名/别名未出现即打回；缺省跳过
+  11. （英文）注释密度超阈值 → 仅 WARN
 
 输入: chunk 原文 + 译文 + keep-list + brief（阈值来源；优先级 CLI > brief > 默认）
 输出: 退出码 0=过 / 1=打回；--json 出完整结果；译文在 */translated-chunks/ 下时追加 verify-results.json
@@ -598,7 +634,16 @@ export function runCli(args) {
   }
   // 优先级：CLI 显式旗标 > brief > 默认
   if (opts.maxAnnotations != null) briefTh.maxAnnotations = opts.maxAnnotations;
-  const result = verify(originalText, translatedText, { keepList, ...briefTh });
+  let projectionText = null;
+  if (opts.projectionPath) {
+    try {
+      projectionText = fs.readFileSync(opts.projectionPath, "utf-8");
+    } catch (e) {
+      console.error(`❌ 投影文件读取失败（${opts.projectionPath}）：${e.message}`);
+      process.exit(1);
+    }
+  }
+  const result = verify(originalText, translatedText, { keepList, projectionText, ...briefTh });
   appendResultLog(pos[1], {
     time: new Date().toISOString(),
     original: path.basename(pos[0]),

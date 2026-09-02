@@ -37,6 +37,8 @@ import {
   requiredSamples,
   headingAnchorCheck,
   probeCheck,
+  renderMetaHeader,
+  stripMetaHeader,
 } from "../../final-gate.mjs";
 
 const sha12 = (s) => crypto.createHash("sha1").update(s, "utf-8").digest("hex").slice(0, 12);
@@ -194,6 +196,9 @@ function greenDir() {
   // 精选表（R23：chunk 01 原文含左值）
   fs.writeFileSync(path.join(dir, "special-phrases-fintest.md"), "# 精选表\nthe quick brown fox :: 敏捷的棕色狐狸\n", "utf-8");
 
+  // glossary（R8-c 重推导源：system 出现于 chunk 01 原文、译文含「系统」——正向兑现）
+  fs.writeFileSync(path.join(dir, "glossary-fintest.md"), "# 术语表\n\n| English Term | Translation | Context |\n|---|---|---|\n| system | 系统 | 语境 |\n", "utf-8");
+
   // verify 流水（merge 的筛选依据；final-gate 不信它、自己重跑）
   fs.writeFileSync(
     path.join(dir, "verify-results.json"),
@@ -290,6 +295,13 @@ test("PASS：全绿目录 → 原子改名 + REPORT 定稿 + G1 回显 + events�
     const deliverable = path.join(dir, "translated-fintest-zh.md");
     assert.ok(fs.existsSync(deliverable), "交付物落盘");
     assert.ok(!fs.existsSync(path.join(dir, "merged-draft.md")), "临时名消失");
+    // 裁决 B：元信息头前置（字段 = delivery-template 第二节；头在最前，标题 H1 由 chunk 01 自带）
+    const dv = fs.readFileSync(deliverable, "utf-8");
+    assert.ok(dv.startsWith("> **原文**："), "元信息块在最前");
+    assert.ok(/^> \*\*风格\*\*：意译$/m.test(dv), "风格行（brief 缺省 = 意译）");
+    assert.ok(/^> \*\*字数\*\*：\d+（汉字）$/m.test(dv), "字数行（CJK 计数）");
+    assert.ok(/^---\s*$/m.test(dv), "分隔线");
+    assert.ok(!fs.existsSync(deliverable + ".tmp"), "无临时件残留");
     // REPORT：sha 锚（R18-⑥）+ G1 回显 + 探针人话
     const report = fs.readFileSync(path.join(dir, "REPORT.md"), "utf-8");
     assert.ok(report.includes("可发布"));
@@ -307,6 +319,86 @@ test("PASS：全绿目录 → 原子改名 + REPORT 定稿 + G1 回显 + events�
     // 摘要（stdout 内联件）
     assert.ok(r.summary.includes("translated-fintest-zh.md"));
     assert.ok(r.summary.includes("抽查"));
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("裁决 B：renderMetaHeader/stripMetaHeader 纯函数往返 + 字段来源", () => {
+  const body = "# 中文标题\n*English Title*\n\n正文一段。\n";
+  const header = renderMetaHeader({
+    originalText: "# English Title\n\nBody…",
+    briefText: "风格: 直译\n作者: Someone\n来源: https://example.com/a\n",
+    mergedText: body,
+  });
+  assert.ok(header.startsWith("> **原文**：English Title"));
+  assert.match(header, /^> \*\*作者\*\*：Someone$/m);
+  assert.match(header, /^> \*\*来源\*\*：https:\/\/example\.com\/a$/m);
+  assert.match(header, /^> \*\*风格\*\*：直译$/m);
+  assert.match(header, /^> \*\*字数\*\*：\d+（汉字）$/m);
+  assert.match(header, /\n---\n\n$/);
+  // 往返：去头还原纯拼接正文
+  assert.equal(stripMetaHeader(header + body), body);
+  // 无头文本原样返回（手改件不误剥）
+  assert.equal(stripMetaHeader("# 手改\n内容"), "# 手改\n内容");
+  // brief 无风格行 → 缺省意译；作者/来源缺行 → 空值行仍在（delivery-template 形态）
+  const h2 = renderMetaHeader({ originalText: "", briefText: "", mergedText: "中文字" });
+  assert.match(h2, /^> \*\*风格\*\*：意译$/m);
+  assert.match(h2, /^> \*\*作者\*\*：$/m);
+});
+
+test("裁决 B：幂等重入——PASS 后再跑（merged-draft 已删）→ 去头比对一致，不误报手改", () => {
+  const { dir, truthFile } = greenDir();
+  try {
+    const first = runGate(dir, { probeTruth: truthFile });
+    assert.equal(first.exitCode, 0);
+    assert.ok(!fs.existsSync(path.join(dir, "merged-draft.md")), "首次 PASS 已删临时稿");
+    const second = runGate(dir, { probeTruth: truthFile });
+    assert.equal(second.exitCode, 0, JSON.stringify(second.fails, null, 2));
+    assert.equal(second.passed, true);
+    assert.equal(second.delivered, true);
+    assert.ok(!second.fails.some((f) => f.check === "deliverable-guard"), "不得误报手改（R18-⑥）");
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("R8-c：投影条目译名未兑现 → scoped FAIL（term-fidelity）；缺 glossary → global", () => {
+  const { dir, truthFile } = greenDir();
+  try {
+    // 追加条目：hit rate 出现于 chunk 02 原文，译文只写「命中率」——既定译名「命中比率」未兑现
+    fs.writeFileSync(
+      path.join(dir, "glossary-fintest.md"),
+      "# 术语表\n\n| English Term | Translation | Context |\n|---|---|---|\n| system | 系统 | 语境 |\n| hit rate | 命中比率 | 语境 |\n",
+      "utf-8"
+    );
+    let r = runGate(dir, { probeTruth: truthFile });
+    assert.ok(!r.passed);
+    assert.ok(r.fails.some((f) => f.check === "verify" && f.message.includes("term-fidelity") && f.message.includes("hit rate")), `R8-c 打回：${JSON.stringify(r.fails.map((f) => [f.scope, f.check]))}`);
+    assert.equal(r.exitCode, 3, "scoped（单 chunk 根因）");
+    assert.ok(!fs.existsSync(path.join(dir, "translated-fintest-zh.md")), "FAIL 不得改名");
+    // 缺 glossary → global（Step 2 产物破口）
+    fs.rmSync(path.join(dir, "glossary-fintest.md"));
+    r = runGate(dir, { probeTruth: truthFile });
+    assert.equal(r.exitCode, 4);
+    assert.ok(r.fails.some((f) => f.check === "completeness" && f.message.includes("glossary")));
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("R8-c 零信任：删/改落盘投影文件不影响判定（重推导为准，漂移仅 WARN）", () => {
+  const { dir, truthFile } = greenDir();
+  try {
+    fs.mkdirSync(path.join(dir, "handoff"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "handoff", "projection-chunk-01.md"), "# 被篡改的投影\nwhatever :: 什么都行\n", "utf-8");
+    const r = runGate(dir, { probeTruth: truthFile });
+    assert.equal(r.exitCode, 0, JSON.stringify(r.fails, null, 2));
+    assert.ok(r.warns.some((w) => w.includes("投影文件与重推导不一致")), "漂移 WARN");
+    assert.ok(!fs.existsSync(path.join(dir, "handoff", "projection-chunk-02.md")), "未生成投影文件不构成 FAIL");
   } finally {
     fs.rmSync(truthFile, { force: true });
     fs.rmSync(dir, { recursive: true, force: true });

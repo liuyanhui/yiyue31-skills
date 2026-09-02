@@ -1,6 +1,6 @@
 # HANDOFF：M1c 交付门开工（新会话冷启动用）
 
-> ⚠️ **状态更新（2026-09-01，第二次）**：M2 编排层已交付（references/ 10 件 + SKILL.md v0.3.0；走查纪要与发现清单见 DESIGN §6 M2 行、待裁决项见 §7 第 0 条）。**下一步 = M3 标定实验（前置五件：①交付物元信息头前置（§7-0 裁决 B）、②consistency.mjs + word-counter.mjs 交付、③R8-c 投影格式冻结、④handoff 生成器落点、⑤probe accuracy 模板改自可见缺陷——详见 DESIGN §6 M3 行），另开新会话**；本文件正文保留作 M1c 交付时的规格存档。
+> ⚠️ **状态更新（2026-09-02，第三次）**：M3 前置五件已全部落地（①元信息头前置 ②consistency/word-counter ③R8-c 重推导 ④handoff.mjs 机器件 ⑤probe 自可见模板；纪要见 DESIGN §6 M3 行），全套 149 项测试串行全过。**下一步 = M3 本体：~20KB 文档 `--xl-force` 全流程试跑（粒度/四维有效性/探针命中/断点续跑/耗时与每次调用 token 记录），另开新会话**；本文件正文保留作 M1c 交付时的规格存档。
 > 结构化解析契约四件已随 M1c 代码冻结（final-gate.mjs 头注）：裁定台账行 `- «en» → 保留|删除`、精选表 `en :: zh`、冷读覆盖行 `- chunk NN: sha <12hex>`、pm-review `merged-sha:` 锚 + `- chunk NN: 结论` 选样行——M2 写 references prompts 时须与之一致。
 
 > **给新会话执行者**：本文件自足——读完即可开工，不需要先读其他文档。文末索引仅供可选深查。

@@ -5,7 +5,9 @@
 //
 // 检查面（DESIGN §2 Step 10；HANDOFF M1c）：
 //   1. 分母复核（global）：chunks/ 按 NN 数值序拼接 sha === original 文件 sha；manifest 钉死
-//   2. 机械校验全项重跑（scoped/chunk）：verify() 同源重跑每 chunk（keep-list + brief clamp 同参）
+//   2. 机械校验全项重跑（scoped/chunk）：verify() 同源重跑每 chunk（keep-list + brief clamp +
+//      R8-c 投影同参——投影从 glossary × chunk 原文**重推导**（handoff.mjs 纯函数），不信任
+//      落盘 projection-chunk 文件：防"删投影灭判"；落盘件与重推导不一致仅 WARN，以重推导为准）
 //   3. merged 重导出 diff（global）：assemble(全部译文)（merge.mjs 纯函数）vs merged-draft.md 字节比较
 //   4. 完备性矩阵（分母 = 原文钉死；scoped/chunk）：裁定台账 + 4 维 × 2 半块报告全存在且
 //      头部 sha fresh；**准确性维度缺失 = 无条件 FAIL（不可降级）**
@@ -46,6 +48,7 @@ import { scanWorkdir, halfSlices, appendEvents, chapterMap } from "./status.mjs"
 import { fenceAwareHeadings } from "./segment/segment.mjs";
 import { verify, loadKeepList, loadBrief, englishAnnotationMatches } from "./verify-mech.mjs";
 import { assemble } from "./merge.mjs";
+import { parseGlossary, projectionFor, renderProjection } from "./handoff.mjs";
 
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
 const PM_QUALITY_DIMS = [
@@ -129,6 +132,39 @@ export function parsePmReview(text) {
 export function anchorOff(briefText) {
   if (!briefText) return false;
   return /^标题双语锚\s*[:：]\s*(off|false|关|关闭)\s*$/im.test(briefText);
+}
+
+// ---------- 交付物元信息头（§7-0 裁决 B：PASS 改名时前置；字段 = delivery-template.md 第二节） ----------
+// 块置于全文最前（frontmatter 位），其后 `---` 分隔——不插 H1（标题 H1 由 chunk 01 译文自带，
+// 前插块不得插在 H1 与其锚行之间，否则标题双语锚硬判破坏）。merged-draft 本体仍纯拼接（M5 确定性不变）。
+
+export function renderMetaHeader({ originalText, briefText, mergedText }) {
+  const origTitle = originalText?.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? "";
+  const grab = (re) => briefText?.match(re)?.[1]?.trim() ?? "";
+  const style = grab(/^风格\s*[:：]\s*(意译|直译)\s*$/m) || "意译";
+  const author = grab(/^作者\s*[:：]\s*(.+)$/m);
+  const source = grab(/^来源\s*[:：]\s*(.+)$/m);
+  const date = new Date().toISOString().slice(0, 10);
+  const cjk = (mergedText?.match(/[一-鿿]/g) ?? []).length;
+  return [
+    `> **原文**：${origTitle}`,
+    `> **作者**：${author}`,
+    `> **来源**：${source}`,
+    `> **翻译日期**：${date}`,
+    `> **风格**：${style}`,
+    `> **字数**：${cjk}（汉字）`,
+    "",
+    "---",
+    "",
+    "",
+  ].join("\n");
+}
+
+// 交付物去头（幂等重入比对用）：块以 `> **原文**：` 起、首个 `---` 行止，其后为纯拼接正文
+export function stripMetaHeader(text) {
+  if (!text?.startsWith("> **原文**：")) return text;
+  const idx = text.split(/\r?\n/).findIndex((l) => /^---\s*$/.test(l));
+  return idx === -1 ? text : text.split(/\r?\n/).slice(idx + 1).join("\n").replace(/^\n/, "");
 }
 
 // pm-review 必备选样集（Step 9"脚本化分层选样 ≥20%"的同规则重推导——零信任：
@@ -242,7 +278,14 @@ export function runGate(dir, opts = {}) {
     }
   }
 
-  // ---- 2. 机械校验全项重跑（不信 verify-results.json；scoped/chunk） ----
+  // ---- 2. 机械校验全项重跑（不信 verify-results.json；scoped/chunk；R8-c 投影同参——重推导） ----
+  // R8-c 零信任口径：投影从 glossary × chunk 原文重推导（handoff.mjs 纯函数），不信任落盘
+  // projection-chunk 文件（防"删投影灭判"）；落盘件与重推导不一致仅 WARN，判以重推导为准。
+  const glossaryFile = fs.readdirSync(dir).find((f) => /^glossary-/.test(f)) ?? null;
+  const glossaryText = glossaryFile != null ? safeRead(path.join(dir, glossaryFile)) : null;
+  if (glossaryText == null) push("global", "completeness", "缺 glossary-<title>.md——Step 2 产物破口（R8-c 投影无源）");
+  const glossaryEntries = glossaryText != null ? parseGlossary(glossaryText) : [];
+  const glossarySha = glossaryText != null ? sha12(glossaryText) : "-";
   for (const c of inv.chunks) {
     const orig = safeRead(path.join(dir, "chunks", c.name));
     const t = inv.translated[c.nn];
@@ -251,18 +294,24 @@ export function runGate(dir, opts = {}) {
       continue;
     }
     if (orig == null) continue; // 分母缺已在 global 记
-    const result = verify(orig, t.text, { keepList, ...briefTh });
+    const projectionText = renderProjection(projectionFor(glossaryEntries, orig), { glossarySha, chunkSha: sha12(orig), nn: c.nn });
+    const onDiskProj = safeRead(path.join(dir, "handoff", `projection-chunk-${nn2(c.nn)}.md`));
+    if (onDiskProj != null && onDiskProj !== projectionText) {
+      warns.push(`投影文件与重推导不一致（chunk ${nn2(c.nn)}）——判以重推导为准，建议重跑 handoff.mjs`);
+    }
+    const result = verify(orig, t.text, { keepList, projectionText, ...briefTh });
     if (!result.passed) {
       push(c.nn, "verify", `chunk ${nn2(c.nn)} 机械校验重跑未过（${result.fails.length} 项）：${result.fails.slice(0, 3).map((f) => `[${f.check}] ${f.message}`).join("；")}${result.fails.length > 3 ? " …" : ""}`);
     }
   }
 
   // ---- 3. merged 重导出 diff（复用 merge.mjs 纯函数；归因规则见下） ----
-  // 幂等重入：PASS 改名后 merged-draft.md 不在，交付物即 merged 内容（sha 一致性由本阶段判定）
+  // 幂等重入：PASS 改名后 merged-draft.md 不在，交付物去元信息头后即 merged 内容（裁决 B——头是改名时前置的）
   const deliverable = `translated-${title}-zh.md`;
   const deliverablePath = path.join(dir, deliverable);
   const mergedOnDisk = safeRead(path.join(dir, "merged-draft.md"));
-  const mergedText = mergedOnDisk ?? safeRead(deliverablePath);
+  const deliverableRaw = safeRead(deliverablePath);
+  const mergedText = mergedOnDisk ?? (deliverableRaw != null ? stripMetaHeader(deliverableRaw) : null);
   const mergedIsDeliverable = mergedOnDisk == null && mergedText != null;
   const mergedLabel = mergedIsDeliverable ? `交付物 ${deliverable}` : "merged-draft.md";
   const reassembled = assemble(inv.chunks.map((c) => ({ nn: c.nn, text: inv.translated[c.nn]?.text ?? "" })));
@@ -448,14 +497,19 @@ export function runGate(dir, opts = {}) {
 
   if (passed) {
     const existing = safeRead(deliverablePath);
-    if (existing != null && existing !== mergedText) {
+    if (existing != null && stripMetaHeader(existing) !== mergedText) {
       // R18-⑥：已存在不一致交付物 = 用户手改 → 拒绝覆盖，转人工裁决（手修永不覆盖）
       fails.push({ scope: "global", check: "deliverable-guard", message: `已存在交付物 ${deliverable} 与本次产物 sha 不一致（疑用户手改）——保留手修或删除后重跑，终检不自动覆盖（R18-⑥）` });
     } else if (mergedIsDeliverable) {
-      delivered = true; // 幂等重入：交付物在位且 = 重导出组装，无需动作
+      delivered = true; // 幂等重入：交付物在位且去头后 = 重导出组装，无需动作
     } else {
-      // 原子改名：全部判据过后的唯一落盘动作（PASS 前全目录唯一允许命中发布模式的文件名）
-      fs.renameSync(path.join(dir, "merged-draft.md"), deliverablePath);
+      // 落盘（裁决 B）：元信息头 + merged 内容。写临时件再原子改名——交付物要么完整出现要么不出现；
+      // merged-draft 删除在交付物就位之后。merged-draft 本体保持纯拼接（M5 确定性不变）。
+      const header = renderMetaHeader({ originalText: safeRead(inv.originalFile), briefText, mergedText });
+      const tmp = deliverablePath + ".tmp";
+      fs.writeFileSync(tmp, header + mergedText, "utf-8");
+      fs.renameSync(tmp, deliverablePath);
+      fs.rmSync(path.join(dir, "merged-draft.md"));
       delivered = true;
     }
   }

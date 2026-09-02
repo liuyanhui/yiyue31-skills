@@ -312,7 +312,9 @@ xl-translator/<title>/
 ├── chunks/chunk-<NN>-<slug>.md                  # Step 1；fence/表格原子巨块超限单 chunk 用 chunk-<NN>X-（X 标记超限，仅原子块可得——R11-B；散文巨块强制再切）
 ├── handoff/
 │   ├── map.md                                   # 全文 chunk 地图（五件套①，含标题树既定译名——R19）
-│   ├── chunk-<NN>.md                            # 该 chunk 交接包（②-⑤）
+│   ├── chunk-<NN>.md                            # 该 chunk 交接包判断段（②④⑤与①④引用——主 agent 组装，机器件外）
+│   ├── projection-chunk-<NN>.md                 # 机器生成（handoff.mjs）：既定译法投影（R8-b）；格式 `English :: 中文 [| 别名]`（# 注释/空行忽略）；verify-mech R8-c 消费（M3 前置④冻结）
+│   ├── context-chunk-<NN>.md                    # 机器生成（handoff.mjs）：串行增强段（N-1 邻 chunk 已审译文末段 300-500 字 + sha 锚——源译文变更即重生成）
 │   └── anchor.md                                # 范文锚点（chunk 1 过审后生成；文体分化的书按部分节存多锚点——R19）
 ├── translated-chunks/translated-chunk-<NN>.md   # 阶段A+B 后译文（当前版）
 ├── adjudications/adjudication-chunk-<NN>.md     # 阶段B 裁定台账
@@ -364,11 +366,12 @@ xl-translator/<title>/
 | delivery-template.md | Step 10 | REPORT 元信息模板（fork） |
 | terms.md | Step 2 | 种子术语表（一次性拷贝起点，与 translator 零共享） |
 
-**B. `scripts/`（9 个）**
+**B. `scripts/`（10 个）**
 
 | 文件 | 引入位置 | 职责 |
 |---|---|---|
 | segment/ | Step 1 | doc_segmenter fork：8-15KB 目标带/跨级别合并/fence 感知/分布自检 |
+| handoff.mjs | Step 3 派发前（每 chunk） | 交接包机器件生成：projection-chunk-（R8-b 投影：glossary × chunk 原文扫描，大小写/单复数归一）+ context-chunk-（串行增强段，sha 绑定）；判断段 chunk-<NN>.md 由主 agent 组装（M3 前置④落点裁决：机械归脚本、判断归主 agent；标题条目/反复用语待 map.md 格式冻结后并入，M3 标定观察） |
 | verify-mech.mjs | Step 5（Step 10 重执行同源） | 原五+新四硬判、修复后强制重跑；R8-c 术语兑现硬判已裁决采纳（2026-08-31），随 M1b 投影格式冻结后实现 |
 | status.mjs | 横切（每动作前必跑） | resume oracle：状态推导、探针队列注入、用户动词响应 |
 | final-gate.mjs | Step 10 | 重执行一切、新鲜度豁免 glob、探针命中比对、原子改名 |
@@ -393,7 +396,7 @@ xl-translator/<title>/
 | **M1b 状态机** ✅（2026-09-01 完成：status.mjs + 15 项单测串行全过，全套 63 项；progress.json 已移除——segment 停写 + 两层测试对账改 manifest/status.md；R25 统一物化（staging/ 同构命名 + 虚拟 NN 901-999 + 工作区无 probes/）、R22 阈值披露、R28 落盘字节 sha、events.jsonl 计数器（G6/R4 超限自动挂起）、会话预算干净退出点（R14）、六动词（含 R16 样张/R18-③ 重新翻译）均已实现；实测修复一个真 bug：reviews 扫描正则不吃连字符 dim（ai-tone）静默漏读） | status.mjs：stale 分类/升级态/PENDING-USER/原文 re-keying（内容 sha 匹配）/探针队列注入/用户动词表/进度人话 | 单元自测：各状态转移、断点重入、动词响应 |
 | **M1c 交付门** ✅（2026-09-01 完成：merge.mjs + probe.mjs + final-gate.mjs，全套 121 项串行全过（63 基线 + 新增 58）；merge M1-M7 双层落地（unit 18 + 真实译文快照回归 7——夹具取自 refined-stock loop-engineering 真实交付切片，场景装置合成）；final-gate 重执行一切（verify 同源重跑/chunks 拼接 sha 复核/merged 重导出 diff 复用 merge 纯函数）、完备性矩阵（准确性缺失无条件 FAIL）、报告签名扫描（undersize 阈值缩放公式落定：base 240B × unitKB/4、下限 120B + 跨报告模板签名）、G3 括注对账（期望集 = 台账保留 ∪ R23 必兑现，双向相等）、R23 形态硬判、标题双语锚（fence 感知分母 + brief `标题双语锚: off` 开关随披露跳过）、G4 冷读覆盖矩阵 + pm-review 选样集重推导（每 5 抽 1 + 升级/接缝必抽）+ 五维无 SKIPPED、R15 锚不豁免、探针命中比对（缺 truth = FAIL）、新鲜度豁免 glob（mtime 仅 WARN）、PASS 原子改名 + REPORT 定稿（R18-⑥ 手改保护/交付物 sha 锚/G1 回显/R20 人话括注）、FAIL 半径分级（scoped 退出码 3/global 退出码 4）+ 连续 ≥3 转 PENDING-USER；probe 源侧 truth（`probe/truth/<run>.json`，同 run+seed 字节可复现，虚拟 NN 901-999 与 status 分配同规则）；结构化解析契约四件（台账行/精选表/冷读覆盖行/pm-review 锚+选样行）随码冻结供 M2 prompt 对齐；实测修复三个真 bug：M1b status.mjs CLI 守卫在 Windows 静默空转（`new URL().pathname` → `D:\D:\` 假绿，改 fileURLToPath）、verify-mech 落盘裸数组与 status/merge 的 `{results}` 接口互相失明、status.mjs 探针占位符 `__PROBE_BODY__` 未接真实样本文本） | final-gate.mjs + probe + **merge.mjs**（Step 8 本体，2026-08-31 Yiyue 裁决补登记——M3 试跑前必须就位，见 §5.2）（依赖 M1b） | 单元自测：重执行、新鲜度豁免 glob、探针命中判定、原子改名、标题双语锚硬判（§2 Step 10）；**merge 双层测试**（unit + 真实译文快照回归，固定判据 M1-M7，契约已先行登记于 `scripts/test/README.md`，测试本体随脚本交付落地） |
 | **M2 编排层** ✅（2026-09-01 完成：references/ 10 件全落位（§5.2 A 封闭集）+ SKILL.md v0.3.0。**指针替换**：开发期"见 DESIGN §X"全部换为封闭集文件指针；**同步点全回写**：progress.json 移除（Step 1 产物与 Step 10 豁免 glob）、brief 默认值 + 标题双语锚开（Step 0）、G3 括注对账 ⊆→**双向相等**（Step 4 残留修正）、Step 10 豁免 glob 按 final-gate EXEMPT_GLOBS 实口径（probes/→staging/、补 status.md/events.jsonl/pending.md）、R11-B 巨块收紧、R8-c 术语兑现/G2 clamp/G7 手修（Step 5）、G6 升级计数器三条款（Step 7）、R3 冷读计入统稿轮（Step 9）、R18 六项与动词表补"重新翻译/样张"（横切）、G1 外锚/R16 喊停样张/R28 EOL 归一（Step 0）。terms.md 种子一次性拷贝自 translator 并 gitignore 为用户态（零共享）。**与 M1c 冻结契约逐字对齐**：台账行 `- «en» → 保留|删除`、精选表 `en :: zh`、冷读覆盖行 `- chunk NN: sha <12hex>`、pm-review `merged-sha:` + 选样行、报告头 `sha:/model:/time:`；评估 prompt 不写签名阈值与探针机制（零信任防线对被审者不可见）。**走查评审逐 Step 过**（关卡/预算计费/零介入三列）：全齐，预算账 8+8+64+1+1+2+4 = 88 与 §4 一致；走查即修四处口径差：Step 6 审校 sha 数据源补写（status --json state.chunks[].halves，随派发指令附给审校者）、Step 9 选样口径改"final-gate 同规则重推导核验"（实装无 Step 9 侧落盘脚本）、横切补探针 truth 生成/传参职责（probe.mjs→--probe-truth→status/final-gate）、scripts/test/README.md S4 行残留 progress.json 表述修正。全套 121 项测试串行全过（无代码改动，回归确认）。**走查发现登记 §7**：交付物元信息头 vs M1c 零改写冻结（待裁决）；consistency.mjs/word-counter.mjs 未交付、R8-c 投影格式未冻结、handoff/投影生成器无落点——三项 M3 前置已记 M3 行。**M2 后追加三评审**（2026-09-01，Yiyue 批准按维度 3 个串行只读 subagent：A 完备 3 条 / B 修剪 28 处 / C 可执行 15 条——高危 3 条均属实并核实）：文档层整包落地（SKILL.md v0.3.1 + 9 prompts）——审校派发附 **chunk 原文全文只读对照**（Yiyue 裁决；staging 物化译文半块的原文侧缺口补上）、**路径根派发纪律**（绝对路径）、**密度档裁定规则**（Yiyue 口径：告知背景 + 用户经 brief 决定 + 质量第一——低=宁删/中=默认宁留/高=宁留且专业术语首现亦可注）、精选表豁免全文唯一、标题锚四关闭值对齐（off/false/关/关闭）、聚合视图入翻译腔审校（(a) 类首现口径）+ ai-tone 补投影、Step 7 括注修复同步台账回写、冷读 chunk 定位表 + 接力段只回传、B 28 处修剪（~950 字，SKILL.md 占 ~730；机器格式示例零改动）；代码层缺口登记 M3 前置⑤ | SKILL.md + references prompts + 目录结构 | 走查评审：每步关卡/预算计费/零介入路径齐全；**同步点**：v0.2.0-skeleton 内 progress.json 表述随 status.md 裁决移除（§2 横切，2026-08-31） |
-| **M3 标定实验**（**前置**：M2 走查缺口①-④——①交付物元信息头前置落地（§7-0 已裁决 B：final-gate 改名逻辑 + 测试同步）、②consistency.mjs + word-counter.mjs 交付（§5.2 B 缺件）、③R8-c 投影文件格式冻结与实现（先定接口再编码）、④handoff 五件套/投影生成器落点裁决（脚本生成 or 主 agent 组装）、⑤probe accuracy 模板改**译文侧自可见缺陷**（M2 三评审·可执行性发现：现三模板均需原文对照才能识别缺陷，而探针单元无原文侧 → 结构性不命中 → 终检 global FAIL 死循环）） | ~20KB 文档全流程试跑 | 8-15KB 粒度质量验证、四维度审校有效性抽查、**上下文溢出/断点续跑实测**、单次耗时记录（对账基线，非约束） |
+| **M3 标定实验**（**前置①-⑤已全部落地，2026-09-02**：①final-gate PASS 前置元信息头（裁决 B——renderMetaHeader/stripMetaHeader + 写临时件原子改名；块在最前+`---` 分隔不另加 H1；幂等重入去头比对；作者/来源取 brief 可选行，字数 CJK 计数）、②consistency.mjs（fork 三项继承 + xl 扩展④标题锚对译法一致⑤间距清点⑥接缝拼料⑦文风抽样——机械只拼料不判语义）+ word-counter.mjs（fork ESM 化 + bytes 判据 + --json）交付、③R8-c 落地（投影格式冻结 `English :: 中文 [| 别名]`；verify-mech --projection + check 10；**final-gate 零信任重推导**：从 glossary × chunk 原文重推导同参重跑，不信任落盘投影——防"删投影灭判"，落盘漂移仅 WARN；glossary 缺失 = global FAIL）、④handoff.mjs 交付（落点裁决：机械归脚本/判断归主 agent——projection-chunk- + context-chunk- 机器件幂等生成，chunk-<NN>.md 判断件主 agent 组装；[KEEP] 不进投影、"/" 译法拆别名；标题条目/反复用语待 map.md 格式冻结后并入）、⑤probe accuracy 三模板改译文侧自可见（算术矛盾/陈述矛盾/量级矛盾——无原文可判，堵探针死循环）；全套 149 项测试串行全过（121 基线 + 28 新增：handoff 8 / consistency 10 / word-counter 3 / final-gate +4 / verify-mech +3）） | ~20KB 文档全流程试跑 | 8-15KB 粒度质量验证、四维度审校有效性抽查、**上下文溢出/断点续跑实测**、单次耗时记录（对账基线，非约束）+ 每次调用实际输入 token（M2 三评审新增观察项） |
 | **M4 全量验收** | playbook 重跑 + 验收 10 条 + 红队 4 场景（植入缺陷/篡改 sha/偷删 chunk/违规命名中间产物半泄漏——全被捕获或 git 历史可追溯，R12 边界复审补）+ 中断续跑演练 + **上下文溢出/compact 恢复实测** + 限流退避演练 + **中途 SessionEnd 演练（含 Step 9↔10 之间退出：未验收内容推不出去）** + **"用户 12 小时不在场"场景**（停等时状态/回来第一屏/一句话能否推进） | 全绿 + REPORT 对账 |
 | **M5 部署收尾** | refined-stock CLAUDE.md 表加 xl 条目；translator description 加边界互指；中间态 gitignore 复核（规则已随 R12 提前落 refined-stock）；两 skill 触发测试 | 小文章仍走旧 skill |
 
@@ -406,7 +409,7 @@ xl-translator/<title>/
 **已定案（累积）**：工作目录 `xl-translator/<title>/`（M5 写入 refined-stock 约定表）；待决终态 = PENDING-USER；N>1 并发实现推迟 v2；审校单元减半（基线 ~84）；文风基准卡；异模型 = 披露不验证；**标题双语锚**（2026-08-31 Yiyue 裁决三项全采纳：brief 默认开 / 次行斜体弱化格式 / 全级别 H1-H6，见 §2 Step 2 与 Step 10 硬判）。
 
 仍待确认：
-0. ~~交付物元信息头~~ **已裁决 B**（2026-09-01 Yiyue）：final-gate PASS 改名时前置元信息头（refined-stock 家格式）——重开 M1c：改名逻辑改"前置头后原子写出"+ final-gate 测试同步；merged-draft 仍纯拼接（M5 确定性不受影响，头写在改名时）；元信息字段以 delivery-template.md 第二节为准。实现归 M3 前置
+0. ~~交付物元信息头~~ **已裁决 B**（2026-09-01 Yiyue）**已落地**（2026-09-02）：final-gate PASS 改名时前置元信息头（refined-stock 家格式）——写临时件原子改名（交付物要么完整出现要么不出现）；merged-draft 仍纯拼接（M5 确定性不受影响，头写在改名时）；元信息字段以 delivery-template.md 第二节为准（块在最前 + `---` 分隔，不另加 H1——标题 H1 由 chunk 01 自带）
 1. v1 不合并阶段 A/B（M3 标定后可复议）
 2. 冷读接力阈值 30KB、PM 通读样本 20%、会话预算默认 N（工作值，M3 后定）
 3. ~~文件命名 schema~~ **已定稿**（2026-08-30，见 §5.1——经 classify() 真实代码验证发布安全）

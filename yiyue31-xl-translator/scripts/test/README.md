@@ -14,7 +14,10 @@ scripts/test/
 │   ├── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
 │   ├── merge.test.mjs              #   合并（M1c）：M1-M7 纯函数与病态输入、CLI 冒烟
 │   ├── probe.test.mjs              #   探针生成（M1c）：四维覆盖/虚拟 NN/确定性/truth 落盘与防覆盖
-│   └── final-gate.test.mjs         #   交付门（M1c）：重执行/完备性/G3/R23/标题锚/G4/R15/探针/改名/半径
+│   ├── final-gate.test.mjs         #   交付门（M1c+前置①③）：重执行/完备性/G3/R23/标题锚/G4/R15/探针/元信息头/R8-c
+│   ├── handoff.test.mjs            #   交接包机器件（M3 前置④）：glossary 解析/单复数归一/词边界投影/语境段/幂等
+│   ├── consistency.test.mjs        #   统稿清单（M3 前置②）：fork 三项继承 + 标题锚对/间距/接缝/文风拼料
+│   └── word-counter.test.mjs       #   字数统计（M3 前置②）：bytes 判据/中英分项/CLI --json
 └── regression/                     # 回归层：git 管理的真实文档夹具，钉死真实世界回归
     ├── segment.regression.test.mjs
     ├── merge.regression.test.mjs   #   M1c：真实译文快照 × 合成场景装置（M1-M7）

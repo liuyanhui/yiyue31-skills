@@ -33,26 +33,29 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 
 // ---------- 缺陷模板库 ----------
 // half 混排 a/b（真半块也分 a/b，同构）；defectType 供 REPORT 人话披露。
+// 设计规则（M3 前置⑤）：探针单元**无原文侧**（staging 只物化单段中文），一切缺陷必须
+// **译文侧自可见**——审校者不对照原文也能判错。依赖原文比对的错型（千分位错位/否定丢失/
+// 条件句误译）会结构性不命中 → 终检 global FAIL 死循环，禁用。
 
 const TEMPLATES = {
   accuracy: [
     {
       half: "a",
-      text: "该集群共部署 18,000 个节点，单个节点配备 4 张加速卡，端到端时延低于 12ms。",
-      defectType: "数字保真：原文 1,800 误作 18,000（千分位错位）",
-      expectedHit: "18,000",
+      text: "集群共部署 18 个节点，每个节点配备 4 张加速卡，合计 54 张加速卡。",
+      defectType: "算术自相矛盾：18×4=72，文中写 54（译文侧可判）",
+      expectedHit: "54",
     },
     {
       half: "b",
-      text: "这次重构是一个微不足道的改动，可以直接合入主干分支。",
-      defectType: "否定丢失：原文 not 未译出（应为「并非微不足道」）",
-      expectedHit: "微不足道",
+      text: "该功能默认关闭，用户无需任何配置即可直接使用。",
+      defectType: "陈述自相矛盾：默认关闭却无需配置直接使用（译文侧可判）",
+      expectedHit: "默认关闭",
     },
     {
       half: "a",
-      text: "无论缓存开关是否开启，预热任务都会在启动阶段执行。",
-      defectType: "条件句误译：only if 译成「无论是否」",
-      expectedHit: "无论",
+      text: "整个迁移过程耗时 3 小时，其中仅数据校验一步就花了 2.5 天。",
+      defectType: "量级自相矛盾：整体 3 小时却含单步 2.5 天（部分大于整体，译文侧可判）",
+      expectedHit: "2.5 天",
     },
   ],
   translationese: [

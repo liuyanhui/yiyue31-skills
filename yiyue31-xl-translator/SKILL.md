@@ -19,7 +19,7 @@ author: Yiyue31
 
 - `{skill-dir}` = 本 SKILL.md 所在目录。引用文件封闭集（引用格式 `{skill-dir}/references/<file>`、`{skill-dir}/scripts/<file>`）：
   - **references/（10）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md、terms.md（种子，用户态运行时维护）。
-  - **scripts/（9）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、consistency.mjs、final-gate.mjs、probe.mjs、word-counter.mjs、audit.mjs。
+  - **scripts/（10）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs、audit.mjs。
 - 工作目录 `xl-translator/<title>/`（refined-stock 仓库根下）；文件命名严格按 DESIGN §5.1 schema，status/final-gate 按该表 glob 工作。
 - 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生——PASS 前全目录不得命中任何发布模式。
 - 报告/台账的机器解析格式：各 prompt 与产物按 `{skill-dir}/references/` 对应文件的契约逐字执行，不得改写格式。
@@ -29,7 +29,7 @@ author: Yiyue31
 > 执行者：`[脚本]` 确定性、零信任；`[subagent]` 独立调用（**严格串行**，一次一个，等返回再派下一个）；`[主]` 主 agent 编排与本地轻活。
 
 ### Step 0 发起与预检 `[主+脚本]`
-- 取文→markdown 化→落 `original-<title>.md`（**落盘即统一归一 LF**——一切 sha 按落盘文件字节原样计算，防 CRLF 假错死锁）。brief 缺省默认值（技术读者/意译/中等注释密度/发布用途/**标题双语锚开**）直接落盘——**不问用户**。
+- 取文→markdown 化→落 `original-<title>.md`（**落盘即统一归一 LF**——一切 sha 按落盘文件字节原样计算，防 CRLF 假错死锁）。brief 缺省默认值（技术读者/意译/中等注释密度/发布用途/**标题双语锚开**）直接落盘——**不问用户**；取文可得时附可选行 `来源:`/`作者:`（终检 PASS 前置元信息头的字段源）。
 - 规模预检（`word-counter.mjs`）：**>40KB 单条件**才走 xl，否则自动交接 translator（读 `{translator-skill-dir}/SKILL.md` 按其执行 + 一行披露"已自动交接 translator"；不可读时退化本 skill 单 chunk 模式跑完并披露——零跨 skill 运行时依赖）；`--xl-force` 为测试/标定旁路。
 - 原文完整性 WARN（末句截断/围栏不配对，提示不阻塞）；预算公告（chunk 数、subagent 调用基线、预计会话数 + **一行 brief 披露**："按技术读者/意译/中等注释密度/发布用途/标题双语锚开处理——注释密度即术语后附英文括注的多少（低/中/高）——想改就说'换成直译/注释少点/标题不加英文'"——通知非询问）+ **原文 sha1（前 12 位）与 chunk 数**（聊天留痕 = 工作区外分母锚，交付时回显对照）+ **喊停方式与样张入口**：公告末附一行如何中断；支持"先翻第 N 章出样张"，用户确认风格后放全量。
 - 关卡：无（本步不改翻译产物）。
@@ -48,7 +48,8 @@ author: Yiyue31
 - 关卡：glossary 零双选；keep-list 非空（若原文有机械元素）。
 
 ### Step 3 翻译·阶段A `[subagent]` ×N 串行
-- prompt = `{skill-dir}/references/translate-prompt.md`。输入 = **交接包五件套**：①全文 chunk 地图（含标题树既定译名）②前 chunk 末段摘要（含"留下了什么"）③该 chunk 译法投影（含标题条目）④贯穿比喻/叙事台账 ⑤文风卡；另附 chunk 原文 + keep-list + special-phrases + brief。
+- 派发前跑 `{skill-dir}/scripts/handoff.mjs <workdir>` 生成**机器件**：`handoff/projection-chunk-<NN>.md`（R8-b 既定译法投影：glossary × chunk 原文扫描，大小写/单复数归一）+ `handoff/context-chunk-<NN>.md`（串行增强段：邻 chunk 已审中文末段 + sha 锚）；**判断件** `handoff/chunk-<NN>.md`（①地图②"留下了什么"④台账⑤文风卡引用）由主 agent 组装。
+- prompt = `{skill-dir}/references/translate-prompt.md`。输入 = **交接包五件套**（判断件 + 两机器件）：①全文 chunk 地图（含标题树既定译名）②前 chunk 末段摘要（含"留下了什么"）③该 chunk 译法投影（含标题条目）④贯穿比喻/叙事台账 ⑤文风卡；另附 chunk 原文 + keep-list + special-phrases + brief。
 - 串行增强：派发时脚本**追加邻 chunk 已审中文末段 300-500 字**（sha 绑定）；chunk 1 过审后节选定稿入 `handoff/anchor.md` 作**范文锚点**。
 - 输出带 `«english»` 标记的译文；**硬禁止直接括注**；金句/习语按精选表；**标题双语锚按 Step 2 双语对执行**（锚行逐字取自原文标题）；**glossary 外自裁定术语回传清单**（主 agent 一条一译裁定入表、更新下游投影）。
 - 关卡：无（信任后置到 Step 5/6）。
@@ -59,7 +60,7 @@ author: Yiyue31
 - 关卡：`«»` 残留 = 0（正则）。
 
 ### Step 5 机械校验 `[脚本]` ×N
-- `verify-mech.mjs`（Step 10 终检重执行同源）：原五项 + 数字/单位保真 + 散文残留英文阈值 + 中英间距 + 段落计数/长度比下限（防空洞化）+ **术语兑现硬判**（该 chunk 投影条目的既定译名或登记别名未在译文出现即打回）。
+- `verify-mech.mjs [--projection <handoff/projection-chunk-NN.md>]`（Step 10 终检重执行同源）：原五项 + 数字/单位保真 + 散文残留英文阈值 + 中英间距 + 段落计数/长度比下限（防空洞化）+ **术语兑现硬判 R8-c**（投影条目既定译名/别名未在译文出现即打回；终检不信任落盘投影，从 glossary × chunk 原文**重推导**同参重跑）。
 - **brief 阈值只能收紧不能放宽**（各键 clamp 安全域；中英间距不可经 brief 放宽；非默认阈值进 REPORT 首屏披露）。
 - 修复后**强制重跑**；不过自动打回重翻（计返工轮次），**同 chunk 打回 ≤2 次 → 并入 Step 7 升级出口**；结果落 `verify-results.json`（终检不信任、会重跑）。
 - **手修路径**（PENDING-USER 菜单②后）：间距类违规由脚本自动补空格（diff 披露）后重跑；手修 chunk **永不自动重翻**；仅结构性 FAIL（数字缺失/代码改动/漏译）才提示用户。
