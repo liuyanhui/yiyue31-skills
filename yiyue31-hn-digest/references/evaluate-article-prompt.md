@@ -1,6 +1,6 @@
 # Article Evaluation Prompt
 
-> Last updated: 2026-08-19 09:30:00
+> Last updated: 2026-09-11 21:26:36
 
 You are evaluating a generated article against the original source comments. Assess the article on the following five dimensions.
 
@@ -54,7 +54,7 @@ Standout section check (意外之声 / Surprising takes — the SURPRISE track):
 - When `02-grouped.json` `standouts` is non-empty, the article must include a `## 意外之声` (en: `## Surprising takes`) section (before 总结). Omit the section entirely when `standouts` is empty — do not emit an empty heading.
 - Picks must NOT repeat the body: standouts are drawn from the outlier pool (comments the activity filter dropped). A standout quoting a comment already featured in a body section is a defect.
 - The bar is surprise. Picks that are merely "well-argued" or "a clear explanation" with no counter-consensus / counter-intuitive / outrageous edge are defects.
-- Each pick is ONE blockquote of the comment's **exact SOURCE-LANGUAGE words** (a zh article still quotes the English original — translating the quote is a defect), followed by three labeled lines: 作者/Author, 翻译/Translation (omit only when source language = article language), 入选原因/Reason for inclusion. A BLANK `>` line MUST separate every field so each renders as its own paragraph in HTML (consecutive `>` lines collapse into one paragraph and the fields end up on one line — that is the bug to avoid). Labels follow the article language.
+- Each pick is ONE blockquote of the comment's **exact SOURCE-LANGUAGE words** (a zh article still quotes the English original — translating the quote is a defect), followed by three labeled lines: 作者/Author, 翻译/Translation (omit only when source language = article language), 入选原因/Reason for inclusion. Gluing editorial explanation into the quote — words that are not the commenter's own — is a defect. A BLANK `>` line MUST separate every field so each renders as its own paragraph in HTML (consecutive `>` lines collapse into one paragraph and the fields end up on one line — that is the bug to avoid). Labels follow the article language.
 
 Formula check:
 - Any formula must use LaTeX (display $$...$$ on its own line, inline $...$). A formula written as plain prose that loses subscripts/superscripts (e.g. "St−1", "ktT") is a MINOR defect.

@@ -59,7 +59,7 @@ Summary:
   怎么做到的 → How it was done
   意味着什么 → What it means
   人们记住的 → What people remember
-  要点 → Notable points
+  评论要点 → Notable points
   争议点 → Controversies
   意外之声 → Surprising takes
   总结 → Summary
@@ -115,7 +115,7 @@ Summary:
 （不要硬造 `## 争议点`；若讨论中确有分歧，再加。）
 
 === Scattered Q&A ===
-## 要点
+## 评论要点
 {相关但零散的看法 roundup，按粗略主题分组。}
 （老实的 roundup 优于强造叙事。）
 -->
@@ -126,17 +126,16 @@ Summary:
 <!-- 意外之声 (en: Surprising takes) — the SURPRISE track, separate from the heat-ranked body. The point of this section is surprise, not "best of".
 - Picks come from `02-grouped.json` `standouts`. The grouping step draws them PRIMARILY from the outlier pool (comments the activity filter dropped because of low reply volume), so they do NOT repeat what the body already covered. An `active` comment is allowed only when it contradicts its own group's mainstream stance.
 - Bar — each pick must be genuinely SURPRISING: counter-consensus, counter-intuitive, or outrageous-but-coherent. "Well argued", "I agree", or "clearly explained" do NOT qualify. If fewer than 2 picks clear the bar, the grouping step sets `standouts: []` and you OMIT this whole section (empty is the expected outcome for many threads, not a failure).
-- Render each pick as ONE blockquote: the comment's exact SOURCE-LANGUAGE words first (do NOT translate the quote — a zh article quotes the English original), then three labeled lines. Put a BLANK `>` line between EVERY field so each renders as its own paragraph in HTML (consecutive `>` lines collapse into one paragraph and the fields end up on a single line — that is the bug to avoid). Labels follow config.lang:
-  > {the comment's exact source-language quote}
-  >
-  > **作者**：{author}
-  >
-  > **翻译**：{translation}（zh 模式；当源语言 = config.lang 时省略此行）
-  >
-  > **入选原因**：{reason，一句话}
-  `author` / `quote` / `translation` / `reason` come from the standouts entry. Attribution is allowed here — the section is an exact-quote spotlight.
+- Copy the skeleton below VERBATIM — ONE blockquote per pick, 2–4 picks. The shape is not freeform: the quote is the comment's exact SOURCE-LANGUAGE words, so do NOT translate it into the article language (a zh article quotes the English original) and do NOT glue editorial explanations into it. Keep the BLANK `>` line between EVERY field — consecutive `>` lines collapse into one paragraph in HTML and the fields end up on a single line, which is the bug to avoid. `author` / `quote` / `translation` / `reason` come from the standouts entry. Attribution is allowed here — the section is an exact-quote spotlight.
+- Labels follow config.lang — the zh set is shown in the skeleton; en uses **Author** / **Translation** / **Reason**. `standouts` 为空则整节省略，不要写空标题。
 -->
-{从 `02-grouped.json` 的 `standouts` 取 2–4 条，按上述 blockquote 格式逐条渲染（字段间务必留空 `>` 行）。`standouts` 为空则整节省略，不要写空标题。}
+> {quote：评论的源语言原话，逐字}
+>
+> **作者**：{author}
+>
+> **翻译**：{translation（源语言 = config.lang 时省略整行）}
+>
+> **入选原因**：{reason，一句话}
 
 ## 总结
 {回应核心问题 + 超出复述的读者价值：未解答的关键问题 / 实际影响 / 趋势判断 / 一处可被原文或评论佐证的延伸观察。}

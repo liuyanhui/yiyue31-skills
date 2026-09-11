@@ -105,6 +105,11 @@ bun test
 
 ## Changelog
 
+- **0.3.1**（2026-09-11）：意外之声字面模板 + 「要点」改名「评论要点」
+  - `assets/article-v1.md`：意外之声从注释 prose 升级为**字面 copy-paste skeleton**（与参考资料节同等待遇）——blockquote 形态、字段顺序、空 `>` 行照抄，占位符 `{quote}/{author}/{translation}/{reason}` 对应 standouts 字段；en 标签集补全（**Author / Translation / Reason**，此前模板只写了 zh 标签集）；注释保留选材源/意外门槛等 why，删除与 skeleton 重复的格式预览
+  - `references/evaluate-article-prompt.md`：standout check 显式化一条新缺陷——**quote 内粘编辑注解**（非评论者原话）算 defect（其余形态检查 2026-08-19 已存在，本次不重复）；时间戳更新
+  - 「要点」→「评论要点」（仅 zh 改名，en 保持 `Notable points`，Yiyue 裁决接受语义松耦合）：模板映射表、Scattered Q&A 骨架、SKILL.md Step 7.9 三处
+  - 原因：实测产出漂移——49271994 帖（8-13）意外之声 quote/翻译方向倒置且 quote 内粘编辑注解；该次跑的是 mock 评估（目录无 evaluation 文件）且当时格式仅存于注释 prose。8-19 评估侧已补形态检查、9-10 的 49550772 产出已验证干净，本次补上模板侧最后一环，让格式约束在生成时即字面可抄
 - **0.3.0**（2026-08-19）：上下文溢出防护（fetcher 直写文件 + join 脚本化 + Algolia 安全帽）
   - `algolia.ts` / `firebase.ts`：`--out` 必传，统一 JSON 直写文件，stdout 只输出**一行 JSON 摘要**（title/author/score/评论数/latestCommentAt/out）；大帖原始 JSON（数百 KB）不再进智能体上下文
   - `algolia.ts` 新增 `--maxFetchAlgolia` 安全帽（config `maxFetchAlgolia`，默认 2000）：截断时按树序保留、清理悬空 childIds，raw 带 `truncated`/`originalCommentCount`
