@@ -192,8 +192,10 @@ export function scanWorkdir(dir) {
   inv.verify = {};
   if (vr) {
     try {
-      for (const r of JSON.parse(vr).results ?? []) inv.verify[r.nn] = r; // { nn, passed, translationSha, thresholds }
-      inv.verifyThresholds = JSON.parse(vr).thresholds ?? null;
+      const rs = JSON.parse(vr).results ?? [];
+      for (const r of rs) inv.verify[r.nn] = r; // { nn, passed, translationSha, thresholds }（同 nn 后写覆盖 = 末条最新）
+      // R22 阈值披露：verify-mech 把 thresholds 写在每条记录内（非顶层），末条兜底取
+      inv.verifyThresholds = JSON.parse(vr).thresholds ?? rs[rs.length - 1]?.thresholds ?? null;
     } catch { /* 损坏按缺省处理——终检会重执行 */ }
   }
   inv.globals = {

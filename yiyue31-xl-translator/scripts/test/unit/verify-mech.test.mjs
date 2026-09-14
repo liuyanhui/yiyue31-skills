@@ -196,6 +196,30 @@ test("englishRuns 阈值边界：恰好 5 词过、6 词打回", () => {
   assert.equal(englishRuns(prose6, 6).length, 1);
 });
 
+// 裸域名 URL 豁免（2026-09-07 M3 实证回归）：无 scheme 地址被点/斜杠词切分成 ≥6 词 run 误报漏译
+test("散文内裸域名 URL（code.claude.com/docs/en/settings）不算漏译 → 过", () => {
+  const o = "The settings reference documents every key: code.claude.com/docs/en/settings";
+  const t = "设置参考文档覆盖每一个键：code.claude.com/docs/en/settings";
+  const r = verify(o, t);
+  assert.equal(r.passed, true, JSON.stringify(r.fails));
+});
+
+// 标题双语锚豁免（M3 首跑死锁缺陷回归）：锚行是契约性英文，不算漏译
+test("标题双语锚行（≥6 词英文斜体次行）不算漏译 → 过", () => {
+  const o = "## Code is no longer the bottleneck\n\nThe system changes fast.";
+  const t = "## 代码不再是瓶颈\n\n*Code is no longer the bottleneck*\n\n系统变化很快。";
+  const r = verify(o, t);
+  assert.equal(r.passed, true);
+});
+
+test("非锚位斜体英文长行仍判漏译（豁免仅限标题次行）", () => {
+  const o = "The quick brown fox jumps over the lazy dog again today.";
+  const t = "这里描述\n\n*The quick brown fox jumps over the lazy dog again*\n\n结束。";
+  const r = verify(o, t);
+  assert.equal(r.passed, false);
+  assert.ok(checksOf(r).includes("en-residue"));
+});
+
 // ---------- 新③：中英间距 ----------
 
 test("中文紧贴 ASCII → spacing FAIL", () => {
@@ -330,7 +354,7 @@ test("CLI：译文在 translated-chunks/ 下 → verify-results.json 落盘（{r
     assert.equal(data.results.length, 1);
     assert.equal(data.results[0].nn, 1, "记录须带 nn（status/merge 按此取每 chunk 末条为最新）");
     assert.equal(data.results[0].translated, "translated-chunk-01.md");
-    assert.match(data.results[0].translatedSha1, /^[0-9a-f]{12}$/);
+    assert.match(data.results[0].translationSha, /^[0-9a-f]{12}$/);
     assert.ok(data.results[0]._note.includes("终检不信任"));
     assert.ok(data.results[0].thresholds && data.results[0].thresholds.maxEnRun === 6);
   } finally {

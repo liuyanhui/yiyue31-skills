@@ -1,0 +1,34 @@
+[
+  {
+    "virtualNn": 901,
+    "dim": "accuracy",
+    "half": "a",
+    "text": "集群共部署 18 个节点，每个节点配备 4 张加速卡，合计 54 张加速卡。",
+    "defectType": "算术自相矛盾：18×4=72，文中写 54（译文侧可判）",
+    "expectedHit": "54"
+  },
+  {
+    "virtualNn": 902,
+    "dim": "translationese",
+    "half": "b",
+    "text": "该模块依赖它，它又调用了它，因此它的稳定性决定了它的上限。",
+    "defectType": "指代衔接：连续「它」无先行词消解",
+    "expectedHit": "它"
+  },
+  {
+    "virtualNn": 903,
+    "dim": "ai-tone",
+    "half": "a",
+    "text": "毫无疑问，这一设计堪称优雅，充分体现了卓越的工程智慧，令人印象深刻。",
+    "defectType": "AI 味空洞赞美（无信息量的形容词堆叠）",
+    "expectedHit": "毫无疑问"
+  },
+  {
+    "virtualNn": 904,
+    "dim": "readability",
+    "half": "b",
+    "text": "文档被编写之后被审核，被审核之后被修改，被修改之后被再次审核，最终被发布。",
+    "defectType": "被字句堆叠（中文被动滥用）",
+    "expectedHit": "被"
+  }
+]

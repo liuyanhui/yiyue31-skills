@@ -179,14 +179,29 @@ export function checkKeepList(original, translated, keepList) {
 // ---------- 散文视图（新四项共用） ----------
 
 // 剥离机械元素后的"纯散文"视图，供漏译/间距/长度检测。
-// 剥离序：~~~/``` 围栏 → SVG → 行内代码 → URL → markdown 链接定义行 → 括注 → keep-list 条目 → HTML 标签。
+// 剥离序：标题双语锚行 → ~~~/``` 围栏 → SVG → 行内代码 → URL → markdown 链接定义行 → 括注 → keep-list 条目 → HTML 标签。
 // 每项替换为空格而非空串，防止拼接出新的伪相邻（如间距误报）。
 export function stripMechanical(text, keepTerms = []) {
   let s = text;
+  // 标题双语锚行豁免（M3 首跑实测死锁缺陷，2026-09-02）：锚 = 标题行之后的第一个
+  // 非空行且整行 *English Heading* 形态。锚是 brief 默认开的契约性英文——终检硬判
+  // 其存在，计入散文残留则 ≥6 词的锚行必误报，与锚判互相死锁（删锚违契约，留锚过不了本判）。
+  const lines = s.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^#{1,6}\s/.test(lines[i])) continue;
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() === "") j++;
+    if (j < lines.length && /^\*[^*\n]+\*$/.test(lines[j].trim())) lines[j] = " ";
+  }
+  s = lines.join("\n");
   s = s.replace(/```[^\n`]*\n?[\s\S]*?```/g, " ").replace(/~~~[^\n~]*\n?[\s\S]*?~~~/g, " ");
   s = s.replace(/<svg\b[\s\S]*?<\/svg>/g, " ");
   s = s.replace(/`[^`\n]+`/g, " ");
   s = s.replace(/https?:\/\/[^\s)"'`，。、）]+/g, " ");
+  // 裸域名 URL 豁免（2026-09-07 M3 实证）：源文存在无 scheme 的地址（code.claude.com/docs/…），
+  // 词切分把点/斜杠当分隔符 → 连续英文 run 误报"整句漏译"。域名形 = 至少一段点分隔 + 字母尾段
+  // （spec.md/CLAUDE.md 等文件名会被同剥，但它们本属 keep-list 剥离序下游，等效无害）。
+  s = s.replace(/(?<![A-Za-z0-9.-])((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})(\/[^\s)"'`，。、）]*)?/g, " ");
   s = s.replace(/^\[[^\]]*\]:\s.*$/gm, " ");
   s = s.replace(/[（(][^()（）]*[)）]/g, " ");
   for (const t of keepTerms) {
@@ -649,7 +664,9 @@ export function runCli(args) {
     original: path.basename(pos[0]),
     translated: path.basename(pos[1]),
     originalSha1: crypto.createHash("sha1").update(originalText).digest("hex").slice(0, 12),
-    translatedSha1: crypto.createHash("sha1").update(translatedText).digest("hex").slice(0, 12),
+    // 字段名 = status/merge/handoff 三消费方的冻结契约（M3 首跑实测漂移：曾误写 translatedSha1，
+    // verify 永远判 stale，chunk 卡死在 verify 阶段——生产者自测断言同错故隔离测试不暴露）。
+    translationSha: crypto.createHash("sha1").update(translatedText).digest("hex").slice(0, 12),
     passed: result.passed,
     failChecks: [...new Set(result.fails.map((f) => f.check))],
     failCount: result.fails.length,

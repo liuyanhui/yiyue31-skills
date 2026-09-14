@@ -57,8 +57,10 @@ export function enVariants(en) {
 // ---------- 投影（纯函数） ----------
 
 // 条目在该 chunk 原文出现（词边界匹配任一变体，大小写不敏感——"agent" 不误中 "agentic"）→ 收入投影
+// 围栏代码块整体豁免（2026-09-04 M3 实证）：块内英文按 keep-list 原样保留不翻译，只在围栏内出现的
+// 术语不构成"本 chunk 须兑现"项——否则 R8-c 要求一个仅存在于代码块的术语在中文散文出现（假阳性打回）
 export function projectionFor(glossary, chunkText) {
-  const lower = String(chunkText ?? "").toLowerCase();
+  const lower = String(chunkText ?? "").replace(/```[\s\S]*?```/g, " ").toLowerCase();
   return glossary
     .filter((g) => enVariants(g.en).some((v) => new RegExp(`(^|[^a-z0-9])${escapeRe(v)}([^a-z0-9]|$)`, "i").test(lower)))
     .map((g) => ({ en: g.en, zh: g.zh, aliases: g.aliases }));
@@ -73,7 +75,9 @@ export function renderProjection(entries, { glossarySha, chunkSha, nn }) {
     "# 机器生成（handoff.mjs）——勿手改；重跑覆盖",
     `# 源锚：glossary sha ${glossarySha} × chunk ${nn2(nn)} 原文 sha ${chunkSha}`,
   ];
-  const lines = entries.map((e) => [e.en, e.zh, ...e.aliases].join(" :: "));
+  // 冻结格式 `English :: 中文 [| 别名]`（verify-mech parseProjection 按 `::` 切前缀、`|` 拆别名）；
+  // 别名若用 `::` 连接会被解析方并入 zh 串（2026-09-04 M3 实证：首条多别条目 steering 触发）
+  const lines = entries.map((e) => [e.en, [e.zh, ...e.aliases].join(" | ")].join(" :: "));
   return [...head, ...lines, ""].join("\n");
 }
 

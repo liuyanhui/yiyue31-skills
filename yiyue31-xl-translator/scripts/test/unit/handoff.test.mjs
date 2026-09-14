@@ -3,7 +3,8 @@
 // 覆盖：
 //   - parseGlossary：表行解析 / 表头分隔行跳过 / [KEEP] 跳过（keep-list 管辖） / "/" 双写法拆别名
 //   - enVariants：单复数归一（+s / +es / y→ies）
-//   - projectionFor：词边界匹配（agent 不误中 agentic）/ 大小写不敏感 / 复数命中 / 未出现不收
+//   - projectionFor：词边界匹配（agent 不误中 agentic）/ 大小写不敏感 / 复数命中 / 未出现不收 / 围栏代码块豁免
+//   - renderProjection：别名 `|` 渲染并经 parseProjection 回环（`::` 连接会被解析方并入 zh——2026-09-04 实证）
 //   - tailSegment：末段回取 300-500 字窗口
 //   - renderContext：首 chunk 缺省 / 邻未过审缺省 / fresh 附 sha 锚
 //   - runHandoff：产物落盘 + 幂等字节相同（M5 纪律）+ 缺 glossary 退出 2 + --nn 不在 manifest 退出 1
@@ -23,10 +24,12 @@ import {
   parseGlossary,
   enVariants,
   projectionFor,
+  renderProjection,
   tailSegment,
   renderContext,
   runHandoff,
 } from "../../handoff.mjs";
+import { parseProjection } from "../../verify-mech.mjs";
 
 const sha12 = (s) => crypto.createHash("sha1").update(s, "utf-8").digest("hex").slice(0, 12);
 const nn2 = (n) => String(n).padStart(2, "0");
@@ -61,6 +64,33 @@ test("projectionFor：词边界（agent 不误中 agentic）/ 复数命中 / 未
   // 独立词 agent 命中；vaporware 未出现不收
   const hits2 = projectionFor(gl, "An agent evaluates. No mention of pipelines.");
   assert.deepEqual(hits2.map((h) => h.en).sort(), ["agent", "pipeline"]);
+});
+
+test("projectionFor：围栏代码块整体豁免（块内英文不构成须兑现项）", () => {
+  const gl = parseGlossary("| English Term | Translation | Context |\n|---|---|---|\n| spec | 规格 | c |\n");
+  // spec 仅出现于围栏代码块（SKILL.md 示例场景）——不收
+  const fenced = projectionFor(gl, "Prose intro.\n\n```\ngenerating an OpenAPI spec.\n```\n\nMore prose.");
+  assert.deepEqual(fenced, [], "围栏内命中不收（块内英文原样保留，无中文可兑现）");
+  // 同一词出现在围栏外散文——照常收
+  const mixed = projectionFor(gl, "The spec is approved.\n\n```\ngenerating an OpenAPI spec.\n```\n");
+  assert.deepEqual(mixed.map((h) => h.en), ["spec"]);
+});
+
+test("renderProjection：别名 `|` 渲染并经 parseProjection 回环", () => {
+  const entries = [
+    { en: "agent", zh: "智能体", aliases: [] },
+    { en: "steering", zh: "掌舵", aliases: ["引导"] },
+  ];
+  const text = renderProjection(entries, { glossarySha: "a".repeat(12), chunkSha: "b".repeat(12), nn: 3 });
+  const line = text.split(/\r?\n/).find((l) => l.startsWith("steering ::"));
+  assert.equal(line, "steering :: 掌舵 | 引导", "冻结格式 `English :: 中文 [| 别名]`");
+  // 回环：渲染产物可被 verify-mech 解析方还原（`::` 连接别名会使 zh 吞并别名串——M3 实证）
+  const parsed = parseProjection(text);
+  assert.deepEqual(
+    parsed.find((p) => p.en === "steering"),
+    { en: "steering", zh: "掌舵", aliases: ["引导"] }
+  );
+  assert.deepEqual(parsed.find((p) => p.en === "agent"), { en: "agent", zh: "智能体", aliases: [] });
 });
 
 test("tailSegment：末段回取，凑满 ~300 止、超 ~500 截前留尾", () => {

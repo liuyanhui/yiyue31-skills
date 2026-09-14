@@ -201,7 +201,10 @@ export function headingAnchorCheck(originalText, translatedText) {
       continue;
     }
     const zh = transH[i].title;
-    if (zh === origH[i].title || !/[一-鿿]/.test(zh)) {
+    // 文件名标题豁免（2026-09-11 M3 实证）：keep-list 文件名作标题（如 `### CLAUDE.md`，源 "The CLAUDE.md"）
+    // 合法无 CJK——"非中文标题"判的意图是抓未翻译标题，文件名标题本就无译。形 = 含点扩展名的 ASCII 串。
+    const filenameHeading = !/[一-鿿]/.test(zh) && /^[\w .\/:@-]+\.[A-Za-z]{2,4}$/.test(zh.trim());
+    if (!filenameHeading && (zh === origH[i].title || !/[一-鿿]/.test(zh))) {
       fails.push(`第 ${i + 1} 个标题非中文标题行：${zh}`);
       continue;
     }
