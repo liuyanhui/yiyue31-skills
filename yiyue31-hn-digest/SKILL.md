@@ -1,7 +1,7 @@
 ---
 name: yiyue31-hn-digest
 description: Digest HN threads when user says "summarize/digest/analyze this HN thread", "TLDR this HN post", "what are people saying on HN", or provides an HN post URL/ID.
-version: 0.3.0
+version: 0.3.1
 author: yiyue31
 ---
 
@@ -152,7 +152,7 @@ All rounds exhausted → copy best-scoring draft to `03-article.md`, output "文
 6. Overwrite existing `03-article.md` (output "正在覆盖已有输出" if overwriting).
 7. **Coverage (no end note, no per-section markers)**: do NOT append `（N / M 条）` / `(N / M comments)` to section headings, and do NOT write any coverage/methodology note at the end — that is injected as a `<small>` paragraph after the H1 by Step 10.3's `insert-header.ts`. Full generation constraints in `assets/article-{templateVersion}.md`.
 8. **Standout section**: render `## 意外之声` (en: `## Surprising takes`; all skeletons, before 总结) from `02-grouped.json` `standouts`; source and surprise bar are defined in Step 6.4. **Full format (blockquote shape, blank `>` line between fields, label set, omit-when-empty) in `assets/article-{templateVersion}.md`.**
-9. **Catch-all group**: if `02-grouped.json` contains an `其他观点`/`Other` group (the coverage safety net from Step 6.1), render it briefly as a short roundup or fold it into `## 要点` — never as a full body section. It exists to guarantee coverage, not to carry narrative weight.
+9. **Catch-all group**: if `02-grouped.json` contains an `其他观点`/`Other` group (the coverage safety net from Step 6.1), render it briefly as a short roundup or fold it into `## 评论要点` (en: `## Notable points`) — never as a full body section. It exists to guarantee coverage, not to carry narrative weight.
 
 ---
 
