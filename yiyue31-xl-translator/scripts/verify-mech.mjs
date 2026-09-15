@@ -652,6 +652,7 @@ function parseArgs(argv) {
     if (a === "--keep-list") opts.keepListPath = argv[++i];
     else if (a === "--brief") opts.briefPath = argv[++i];
     else if (a === "--projection") opts.projectionPath = argv[++i];
+    else if (a === "--chunk-nn") opts.chunkNn = parseInt(argv[++i], 10); // B4 scope 过滤（M4 缺陷#4：CLI 缺口补齐——scoped 条目须按 chunk 生效，CLI 此前无法传入）
     else if (a === "--max-annotations") opts.maxAnnotations = parseInt(argv[++i], 10);
     else if (a === "--json") opts.json = true;
     else if (a === "-h" || a === "--help") opts.help = true;
@@ -664,7 +665,7 @@ function printHelp() {
   console.log(`verify-mech.mjs — xl-translator 翻译后机械校验（单次判定）
 
 用法:
-  node verify-mech.mjs <original.md> <translated.md> [--keep-list <path>] [--brief <path>] [--projection <path>] [--max-annotations N] [--json]
+  node verify-mech.mjs <original.md> <translated.md> [--keep-list <path>] [--brief <path>] [--projection <path>] [--chunk-nn N] [--max-annotations N] [--json]
 
 校验项（FAIL 退出码 1）:
   1. 代码块 / 行内代码：原文 ⊆ 译文（抓遗漏与误改）
