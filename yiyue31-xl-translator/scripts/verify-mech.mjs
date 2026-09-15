@@ -730,7 +730,7 @@ export function runCli(args) {
       process.exit(1);
     }
   }
-  const result = verify(originalText, translatedText, { keepList, projectionText, ...briefTh });
+  const result = verify(originalText, translatedText, { keepList, projectionText, chunkNn: opts.chunkNn ?? null, ...briefTh });
   appendResultLog(pos[1], {
     time: new Date().toISOString(),
     original: path.basename(pos[0]),
