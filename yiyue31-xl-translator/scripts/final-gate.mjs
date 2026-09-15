@@ -515,6 +515,14 @@ export function runGate(dir, opts = {}) {
       fs.rmSync(path.join(dir, "merged-draft.md"));
       delivered = true;
     }
+    // PASS 消解挂起旗标（M4 观测 #1，2026-09-15）：终检连续 FAIL ≥3 写入的 pending.md，
+    // 在续跑（菜单①）并 PASS 后必须清除——否则 status 永判"挂起中"且不再给动作指令
+    // （M3 实证：交付后 status 仍报挂起）。sealed 是用户显式封存，不由此路径解（解封走 continue 动词）。
+    const pendingPath = path.join(dir, "pending.md");
+    if (fs.existsSync(pendingPath) && !/^type:\s*sealed\b/m.test(fs.readFileSync(pendingPath, "utf-8"))) {
+      fs.rmSync(pendingPath, { force: true });
+      appendEvents(dir, { ev: "pending-clear", detail: "终检 PASS——挂起旗标随终态消解" });
+    }
   }
 
   // 半径在交付守卫之后计算（守卫失败属全局半径）

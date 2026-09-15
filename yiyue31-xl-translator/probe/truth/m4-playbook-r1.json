@@ -1,0 +1,34 @@
+[
+  {
+    "virtualNn": 901,
+    "dim": "accuracy",
+    "half": "a",
+    "text": "集群共部署 18 个节点，每个节点配备 4 张加速卡，合计 54 张加速卡。",
+    "defectType": "算术自相矛盾：18×4=72，文中写 54（译文侧可判）",
+    "expectedHit": "54"
+  },
+  {
+    "virtualNn": 902,
+    "dim": "translationese",
+    "half": "b",
+    "text": "该模块依赖它，它又调用了它，因此它的稳定性决定了它的上限。",
+    "defectType": "指代衔接：连续「它」无先行词消解",
+    "expectedHit": "它"
+  },
+  {
+    "virtualNn": 903,
+    "dim": "ai-tone",
+    "half": "a",
+    "text": "总而言之，综上所述，在当今快速发展的时代背景下，我们不难发现该协议具有重要意义。",
+    "defectType": "AI 味套话（总结性空话开头）",
+    "expectedHit": "综上所述"
+  },
+  {
+    "virtualNn": 904,
+    "dim": "readability",
+    "half": "a",
+    "text": "系统启动时会加载配置文件然后解析环境变量接着初始化数据库连接池之后注册中间件最后启动监听端口。",
+    "defectType": "超长流水句一逗到底（应断句）",
+    "expectedHit": "接着"
+  }
+]

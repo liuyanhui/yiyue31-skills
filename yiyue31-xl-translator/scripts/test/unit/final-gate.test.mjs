@@ -745,6 +745,32 @@ test("连续 FAIL ≥3 → PENDING-USER（pending.md + suspend 事件）", () =>
   }
 });
 
+test("M4 观测#1：挂起态（FAIL≥3 残留 pending.md）续跑至 PASS → 旗标消解；sealed 不被动解", () => {
+  const { dir, truthFile } = greenDir();
+  try {
+    // 场景 a：FAIL≥3 产生 pending.md → 修复（恢复冷读覆盖行）→ 再跑 PASS → pending.md 应被清除
+    const cp = path.join(dir, "cold-read-fintest.md");
+    const cpText = fs.readFileSync(cp, "utf-8");
+    fs.writeFileSync(cp, cpText.replace(/- chunk 03: sha [0-9a-f]{12}（发现 0）\n/, ""), "utf-8");
+    for (let i = 0; i < 3; i++) runGate(dir, { probeTruth: truthFile });
+    assert.ok(fs.existsSync(path.join(dir, "pending.md")), "前置：FAIL≥3 已挂起");
+    fs.writeFileSync(cp, cpText, "utf-8"); // 修复根因
+    const r = runGate(dir, { probeTruth: truthFile });
+    assert.equal(r.exitCode, 0, JSON.stringify(r.fails.map((f) => f.message)));
+    assert.ok(!fs.existsSync(path.join(dir, "pending.md")), "PASS 后挂起旗标应消解");
+    const ev = fs.readFileSync(path.join(dir, "events.jsonl"), "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+    assert.ok(ev.some((e) => e.ev === "pending-clear"), "应记 pending-clear 事件");
+    // 场景 b：sealed（用户显式封存）不由此路径解
+    fs.writeFileSync(path.join(dir, "pending.md"), "type: sealed\n封存于 测试\n", "utf-8");
+    assert.equal(runGate(dir, { probeTruth: truthFile }).exitCode, 0); // 幂等重入 PASS
+    assert.ok(fs.existsSync(path.join(dir, "pending.md")), "sealed 不被 PASS 清除");
+    assert.ok(fs.readFileSync(path.join(dir, "pending.md"), "utf-8").includes("sealed"));
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("工作目录异常 → 退出码 2；PASS 后再跑（幂等重入）按新产物对账", () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), "fg2-"));
   try {
