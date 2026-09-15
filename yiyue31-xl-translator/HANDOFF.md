@@ -1,72 +1,56 @@
-# HANDOFF：xl-translator skill 开发交接（冷启动文档）
+# HANDOFF：xl-translator M4 全量验收（活文档——每个单元结束后更新）
 
-> **本文自足**：读完即可在任何机器继续任务。文末索引仅供可选深查。
-> 最后更新：2026-09-15（M3 回写全部完成，M3 收口）。
+> **本文自足**：读完即可在**任何机器**继续任务。机器专属路径在本地配置文件，不入 git。
+> 换机冷启动：①两仓库 git pull（skill 仓库 + 运行仓库 refined-stock）②读本文 ③按"当前状态"行的下一步动作执行。
+> 最后更新：2026-09-15 晚（Step 2 评审第 2 轮复核中）。
 
-## 0. 当前状态与你的任务
+## 0. 任务与判定依据
 
-| 里程碑 | 状态 |
+**任务 = M4 全量验收**（DESIGN §6 M4 行）：playbook 重跑（验证 M3 回写后的 skill 修改）+ 验收 10 条（REQUIREMENTS §6，含 4/5 细则）+ 红队 4 场景 + 中断续跑 / compact / 限流退避 / SessionEnd（含 Step 9↔10 退出）/"用户 12 小时不在场"演练。**验收 = 全绿 + REPORT 对账**。
+
+开工裁定（2026-09-15 Yiyue）：全 subagent 派发 / 审校两波制 ≤5（D1）/ M4 新标题并行（M3 交付物原位不动）/ 验收 4/5 细则已入 REQUIREMENTS §6。
+
+## 1. 机器本地配置（不入 git，换机时手工重建）
+
+文件 `~/.config/xl-translator/m4-local.json`（键：run_repo_dir / skill_dir / workdir / title / probe_truth / translator_skill_dir）。
+运行仓库内工作目录：`<run_repo>/xl-translator/AI-Native-SDLC-playbook-r2/`；验收记录：`<run_repo>/xl-translator/m4-outbox/`（M4-验收记录.md = 逐单元台账；演练规程.md = 6 演练 + 红队 4 场景执行规程）。
+探针 truth 已入 skill 仓库 git（probe/truth/m4-playbook-r1.json，run=m4-playbook-r1 seed=20260915）。
+
+## 2. 当前状态
+
+| 阶段 | 状态 |
 |---|---|
-| M1a-M1c + M2 + M3 前置 | ✅ 已提交 |
-| M3 试运行 + 回写 | ✅ **本次提交收口** |
-| **M4 全量验收** | ⬜ **下一步**（见 DESIGN §6） |
-| M5 部署收尾 | ⬜ 最后 |
+| Step 0-1 | ✅ 落盘/预检/分段（5 chunk 落带，sha 9bdcc5278c2b === M3 同源） |
+| Step 2 五件产物 + 探针 truth | ✅ 落盘（glossary 187 条零双选；评审第 1 轮打回·轻 36 条 → 修复全部落盘） |
+| Step 2 评审第 2 轮复核 | ⏳ 进行中（同评审官续核，只核修复项） |
+| **下一步** | 复核通过 → Step 3 chunk 01 翻译派发（handoff.mjs 机器件 + 判断件组装）；仍打回 → 按 2 轮限额规则处置 |
+| Step 3-10 | ⬜ 逐 chunk 流水（每 chunk：翻译→裁定→机械→四维审校→修复闭环）→ merge/统稿 → 冷读/PM → final-gate |
+| 演练 + 红队 + 验收 10 条 | ⬜ 按 m4-outbox/演练规程.md 执行（穿插进行） |
 
-**你的任务 = M4 全量验收**：playbook 重跑（验证回写后的 skill 修改在真实语料上工作）+ 验收 10 条 + 红队 4 场景 + 中断续跑演练 + 上下文溢出/compact 恢复实测 + 限流退避演练 + 中途 SessionEnd 演练 + "用户 12 小时不在场"场景。详见 DESIGN §6 M4 行。
+**续跑口令**（用户视角）：`继续翻译 AI-Native-SDLC-playbook-r2` / `翻译进度` / `停止翻译 …` / `重新翻译 …`。
+**编排侧冷启动**：`node <skill_dir>/scripts/status.mjs <workdir> [--verb progress]`——状态纯落盘推导（C3 后默认 view 零副作用）。
 
-## 1. M3 回写完成内容（SKILL.md v0.3.2 + 全套件绿）
+## 3. 已完成的关键事实（换机后必读）
 
-### 代码改动（8 项）
+- 原文 sha1 前 12 = `9bdcc5278c2b`（=== M3，分母钉死）；5 chunk（unitTarget 12KB 一次过，与 M3 同边界）。
+- **skill 侧已修 2 项**（M4 期间发现，均已提交 + 测试绿）：①final-gate PASS 消解 pending.md 挂起旗标（M3 遗留状态缺口——sealed 不被动解）②B2 最长匹配回归测试补齐（token⊂scoped token 吸收/Nit 词边界/review 部分吸收）。
+- M3 工作目录的陈旧 pending.md 已清（status 现正确报"已交付"）。
+- 评审第 1 轮要点（已修）：glossary 补 harness/loop/governance/control 等核心条、keep-list 幽灵词、Western Electric 双收、围栏散文 mock 块口径（7 处照译）、special-phrases 增收 L416、analysis 6 处 chunk 定位。详见 workdir review-pre-translation.md。
+- 全局 terms.md 冲突处置：agentic AI 对齐"智能体式 AI"；artifact 本篇覆盖为"产物"（REPORT 披露）。
+- 低内存纪律：subagent 串行派发（审校波次 ≤5 两波制）；每次派发唯一，等回传。
 
-| 项 | 文件 | 要点 |
-|---|---|---|
-| B1 G3 围栏豁免 | verify-mech + final-gate | `fenceAwareAnnotationMatches` |
-| B2 R8-c 最长匹配 | handoff | `projectionFor` 短被长吸收 |
-| B3 锚行紧贴硬判 | verify-mech | 标题锚行间空行 → FAIL |
-| B4 keep-list scope | verify-mech | `scoped` 对象 + `chunkNn` 过滤 |
-| B5 inline-code waiver | verify-mech | `parseWaivers` + 豁免转 WARN |
-| C1 标题边界锚定 | status | `halfSlices` 标题切点（30%-70%） |
-| C2 探针去重 | status | fresh 探针不入队 |
-| C3 view/dispatch 拆分 | status | 默认零副作用；dispatch 才物化 |
+## 4. 单元台账（最近单元，完整版见 m4-outbox/M4-验收记录.md）
 
-### 文档改动（6 项）
+| # | 单元 | 状态 | 备注 |
+|---|---|---|---|
+| 00 | 译前评审第 1 轮 | ✅ 打回·轻（36 条） | 报告 review-pre-translation.md |
+| 00b | 修复（6 类必改全落） | ✅ | glossary 171→187 |
+| 00c | 评审第 2 轮复核 | ⏳ 在途 | 追加写报告"第 2 轮复核"节 |
 
-| 项 | 文件 | 要点 |
-|---|---|---|
-| C4 派发口径模板 | SKILL.md Step 6 | 行数+起止标题+节名枚举+grep 核对 |
-| C5 跨维回核规则 | SKILL.md Step 7 | 采纳非 accuracy 结构性改写后回核数字/比例/极性 |
-| C6 括注 doctrine | adjudicate-prompt.md | 首现窗口关闭后补注一次合规；终裁分歧登记不翻转 |
-| B1 配套 | adjudicate-prompt.md | 兜底扫描围栏内不改不记 |
-| D1 环境处置模板 | SKILL.md 横切 | 429[1302] 即补 / [1308] 等窗 / ≤5 两波 / 流停滞核验后重派 |
-| D2 版本与裁决回写 | SKILL.md v0.3.2 + DESIGN §6 M3 行 | 计划文档已删（要义入 DESIGN） |
+## 5. 环境注意（跨机器通用）
 
-## 2. 两个仓库
-
-| 仓库 | 内容 |
-|---|---|
-| **本仓库** | skill 本体 |
-| **运行仓库**（refined-stock） | M3 试运行语料与产物（标定记录 + 交付物） |
-
-## 3. 冷启动步骤
-
-1. `git pull` 两仓库
-2. 读本文档 → 读 DESIGN §6 M4 行（验收范围与判据）
-3. 执行 M4 验收
-4. Commit + push
-
-## 4. 环境注意
-
-- **node -e 内联脚本转义不可靠**（Git Bash）→ 非平凡脚本写临时 .mjs
-- ESM 绝对路径导入须 `file:///D:/...` URL
-- subagent 可用；测试串行 `bash scripts/test/run.sh`
-- API 限流处置见 SKILL.md D1 模板
-- `agent`（AI 义）译"智能体"、`token`（AI 义）译"词元"
-
-## 5. 可选深查索引
-
-| 文件 | 用途 |
-|---|---|
-| `DESIGN.md` v2 §6 M4 行 | 下一步验收范围 |
-| 运行仓库 `xl-translator/m3-outbox/M3-标定记录.md` | M3 全程时间线 |
-| `SKILL.md` v0.3.2 | 五步流水线（含 M3 回写全部规则） |
-| `scripts/test/run.sh` | 测试串行入口 |
+- 测试串行入口：`bash <skill_dir>/scripts/test/run.sh`（当前 160 项绿）。
+- node -e 内联脚本转义在部分 shell 不可靠 → 非平凡脚本写临时 .mjs/.py 文件再跑。
+- API 限流处置模板见 SKILL.md D1（429[1302] 补派 / [1308] 等窗 / 流停滞核验后重派 / ≤5 两波制）。
+- 派发纪律：inputs/outputs 一律绝对路径；审校派发按 C4 模板（staging 总行数 + 起止标题 + 节名枚举 + grep 核对）；禁 web 条款随派发附。
+- `agent`（AI 义）译"智能体"、`token`（AI 义）译"词元"。
