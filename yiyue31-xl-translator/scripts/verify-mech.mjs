@@ -38,12 +38,17 @@ import { fileURLToPath } from "node:url";
 // ---------- 文本抽取（fork 源继承，行为不回归） ----------
 
 // 反引号定界代码：先抽 fenced 块（连内容），再从剩余文本抽 inline。
+// M4 缺陷#3（2026-09-15）：围栏分两族——**有语言标注**（```yaml/json/bash…）= 真代码，逐字 verbatim 契约；
+// **无标注**（裸 ```）= 散文 mock 文档块（intent.md/REVIEW.md 等示例文档，本语料 7 块全裸）——
+// 文风卡 §7 口径为散文照译（保留结构/标识符），不参与 verbatim 比对（en-residue/G3/keep-list
+// 照旧整体剥离围栏，不受影响）。之前一刀切 verbatim 与"散文照译"口径互相死锁（M4 chunk 01 首证）。
 export function extractCode(text) {
   const blocks = [];
+  const untagged = [];
   const inline = [];
-  const fencedRe = /```[^\n`]*\n?([\s\S]*?)```/g;
-  const stripped = text.replace(fencedRe, (_m, inner) => {
-    blocks.push(inner.replace(/\n$/, ""));
+  const fencedRe = /```([^\n`]*)\n?([\s\S]*?)```/g;
+  const stripped = text.replace(fencedRe, (_m, info, inner) => {
+    (info.trim() ? blocks : untagged).push(inner.replace(/\n$/, ""));
     return "";
   });
   const inlineRe = /`([^`\n]+)`/g;
@@ -51,7 +56,7 @@ export function extractCode(text) {
   while ((im = inlineRe.exec(stripped)) !== null) {
     inline.push(im[1]);
   }
-  return { blocks, inline };
+  return { blocks, inline, untagged };
 }
 
 export function extractSvg(text) {

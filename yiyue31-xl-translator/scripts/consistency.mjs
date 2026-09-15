@@ -22,7 +22,8 @@ import { extractCode, countEnglishAnnotations, spacingViolations, stripMechanica
 // ---------- ① 术语表面形式（fork 源继承） ----------
 
 export function proseOnly(text) {
-  return extractCode(text).blocks.length || extractCode(text).inline.length
+  const c = extractCode(text);
+  return c.blocks.length || c.untagged?.length || c.inline.length
     ? text.replace(/```[^\n`]*\n?[\s\S]*?```/g, "").replace(/`[^`\n]+`/g, "")
     : text;
 }

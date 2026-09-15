@@ -16,7 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-import { verify, parseBrief, parseProjection, numberVariants, extractNumbers, englishRuns, spacingViolations, paragraphUnits, stripMechanical, fenceAwareAnnotationMatches, checkKeepList, parseWaivers } from "../../verify-mech.mjs";
+import { verify, parseBrief, parseProjection, numberVariants, extractNumbers, englishRuns, spacingViolations, paragraphUnits, stripMechanical, fenceAwareAnnotationMatches, checkKeepList, parseWaivers, extractCode } from "../../verify-mech.mjs";
 
 const require = createRequire(import.meta.url);
 // fork 源只读引用（对照测试用；绝不回写）。路径：scripts/ → 上两级到 skills 根 → 兄弟 skill
@@ -83,6 +83,23 @@ test("代码块缺失 → code-block FAIL（与 fork 一致）", () => {
   const t = T_BASE.replace(/```js\nconst x = verify\(1\);\n```/, "");
   const r = assertForkAgrees("代码块缺失", O_BASE, t);
   assert.ok(checksOf(r).includes("code-block"));
+});
+
+test("M4 缺陷#3：无标注围栏=散文 mock 文档（可译不 verbatim）；有标注围栏仍 verbatim 硬判", () => {
+  // 无标注围栏：原文英文示例文档 → 译文照译（结构/标识符保留）——不得 code-block FAIL
+  const o = "Prose intro.\n\n```\n# Intent: claims status\nCustomers phone the contact center.\n```\n\nMore prose here.\n";
+  const t = "引言。\n\n```\n# 意图：理赔状态自助服务\n客户打电话到客服中心询问。\n```\n\n后续散文。\n";
+  const r = verify(o, t);
+  assert.ok(!checksOf(r).includes("code-block"), `无标注围栏照译不应 FAIL：${JSON.stringify(r.fails)}`);
+  // 同一围栏改为有语言标注（```yaml）→ 译文照译即 FAIL（真代码 verbatim 契约）
+  const o2 = o.replace("```", "```yaml");
+  const r2 = verify(o2, t);
+  assert.ok(checksOf(r2).includes("code-block"), "有标注围栏照译应 FAIL");
+  // extractCode 分流单元断言
+  const c = extractCode(o + "\n```js\nconst x = 1;\n```\n");
+  assert.equal(c.untagged.length, 1);
+  assert.equal(c.blocks.length, 1);
+  assert.equal(c.inline.length, 0);
 });
 
 test("行内代码被改动 → inline-code FAIL（与 fork 一致）", () => {
