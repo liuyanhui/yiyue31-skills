@@ -66,6 +66,27 @@ test("projectionFor：词边界（agent 不误中 agentic）/ 复数命中 / 未
   assert.deepEqual(hits2.map((h) => h.en).sort(), ["agent", "pipeline"]);
 });
 
+test("projectionFor：B2 最长匹配吸收（M4 译前评审 2.8/2.9 回归对）", () => {
+  const gl = parseGlossary(
+    "| English Term | Translation | Context |\n|---|---|---|\n" +
+      "| token | 词元 | c |\n| scoped token | 受限令牌 | c |\n" +
+      "| Nit | 小毛病 | c |\n| review | 评审 | c |\n| security review | 安全审查 | c |\n"
+  );
+  // token 的唯一出现都在 "scoped tokens" 内 → 被长者吸收，不进投影
+  const absorbed = projectionFor(gl, "Jobs run with short-lived scoped tokens.");
+  assert.deepEqual(absorbed.map((h) => h.en), ["scoped token"], "短词条全被长词条覆盖时吸收");
+  // token 另有独立出现 → 两条都收（各自须兑现）
+  const both = projectionFor(gl, "Jobs run with short-lived scoped tokens. Each token is short-lived.");
+  assert.deepEqual(both.map((h) => h.en).sort(), ["scoped token", "token"]);
+  // Nit 大小写不敏匹配 + 词边界：不误中 monitoring；独立 Nit 命中
+  const nit = projectionFor(gl, "The monitoring stack flags one Nit per review.");
+  assert.ok(nit.map((h) => h.en).includes("Nit"), "独立 Nit 命中（大小写不敏）");
+  assert.ok(!nit.map((h) => h.en).includes("monitoring"), "词边界防子串误收");
+  // review 部分吸收：security review 出现 + review 独立出现 → review 保留（删长词后仍有独立出现）
+  const rev = projectionFor(gl, "A security review and a plain review pass.");
+  assert.deepEqual(rev.map((h) => h.en).sort(), ["review", "security review"]);
+});
+
 test("projectionFor：围栏代码块整体豁免（块内英文不构成须兑现项）", () => {
   const gl = parseGlossary("| English Term | Translation | Context |\n|---|---|---|\n| spec | 规格 | c |\n");
   // spec 仅出现于围栏代码块（SKILL.md 示例场景）——不收
