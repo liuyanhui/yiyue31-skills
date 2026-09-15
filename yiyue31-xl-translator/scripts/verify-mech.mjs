@@ -86,6 +86,16 @@ export function englishAnnotationMatches(text) {
   return out;
 }
 
+// B1 围栏豁免（2026-09-14 M3 回写）：G3 括注对账时剥离围栏代码块——块内英文括注
+// 是代码本体而非译文注释，计入集合则必然 extra 误报（M3 实证 39 项，靠兜底台账人力消解）。
+// 与 stripMechanical 的围栏剥离同源（``` 和 ~~~），但仅替换为空格不做其他剥离。
+export function fenceAwareAnnotationMatches(text) {
+  const stripped = String(text ?? "")
+    .replace(/```[^\n`]*\n?[\s\S]*?```/g, " ")
+    .replace(/~~~[^\n~]*\n?[\s\S]*?~~~/g, " ");
+  return englishAnnotationMatches(stripped);
+}
+
 export function countEnglishAnnotations(text) {
   return englishAnnotationMatches(text).length;
 }
@@ -160,15 +170,21 @@ export function loadKeepList(p) {
     keep: Array.isArray(json.keep) ? json.keep : [],
     properNouns: Array.isArray(json.properNouns) ? json.properNouns : [],
     abbreviations: Array.isArray(json.abbreviations) ? json.abbreviations : [],
+    scoped: json.scoped && typeof json.scoped === "object" ? json.scoped : {},
   };
 }
 
 // keep-list 条目在原文中出现、却在译文中消失（被改写）→ 违规。
-export function checkKeepList(original, translated, keepList) {
+// B4 scope 过滤（2026-09-14 M3 回写）：scoped 对象形如 { "Teams": [5] }（词条仅指定 chunk 生效），
+// 消除"产品义词条撞他 chunk 句首泛指"的假阳性（M3 实证：Teams 在 chunk 04 是句首泛指"团队"）
+export function checkKeepList(original, translated, keepList, chunkNn) {
   const violations = [];
   for (const term of [...keepList.keep, ...keepList.properNouns, ...keepList.abbreviations]) {
     const t = String(term).trim();
     if (!t) continue;
+    // scope 过滤：若该词条有 scope 限定且当前 chunk 不在限定范围内，跳过
+    const scope = keepList.scoped?.[t];
+    if (scope && Array.isArray(scope) && chunkNn && !scope.includes(chunkNn)) continue;
     if (original.includes(t) && !translated.includes(t)) {
       violations.push(t);
     }
@@ -395,8 +411,25 @@ export function loadBrief(p) {
 
 // ---------- 主校验 ----------
 
+// B5 waiver 解析（2026-09-14 M3 回写）：输入为字符串数组或以 \n 分隔的字符串，
+// 每行格式 "原文串 → 译文字串"（→ 与 -> 均认）
+export function parseWaivers(input) {
+  if (!input) return [];
+  const lines = Array.isArray(input) ? input : String(input).split(/\r?\n/);
+  return lines
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => {
+      const m = l.split(/\s*(?:→|->)\s*/);
+      return m.length === 2 ? { original: m[0], translated: m[1] } : null;
+    })
+    .filter(Boolean);
+}
+
 export function verify(originalText, translatedText, opts = {}) {
   const keepList = opts.keepList || null;
+  const chunkNn = opts.chunkNn || null; // B4 scope 过滤用
+  const waivers = parseWaivers(opts.waivers); // B5 有意规范豁免（"原文串 → 译文字串"）
   const th = defaultThresholds(opts);
   const fails = []; // {check, message, detail}
   const warns = [];
@@ -412,7 +445,16 @@ export function verify(originalText, translatedText, opts = {}) {
   for (const b of blockDiff.missing) fails.push({ check: "code-block", message: `代码块缺失（原文有、译文无）：${preview(b)}`, detail: b });
   for (const i of inlineDiff.missing) fails.push({ check: "inline-code", message: `行内代码缺失（原文有、译文无）：${preview(i)}`, detail: i });
   for (const b of blockDiff.altered) fails.push({ check: "code-block", message: `代码块被改动（相似度 ${b.similarity}）：原文「${preview(b.original)}」→ 译文「${preview(b.closest)}」`, detail: b });
-  for (const i of inlineDiff.altered) fails.push({ check: "inline-code", message: `行内代码被改动（相似度 ${i.similarity}）：原文「${preview(i.original)}」→ 译文「${preview(i.closest)}」`, detail: i });
+  for (const i of inlineDiff.altered) {
+    // B5 waiver（2026-09-14 M3 回写）：译者有意规范化源文笔误（如 Intent.md→intent.md）时，
+    // 逐项登记豁免（"原文串 → 译文字串"），跳过 FAIL 改为 WARN 披露
+    const w = waivers.find((x) => x.original === i.original && x.translated === i.closest);
+    if (w) {
+      warns.push(`行内代码有意规范（waiver 登记）：原文「${preview(i.original)}」→ 译文「${preview(i.closest)}」`);
+    } else {
+      fails.push({ check: "inline-code", message: `行内代码被改动（相似度 ${i.similarity}）：原文「${preview(i.original)}」→ 译文「${preview(i.closest)}」`, detail: i });
+    }
+  }
   for (const b of blockDiff.extra) warns.push(`译文独有代码块（疑似误改，请人工确认）：${preview(b)}`);
   for (const i of inlineDiff.extra) warns.push(`译文独有行内代码（疑似误改，请人工确认）：${preview(i)}`);
 
@@ -433,7 +475,7 @@ export function verify(originalText, translatedText, opts = {}) {
 
   // 4. keep-list
   if (keepList) {
-    const violations = checkKeepList(originalText, translatedText, keepList);
+    const violations = checkKeepList(originalText, translatedText, keepList, chunkNn);
     for (const v of violations) fails.push({ check: "keep-list", message: `keep-list 条目被改写（应原样保留英文）：${v}`, detail: v });
   }
 
@@ -512,6 +554,30 @@ export function verify(originalText, translatedText, opts = {}) {
     warns.push(`（英文）括注数 ${annCount} > ${th.maxAnnotations}：含金句原文/引用/专名括注时正常，需语义层判定是否真过注（--max-annotations / brief 可调）`);
   } else if (annCount > th.maxAnnotations * 0.7) {
     warns.push(`（英文）括注数偏高：${annCount}/${th.maxAnnotations}，接近阈值`);
+  }
+
+  // 12. 标题锚行紧贴硬判（B3，2026-09-14 M3 回写）：brief 双语锚开时，标题行与 *English* 锚行
+  //     之间不得有空行——final-gate "字面次行"契约的前移拦截（M3 实证：verify 宽松语义放行
+  //     空行分隔锚，终检 146 项 FAIL 晚暴露，代价 48 单元终态重审）
+  const anchorOff = /^标题双语锚\s*[:：]\s*(off|false|关|关闭)\s*$/im.test(opts.briefText ?? "");
+  if (!anchorOff) {
+    const lines = String(translatedText ?? "").split("\n");
+    let inFence = false;
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (/^(```|~~~)/.test(lines[i])) { inFence = !inFence; continue; }
+      if (!inFence && /^#{1,6} /.test(lines[i])) {
+        const next = lines[i + 1] ?? "";
+        // 下一行非空且非 *English* 形 → 缺锚；下一行为空但再下一行是 *English* → 有空行
+        if (next === "" ) {
+          const after = lines[i + 2] ?? "";
+          if (/^\*[^*\n]+\*$/.test(after)) {
+            fails.push({ check: "anchor-adjacency", message: `标题锚行间有空行（B3 紧贴契约）：「${lines[i].slice(0, 40)}」第 ${i + 1} 行与第 ${i + 3} 行之间`, detail: { line: i + 1, heading: lines[i], anchor: after } });
+          }
+        } else if (!/^\*[^*\n]+\*$/.test(next)) {
+          // 下一行非空也非锚——可能是缺锚（heading-anchor 在 final-gate 判），这里只管间距
+        }
+      }
+    }
   }
 
   return {

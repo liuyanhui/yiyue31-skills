@@ -115,6 +115,9 @@ export function deriveCounters(events) {
 
 // ---------- 半块切片（§5.1 C-1/G5：字节中点向最近段落边界取整；sha 由本函数重算） ----------
 
+// C1 标题边界锚定（2026-09-14 M3 回写）：字节中点附近取最近标题行为切点，替代纯字节中点——
+// a 侧增删字节不再推动中点漂移越界（M3 三例实证：b 侧未动仍 stale，重审成本 ×2）。
+// 回退链：标题边界 → 段落边界（无标题时）。
 export function halfSlices(translation) {
   const paras = translation.split(/\n{2,}/); // 段落边界（空行）
   const total = Buffer.byteLength(translation, "utf-8");
@@ -124,6 +127,23 @@ export function halfSlices(translation) {
     acc += Buffer.byteLength(paras[i], "utf-8") + (i < paras.length - 1 ? 2 : 0);
     const diff = Math.abs(acc - total / 2);
     if (diff < best.diff) best = { idx: i + 1, diff }; // 切点 = 前 i+1 段
+  }
+  // C1：在中点附近找最近的标题起始段（首行为 # 开头的段），优先在该段前切
+  let headingIdx = -1;
+  let headingDist = Infinity;
+  let bytePos = 0;
+  for (let i = 0; i < paras.length; i++) {
+    const pBytes = Buffer.byteLength(paras[i], "utf-8") + (i < paras.length - 1 ? 2 : 0);
+    if (/^#{1,6} /.test(paras[i]) && i > 0 && i < paras.length - 1) {
+      const d = Math.abs(bytePos - total / 2);
+      if (d < headingDist) { headingDist = d; headingIdx = i; }
+    }
+    bytePos += pBytes;
+  }
+  // 标题边界优先（若标题离中点足够近——本半块长度 ≥ 全文 30% 时接受），否则回退段落边界
+  if (headingIdx > 0) {
+    const aBytes = paras.slice(0, headingIdx).join("\n\n").length;
+    if (aBytes / total >= 0.3 && aBytes / total <= 0.7) best.idx = headingIdx;
   }
   const aText = paras.slice(0, best.idx).join("\n\n");
   const bText = paras.slice(best.idx).join("\n\n");
@@ -346,8 +366,19 @@ export function buildQueue(state, inv, opts = {}) {
   }
   // 探针注入（源侧 truth 存在时）：混排在真单元之后，命名同构；text 随行携带（M1c 起
   // probe.mjs 生成的真实样本文本经 staging 物化派发，缺陷只存源侧 truth）
+  // C2 fresh 探针去重（2026-09-14 M3 回写）：探针报告 sha 与当前探针文本相符即不入队——
+  // 可靠性信号已取得（truth 命中）后重派零信息增益（M3 两轮共 8 单元冗余实证）
   const truth = opts.probeTruth ? JSON.parse(safeRead(opts.probeTruth) ?? "[]") : [];
-  truth.forEach((p, i) => q.push({ dim: p.dim, nn: VIRTUAL_NN_MIN + i, half: p.half ?? "a", kind: "probe", text: p.text }));
+  truth.forEach((p, i) => {
+    const vNn = VIRTUAL_NN_MIN + i;
+    const half = p.half ?? "a";
+    const repPath = path.join(inv.dir, "reviews", `review-${p.dim}-chunk-${String(vNn).padStart(2, "0")}${half}.md`);
+    const repHead = safeRead(repPath) ?? "";
+    const repShaMatch = repHead.match(/^sha:\s*([0-9a-f]{12})/m);
+    const probeSha = sha12(p.text ?? "");
+    if (repShaMatch && repShaMatch[1] === probeSha) return; // fresh，跳过
+    q.push({ dim: p.dim, nn: vNn, half, kind: "probe", text: p.text });
+  });
   return { q, action: null };
 }
 
@@ -478,6 +509,8 @@ export function verb(dir, v, opts = {}) {
       }
       break;
     }
+    case "dispatch": // C3（2026-09-14 M3 回写）：dispatch 只影响 run() 的物化行为，verb 层无额外动作
+      break;
     case "stop": {
       fs.writeFileSync(path.join(dir, PENDING), `type: sealed\n封存于 ${nowIso()}；解封 = 继续翻译，新起 = 重新翻译\n`, "utf-8");
       appendEvents(dir, { ev: "seal" });
@@ -539,7 +572,11 @@ export function run(dir, opts = {}) {
   queue.dispatch = [];
   // 预算到点 = 干净退出点：不物化、不派发（R14）
   const overBudget = opts.budget != null && state.counters.dispatchedSinceSessionEnd >= opts.budget;
-  if (queue.q.length && !inv.pending && !overBudget) {
+  // C3 view/dispatch 拆分（2026-09-14 M3 回写）：默认只读渲染（零副作用），
+  // 仅 verb="dispatch" 时物化 staging + 追加事件——"运行一次 = 派发一轮承诺"不再是默认行为
+  // （M3 实证：三连跑产生 36 条幻影 dispatch 事件）
+  const wantDispatch = opts.verb === "dispatch";
+  if (wantDispatch && queue.q.length && !inv.pending && !overBudget) {
     queue.dispatch = materialize(dir, queue.q);
     appendEvents(dir, queue.q.map((u) => ({ ev: "dispatch", nn: u.nn, dim: u.dim, half: u.half })));
   }

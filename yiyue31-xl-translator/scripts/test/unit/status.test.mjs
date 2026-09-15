@@ -160,7 +160,7 @@ test("审校队列统一物化：探针与真单元同构混排，工作区无�
       { dim: "accuracy", half: "a", text: "探针样本内容（含植入缺陷）" },
       { dim: "readability", half: "b", text: "探针样本内容二" },
     ]), "utf-8");
-    const r = run(dir, { probeTruth: truthFile });
+    const r = run(dir, { probeTruth: truthFile, verb: "dispatch" }); // C3：物化需 dispatch 动词
     // 真单元 4（b 失配 4 维中——fresh a 4 份已写? 未写 reviews 时=8 真单元）+ 探针 2
     assert.equal(r.queue.q.length, 8 + 2, "8 真半块单元 + 2 探针");
     const staging = fs.readdirSync(path.join(dir, "staging"));

@@ -16,7 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-import { verify, parseBrief, parseProjection, numberVariants, extractNumbers, englishRuns, spacingViolations, paragraphUnits, stripMechanical } from "../../verify-mech.mjs";
+import { verify, parseBrief, parseProjection, numberVariants, extractNumbers, englishRuns, spacingViolations, paragraphUnits, stripMechanical, fenceAwareAnnotationMatches, checkKeepList, parseWaivers } from "../../verify-mech.mjs";
 
 const require = createRequire(import.meta.url);
 // fork 源只读引用（对照测试用；绝不回写）。路径：scripts/ → 上两级到 skills 根 → 兄弟 skill
@@ -205,11 +205,20 @@ test("散文内裸域名 URL（code.claude.com/docs/en/settings）不算漏译 �
 });
 
 // 标题双语锚豁免（M3 首跑死锁缺陷回归）：锚行是契约性英文，不算漏译
-test("标题双语锚行（≥6 词英文斜体次行）不算漏译 → 过", () => {
+// B3（2026-09-14）：标题与锚行须紧贴（无空行）——final-gate 字面次行契约的前移拦截
+test("标题双语锚行（≥6 词英文斜体紧贴次行）不算漏译 → 过", () => {
+  const o = "## Code is no longer the bottleneck\n\nThe system changes fast.";
+  const t = "## 代码不再是瓶颈\n*Code is no longer the bottleneck*\n\n系统变化很快。";
+  const r = verify(o, t);
+  assert.equal(r.passed, true);
+});
+
+// B3 锚行间有空行 → FAIL（M3 实证：verify 宽松语义放行，终检 146 项晚暴露）
+test("标题锚行间有空行 → anchor-adjacency FAIL", () => {
   const o = "## Code is no longer the bottleneck\n\nThe system changes fast.";
   const t = "## 代码不再是瓶颈\n\n*Code is no longer the bottleneck*\n\n系统变化很快。";
   const r = verify(o, t);
-  assert.equal(r.passed, true);
+  assert.ok(r.fails.some((f) => f.check === "anchor-adjacency"), JSON.stringify(r.fails));
 });
 
 test("非锚位斜体英文长行仍判漏译（豁免仅限标题次行）", () => {
@@ -427,4 +436,31 @@ test("CLI：--projection 传入生效（缺译名退出 1，failChecks 含 term-
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+// ---------- M3 回写新增（2026-09-15） ----------
+
+// B1 围栏豁免：G3 括注对账时围栏内代码括注不进集合
+test("fenceAwareAnnotationMatches：围栏内括注不计入", () => {
+  const text = "散文（advisory）\n```\nmake test (all green)\n```\n更多散文";
+  const hits = fenceAwareAnnotationMatches(text);
+  assert.equal(hits.length, 1, "仅散文括注计入");
+  assert.equal(hits[0], "advisory");
+});
+
+// B4 scope 过滤：scoped 词条仅在指定 chunk 生效
+test("checkKeepList scope 过滤：scoped 词条他 chunk 不判", () => {
+  const kl = { keep: ["Teams"], properNouns: [], abbreviations: [], scoped: { Teams: [5] } };
+  // chunk 5 内：正常判
+  assert.deepEqual(checkKeepList("like Slack or Teams", "如 Slack 或 团队", kl, 5), ["Teams"]);
+  // chunk 4 内：scope 外，跳过
+  assert.deepEqual(checkKeepList("Teams wrap the loop", "团队把回路包裹", kl, 4), []);
+});
+
+// B5 waiver 解析
+test("parseWaivers：→ 与 -> 均认；# 注释行跳过", () => {
+  const w = parseWaivers("# 注释\nIntent.md → intent.md\nOld.md -> New.md\n\n无效行");
+  assert.equal(w.length, 2);
+  assert.deepEqual(w[0], { original: "Intent.md", translated: "intent.md" });
+  assert.deepEqual(w[1], { original: "Old.md", translated: "New.md" });
 });

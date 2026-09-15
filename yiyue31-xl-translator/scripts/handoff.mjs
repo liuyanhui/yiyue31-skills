@@ -59,11 +59,25 @@ export function enVariants(en) {
 // 条目在该 chunk 原文出现（词边界匹配任一变体，大小写不敏感——"agent" 不误中 "agentic"）→ 收入投影
 // 围栏代码块整体豁免（2026-09-04 M3 实证）：块内英文按 keep-list 原样保留不翻译，只在围栏内出现的
 // 术语不构成"本 chunk 须兑现"项——否则 R8-c 要求一个仅存在于代码块的术语在中文散文出现（假阳性打回）
+// B2 最长匹配优先（2026-09-14 M3 回写）：短词条的全部出现都被同块匹配的长词条覆盖时，
+// 短词条被长者吸收（不进投影）——防 "policy→政策" 在 "network policy（网络策略）" 处假阳性
 export function projectionFor(glossary, chunkText) {
   const lower = String(chunkText ?? "").replace(/```[\s\S]*?```/g, " ").toLowerCase();
-  return glossary
+  const matches = glossary
     .filter((g) => enVariants(g.en).some((v) => new RegExp(`(^|[^a-z0-9])${escapeRe(v)}([^a-z0-9]|$)`, "i").test(lower)))
     .map((g) => ({ en: g.en, zh: g.zh, aliases: g.aliases }));
+  return matches.filter((short) => {
+    for (const long of matches) {
+      if (long.en === short.en) continue;
+      const longEn = long.en.toLowerCase();
+      const shortEn = short.en.toLowerCase();
+      if (!longEn.includes(shortEn)) continue;
+      // 删去长词条所有出现后，短词条不再独立出现 → 被完全吸收
+      const without = lower.split(longEn).join(" ");
+      if (!new RegExp(`(^|[^a-z0-9])${escapeRe(shortEn)}([^a-z0-9]|$)`, "i").test(without)) return false;
+    }
+    return true;
+  });
 }
 
 function escapeRe(s) {

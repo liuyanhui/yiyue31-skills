@@ -46,7 +46,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { scanWorkdir, halfSlices, appendEvents, chapterMap } from "./status.mjs";
 import { fenceAwareHeadings } from "./segment/segment.mjs";
-import { verify, loadKeepList, loadBrief, englishAnnotationMatches } from "./verify-mech.mjs";
+import { verify, loadKeepList, loadBrief, fenceAwareAnnotationMatches } from "./verify-mech.mjs";
 import { assemble } from "./merge.mjs";
 import { parseGlossary, projectionFor, renderProjection } from "./handoff.mjs";
 
@@ -401,7 +401,7 @@ export function runGate(dir, opts = {}) {
     // R23 必兑现集：左值出现于该 chunk 原文的条目
     const r23 = phrases.filter((p) => orig.includes(p.en));
     const expected = new Set([...ledger.keep, ...r23.map((p) => p.en)]);
-    const actual = new Set(englishAnnotationMatches(t.text).map((s) => s.trim()));
+    const actual = new Set(fenceAwareAnnotationMatches(t.text).map((s) => s.trim()));
     const missing = [...expected].filter((e) => !actual.has(e));
     const extra = [...actual].filter((a) => !expected.has(a));
     if (expected.size && !actual.size) {
