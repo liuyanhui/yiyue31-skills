@@ -466,7 +466,7 @@ xl-translator/<title>/
 | 9 | SessionEnd 不泄漏 | M4（含 Step 9↔10 退出）+ 临时名/原子改名 | 有 |
 | 10 | /compact 续跑 | M4 实测 + 横切 | 有 |
 
-验收 4/5 的细则（谁抽、抽多少、判定方法）在 M4 开工前补入 REQUIREMENTS §6——已在 §7 待确认清单登记。
+验收 4/5 的细则（谁抽、抽多少、判定方法）已于 2026-09-15 M4 开工前补入 REQUIREMENTS §6（Yiyue 批准）。
 
 ---
 
