@@ -170,6 +170,8 @@ export function stripMetaHeader(text) {
 // pm-review 必备选样集（Step 9"脚本化分层选样 ≥20%"的同规则重推导——零信任：
 // 不信任何落盘清单，终检自己算）：每 5 个 chunk 必抽 + 升级 chunk 及其 N+1 接缝必抽；
 // 空则兜底抽末 chunk（小文档 ≥1 样本）
+let waiversCache = null; // B5 豁免登记缓存（读取一次）
+
 export function requiredSamples(totalN, events) {
   const req = new Set();
   for (let nn = 5; nn <= totalN; nn += 5) req.add(nn);
@@ -302,7 +304,10 @@ export function runGate(dir, opts = {}) {
     if (onDiskProj != null && onDiskProj !== projectionText) {
       warns.push(`投影文件与重推导不一致（chunk ${nn2(c.nn)}）——判以重推导为准，建议重跑 handoff.mjs`);
     }
-    const result = verify(orig, t.text, { keepList, projectionText, ...briefTh });
+    // B5 豁免持久登记（M4 缺陷#6，2026-09-17）：waivers.md（格式同 parseWaivers："原文串 → 译文字串"，# 注释行忽略）
+    // ——CLI --waiver 旗标是瞬态的，终检重执行须有落盘登记才不误杀合规规范化（M4 chunk 05 Intent.md→intent.md 首证）
+    const waiversText = waiversCache ??= safeRead(path.join(dir, "handoff", "waivers.md"));
+    const result = verify(orig, t.text, { keepList, projectionText, chunkNn: c.nn, waivers: waiversText, ...briefTh }); // chunkNn：B4 scope 同享（M4 缺陷#4 家族——终检内部重跑漏传则 scoped 词条误杀）
     if (!result.passed) {
       push(c.nn, "verify", `chunk ${nn2(c.nn)} 机械校验重跑未过（${result.fails.length} 项）：${result.fails.slice(0, 3).map((f) => `[${f.check}] ${f.message}`).join("；")}${result.fails.length > 3 ? " …" : ""}`);
     }
