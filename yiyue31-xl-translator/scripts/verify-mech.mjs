@@ -653,6 +653,7 @@ function parseArgs(argv) {
     else if (a === "--brief") opts.briefPath = argv[++i];
     else if (a === "--projection") opts.projectionPath = argv[++i];
     else if (a === "--chunk-nn") opts.chunkNn = parseInt(argv[++i], 10); // B4 scope 过滤（M4 缺陷#4：CLI 缺口补齐——scoped 条目须按 chunk 生效，CLI 此前无法传入）
+    else if (a === "--waiver") opts.waivers = (opts.waivers ? opts.waivers + "\n" : "") + argv[++i]; // B5 豁免 CLI 入口（M4 缺陷#4 同族——parseWaivers 此前仅程序内可达）
     else if (a === "--max-annotations") opts.maxAnnotations = parseInt(argv[++i], 10);
     else if (a === "--json") opts.json = true;
     else if (a === "-h" || a === "--help") opts.help = true;
@@ -665,7 +666,7 @@ function printHelp() {
   console.log(`verify-mech.mjs — xl-translator 翻译后机械校验（单次判定）
 
 用法:
-  node verify-mech.mjs <original.md> <translated.md> [--keep-list <path>] [--brief <path>] [--projection <path>] [--chunk-nn N] [--max-annotations N] [--json]
+  node verify-mech.mjs <original.md> <translated.md> [--keep-list <path>] [--brief <path>] [--projection <path>] [--chunk-nn N] [--waiver "原文串 → 译文字串"] [--max-annotations N] [--json]
 
 校验项（FAIL 退出码 1）:
   1. 代码块 / 行内代码：原文 ⊆ 译文（抓遗漏与误改）
@@ -730,7 +731,7 @@ export function runCli(args) {
       process.exit(1);
     }
   }
-  const result = verify(originalText, translatedText, { keepList, projectionText, chunkNn: opts.chunkNn ?? null, ...briefTh });
+  const result = verify(originalText, translatedText, { keepList, projectionText, chunkNn: opts.chunkNn ?? null, waivers: opts.waivers ?? null, ...briefTh });
   appendResultLog(pos[1], {
     time: new Date().toISOString(),
     original: path.basename(pos[0]),
