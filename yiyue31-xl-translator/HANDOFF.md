@@ -2,7 +2,7 @@
 
 > **本文自足**：读完即可在**任何机器**继续任务。机器专属路径在本地配置文件，不入 git。
 > 换机冷启动：①两仓库 git pull（skill 仓库 + 运行仓库 refined-stock）②读本文 ③按"当前状态"行的下一步动作执行。
-> 最后更新：2026-09-16 晨（**chunk 03 done 3/5**；chunk 04 译者在途——围栏两族分流将首次遇到代码围栏密集块）。
+> 最后更新：2026-09-16 午（chunk 04 译/机械毕（含 M4 缺陷#4 修复），裁定官第 3 配额窗后重派在途）。
 
 ## 0. 任务与判定依据
 
@@ -37,7 +37,7 @@
 ## 3. 已完成的关键事实（换机后必读）
 
 - 原文 sha1 前 12 = `9bdcc5278c2b`（=== M3，分母钉死）；5 chunk（unitTarget 12KB 一次过，与 M3 同边界）。
-- **skill 侧已修 3 项**（M4 期间发现，均已提交 + 测试绿）：①final-gate PASS 消解 pending.md 挂起旗标（M3 遗留缺口）②B2 最长匹配回归测试补齐 ③**围栏两族分流**（无标注=散文 mock 可译/有标注=代码 verbatim——chunk 01 首证死锁；extractCode/consistency/回归测试）。
+- **skill 侧已修 4 项**（均已提交 + 测试绿）：①final-gate PASS 消解 pending.md 挂起旗标 ②B2 最长匹配回归测试 ③围栏两族分流 ④verify-mech CLI --chunk-nn 入口 + runCli 透传（B4 scope 的 CLI 缺口）。
 - M3 工作目录的陈旧 pending.md 已清（status 现正确报"已交付"）。
 - 评审第 1 轮要点（已修）：glossary 补 harness/loop/governance/control 等核心条、keep-list 幽灵词、Western Electric 双收、围栏散文 mock 块口径（7 处照译）、special-phrases 增收 L416、analysis 6 处 chunk 定位。详见 workdir review-pre-translation.md。
 - 全局 terms.md 冲突处置：agentic AI 对齐"智能体式 AI"；artifact 本篇覆盖为"产物"（REPORT 披露）。
