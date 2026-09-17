@@ -2,7 +2,7 @@
 
 > **本文自足**：读完即可在**任何机器**继续任务。机器专属路径在本地配置文件，不入 git。
 > 换机冷启动：①两仓库 git pull（skill 仓库 + 运行仓库 refined-stock）②读本文 ③按"当前状态"行的下一步动作执行。
-> 最后更新：2026-09-16 晚（**全书 5/5 过审 ready-merge**；下一步 Step 8 merge/统稿）。
+> 最后更新：2026-09-17 晨（**M4 全量验收完成——全绿收官**。下一步 = M5 部署收尾）。
 
 ## 0. 任务与判定依据
 
@@ -29,7 +29,8 @@
 | chunk 03 全流程 | ✅ done 3/5（终态 sha 9cf190e35f57）：3 轮审校+终态确认轮；精选表 #7 兑现；批引残 2 起+终修代价结构已登观测 9/10 |
 | chunk 04 全流程 | ✅ done 4/5（终态 sha 7b9ddcc95cf1）：3 轮+终态确认；PRs 数据修（Teams 族第二例）；批引残第 4 起（子句级）+staging 槽位漂移（观察 11） |
 | chunk 05 全流程 | ✅ done 5/5（22.7h/4 窗）：审校 2 轮+终态确认；Intent.md 笔误族（waiver/diff scope/10pm）全解；批引残第 5 起（同行双从句） |
-| **下一步（Step 8）** | merge.mjs → consistency.mjs 全量扫描 → 统稿决策 subagent（只读清单下结论，含 5 份残余清单合并裁量）→ 机械应用 → 受影响 chunk 重验 → 再合并重扫（统稿轮 ≤2） |
+| M4 收官 | ✅ 终检二跑 PASS 交付（c88afa0d8101）；红队 4 全捕获；验收 10 条全绿；skill 修复 6 项；详见 m4-outbox/M4-验收记录.md |
+| **下一步 = M5** | refined-stock CLAUDE.md 约定表加 xl 条目 / translator description 边界互指 / 中间态 gitignore 复核 / 两 skill 触发测试（DESIGN §6 M5 行） |
 | Step 3-10 | ⬜ 逐 chunk 流水（每 chunk：翻译→裁定→机械→四维审校→修复闭环）→ merge/统稿 → 冷读/PM → final-gate |
 | 演练 + 红队 + 验收 10 条 | ⬜ 按 m4-outbox/演练规程.md 执行（穿插进行） |
 
