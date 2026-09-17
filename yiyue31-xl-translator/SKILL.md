@@ -1,7 +1,7 @@
 ---
 name: yiyue31-xl-translator
 description: 翻译大英文文档（>40KB）为中文时启用。触发词：翻译大文档、大文档翻译、继续翻译、resume、翻译进度、翻到哪了、停止翻译、重翻第 N 章、重新翻译、审计翻译、查翻译质量。小于 40KB 的文章请用 yiyue31-translator。
-version: 0.3.2
+version: 0.3.3
 author: Yiyue31
 ---
 
@@ -18,9 +18,9 @@ author: Yiyue31
 ## Directory
 
 - `{skill-dir}` = 本 SKILL.md 所在目录。引用文件封闭集（引用格式 `{skill-dir}/references/<file>`、`{skill-dir}/scripts/<file>`）：
-  - **references/（10）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md、terms.md（种子，用户态运行时维护）。
-  - **scripts/（10）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs、audit.mjs。
-- 工作目录 `xl-translator/<title>/`（refined-stock 仓库根下）；文件命名严格按 DESIGN §5.1 schema，status/final-gate 按该表 glob 工作。
+  - **references/（9）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md。（terms.md 系运行时用户态：首次从 translator 一次性拷贝种子至工作目录，非本目录资产。）
+  - **scripts/（9）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs。
+- 工作目录 `xl-translator/<title>/`（refined-stock 仓库根下）；文件命名遵循下方命名三条红线，status/final-gate 按脚本内建 glob 工作。
 - 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生——PASS 前全目录不得命中任何发布模式。
 - 报告/台账的机器解析格式：各 prompt 与产物按 `{skill-dir}/references/` 对应文件的契约逐字执行，不得改写格式。
 
@@ -125,5 +125,5 @@ author: Yiyue31
 ## 交付
 
 - 交付即止：不自动触发发布管线——refined-stock 的 Stop/SessionEnd hook 会自然发布 PASS 后的交付物。
-- 动词 `审计翻译` / `查翻译质量`：响应对应 audit 命令（`{skill-dir}/scripts/audit.mjs`，M5 落地；落地前以 REPORT.md 使用说明兜底）。
+- 动词 `审计翻译` / `查翻译质量`：以 REPORT.md 使用说明兜底（audit 脚本未实现）。
 - `REPORT.md`：final-gate 渲染机器段（首屏结论/覆盖矩阵/sha 锚/FAIL 清单）+ 主 agent 按 `{skill-dir}/references/delivery-template.md` 追加人工段；内部术语附人话括注（如"探针 4 次 = 故意埋 4 处错看审校能否全抓到"）。
