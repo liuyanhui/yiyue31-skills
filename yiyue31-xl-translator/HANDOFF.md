@@ -1,8 +1,8 @@
-# HANDOFF：xl-translator M5 部署收尾（活文档——每单元更新；自足支持换机+冷启动）
+# HANDOFF：xl-translator 项目终态（M1-M5 全部收口；本文件留档备查，支持换机读取）
 
 > **本文自足**：在任何机器读完即可继续任务，不依赖任何会话记忆或本机路径。机器专属路径只存在于本地配置文件（不入 git，见 §1）。
 > **换机冷启动三步**：①两仓库 `git pull`（skill 仓库 + 运行仓库 refined-stock）②读本文 §2"当前状态"③按 §3"下一步动作"执行。
-> 最后更新：2026-09-17 晨（**M4 全量验收全绿收官**；任务 = M5 部署收尾，DESIGN §6 M5 行）。
+> 最后更新：2026-09-17（**M5 收窄口径完成——项目终态 M1-M5 全收口**）。
 
 ## 0. 任务与判定依据
 
@@ -37,7 +37,7 @@
 |---|---|
 | M1a-M1c + M2 + M3 | ✅ 已提交（DESIGN §6 各行已收口） |
 | **M4 全量验收** | ✅ **2026-09-15~17 全绿收官**（DESIGN §6 M4 行已收口）：playbook-r2 全流程重跑 5 chunk / 终检二跑 PASS / 交付物 `translated-AI-Native-SDLC-playbook-r2-zh.md`（sha `c88afa0d8101`）/ 验收 10 条全绿 / 红队 4 全捕获 / 演练 6 全过 / skill 修复 6 项（①PASS 消解挂起旗标 ②B2 回归测试 ③围栏两族分流 ④verify CLI --chunk-nn/--waiver ⑤final-gate waiver 持久登记 handoff/waivers.md ⑥final-gate 内部 chunkNn 透传——全套件 160 测试绿） |
-| **M5 部署收尾** | ⬜ **= 你的任务**（§0 四项 + 触发测试） |
+| **M5 部署收尾** | ✅ 2026-09-17 收窄口径完成（Yiyue：refined-stock 加家族同款配置即可，其他忽略）——CLAUDE.md 约定表+发布清单两处收录，已推送；发布面零改动（classify 既有模式覆盖，M4 已证） |
 
 **关键事实**：
 - M4 详情：运行仓库 `xl-translator/m4-outbox/M4-验收记录.md`（30+ 单元台账 + 验收 10 条终判 + 终账）；M3 对照译本仍在 `xl-translator/AI-Native-SDLC-playbook/`（同源两译本并存，均有效交付）。
