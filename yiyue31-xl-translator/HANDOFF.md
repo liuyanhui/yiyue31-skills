@@ -43,22 +43,23 @@
 - M4 详情：运行仓库 `xl-translator/m4-outbox/M4-验收记录.md`（30+ 单元台账 + 验收 10 条终判 + 终账）；M3 对照译本仍在 `xl-translator/AI-Native-SDLC-playbook/`（同源两译本并存，均有效交付）。
 - 移交用户 3 项源料缺陷（M4 REPORT 记录）：发布时间 2001-08-21 疑错年 / chunk 05 尾段文档列表源缺失 / Traditional 段首连写形。
 - refined-stock 发布链：SessionEnd → gen-html（classify 扫描）→ publish（git push）。M4 已实测 r2 半径仅交付物渲染。
-- refined-stock 的 CLAUDE.md 约定表现状：**尚无 xl-translator 条目**（M5 要加）。
+- refined-stock 的 CLAUDE.md 约定表：**已收录 xl-translator**（输出目录 `xl-translator/<title>/` + 发布工作流清单，2026-09-17 提交）。
 
-## 3. 下一步动作（M5 执行序）
+## 3. M5 执行记录（已完成；若未来重启可选项见此）
 
 1. refined-stock `CLAUDE.md`：约定表加 xl-translator 行（工作目录 `xl-translator/<title>/`；动词"继续翻译/翻译进度/重翻第 N 章/重新翻译"归 xl；≤40KB 走 translator）
 2. translator `SKILL.md` description：加"大文档（>40KB）请用 yiyue31-xl-translator"（若已有则核对措辞）
 3. gitignore 复核：确认 `xl-translator/` 中间产物无 `summary-/talk-/merge-/final-/recommendation-` 前缀与 `-zh.md` 后缀（M4 红队已证此二形是唯一真实泄漏向量）
 4. 触发测试：小文章（<40KB）仍走 translator、大文章触发 xl（两条 description 互指生效）
-5. 收口：DESIGN §6 M5 行 + 本 HANDOFF 更新为"M5 完成/项目终态"；两仓库 commit + push
+5. 收口：DESIGN §6 M5 行 + 本 HANDOFF 终态化；两仓库 commit + push —— ✅ 已完成（第 1/3/5 项落地，第 2/4 项按 Yiyue 指示忽略，登记后续可选）
 6. 测试纪律：skill 侧改动后跑 `bash <skill_dir>/scripts/test/run.sh`（当前 160 项，须全绿）
 
 ## 4. 单元台账（M5 期间逐项追加）
 
 | # | 单元 | 状态 | 备注 |
 |---|---|---|---|
-| — | （待 M5 开工） | ⬜ | |
+| 1 | CLAUDE.md 约定表 + 发布清单收录 xl-translator | ✅ 2026-09-17 | refined-stock 两处提交推送；发布面零改动（classify 既有模式覆盖） |
+| — | translator 互指措辞核对 / 双 skill 触发实测 | ⏸ 按指示忽略 | 后续可选：xl description 已含 40KB 边界反向指引 |
 
 ## 5. 环境注意（跨机器通用）
 
