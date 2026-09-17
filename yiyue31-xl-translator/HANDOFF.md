@@ -1,69 +1,69 @@
-# HANDOFF：xl-translator M4 全量验收（活文档——每个单元结束后更新）
+# HANDOFF：xl-translator M5 部署收尾（活文档——每单元更新；自足支持换机+冷启动）
 
-> **本文自足**：读完即可在**任何机器**继续任务。机器专属路径在本地配置文件，不入 git。
-> 换机冷启动：①两仓库 git pull（skill 仓库 + 运行仓库 refined-stock）②读本文 ③按"当前状态"行的下一步动作执行。
-> 最后更新：2026-09-17 晨（**M4 全量验收完成——全绿收官**。下一步 = M5 部署收尾）。
+> **本文自足**：在任何机器读完即可继续任务，不依赖任何会话记忆或本机路径。机器专属路径只存在于本地配置文件（不入 git，见 §1）。
+> **换机冷启动三步**：①两仓库 `git pull`（skill 仓库 + 运行仓库 refined-stock）②读本文 §2"当前状态"③按 §3"下一步动作"执行。
+> 最后更新：2026-09-17 晨（**M4 全量验收全绿收官**；任务 = M5 部署收尾，DESIGN §6 M5 行）。
 
 ## 0. 任务与判定依据
 
-**任务 = M4 全量验收**（DESIGN §6 M4 行）：playbook 重跑（验证 M3 回写后的 skill 修改）+ 验收 10 条（REQUIREMENTS §6，含 4/5 细则）+ 红队 4 场景 + 中断续跑 / compact / 限流退避 / SessionEnd（含 Step 9↔10 退出）/"用户 12 小时不在场"演练。**验收 = 全绿 + REPORT 对账**。
+**任务 = M5 部署收尾**（DESIGN §6 M5 行，最后一个里程碑）：
+1. refined-stock `CLAUDE.md` 约定表加 xl-translator 条目（工作目录 `xl-translator/<title>/`、动词表、与 translator/summary 等输出目录的边界）
+2. translator skill description 加边界互指（"大文档 >40KB 请用 yiyue31-xl-translator"——xl 侧 description 已有反向指引，核对即可）
+3. 中间态 gitignore 复核（R12 规则已提前落 refined-stock——**M4 复审结论：普通名中间产物 classify() 全 null 安全，`summary-` 前缀与 `-zh.md` 后缀是真实泄漏向量，命名红线三条已防**；复核即可，无需新规则）
+4. 两 skill 触发测试（小文章仍走旧 skill / 大文章触发 xl——description 边界互指生效验证）
 
-开工裁定（2026-09-15 Yiyue）：全 subagent 派发 / 审校两波制 ≤5（D1）/ M4 新标题并行（M3 交付物原位不动）/ 验收 4/5 细则已入 REQUIREMENTS §6。
+**验收** = 小文章仍走旧 skill（DESIGN §6 M5 行验收列）。
+
+**开工口径先例**（M3/M4 均如此）：涉及取舍的问题问 Yiyue；机械可推导的直接做。
 
 ## 1. 机器本地配置（不入 git，换机时手工重建）
 
-文件 `~/.config/xl-translator/m4-local.json`（键：run_repo_dir / skill_dir / workdir / title / probe_truth / translator_skill_dir）。
-运行仓库内工作目录：`<run_repo>/xl-translator/AI-Native-SDLC-playbook-r2/`；验收记录：`<run_repo>/xl-translator/m4-outbox/`（M4-验收记录.md = 逐单元台账；演练规程.md = 6 演练 + 红队 4 场景执行规程）。
-探针 truth 已入 skill 仓库 git（probe/truth/m4-playbook-r1.json，run=m4-playbook-r1 seed=20260915）。
+文件 `~/.config/xl-translator/m4-local.json`（键见下；M5 沿用同文件即可）：
+```json
+{
+  "run_repo_dir": "~/project/refined-stock",
+  "skill_dir": "~/skills/yiyue31-skills/yiyue31-xl-translator",
+  "workdir": "~/project/refined-stock/xl-translator/AI-Native-SDLC-playbook-r2",
+  "title": "AI-Native-SDLC-playbook-r2",
+  "probe_truth": "probe/truth/m4-playbook-r1.json（相对 skill_dir；已入 git）",
+  "translator_skill_dir": "~/skills/yiyue31-skills/yiyue31-translator"
+}
+```
+两仓库在 git 中已含全部必需状态（探针 truth 已入 skill 仓库；运行产物已入 refined-stock）——重建此文件后无其他本机依赖。
 
-## 2. 当前状态
+## 2. 当前状态（换机后必读）
 
-| 阶段 | 状态 |
+| 里程碑 | 状态 |
 |---|---|
-| Step 0-1 | ✅ 落盘/预检/分段（5 chunk 落带，sha 9bdcc5278c2b === M3 同源） |
-| Step 2 五件产物 + 探针 truth | ✅ 落盘（glossary 终态 188 条零双选；评审 2 轮打回→修复闭环完成） |
-| Step 2 评审第 2 轮复核 | ✅ 6/8 到位 + 2 处分钟级修复（stream of work 词头/agentic 补条/analysis 四行定位）——评审判"修后免复审可进翻译" |
-| chunk 01 翻译/裁定/机械 | ✅ 翻译自检全绿（锚 9/9、精选表 5/5）；裁定保留 10/删 2、台账 10 行；机械校验 FAIL 3 → **skill 缺陷#3 修复（围栏两族分流）** + 译文修 2 处 → PASS |
-| chunk 01 审校闭环 | 首审 12 单元（探针 4/4 命中）→ 修复批 1（41 处）→ 重审轮 1（FAIL 4+2+1）→ 修复批 2（8 处，含 quarters 复数端点/跨维张力修复）→ 重审轮 1 波 2 → 修复批 3（4 处，含精选表冻结句形变同步）→ **终审轮 3/3 在途（8 单元两波）** |
-| chunk 02 全流程 | ✅ done 2/5（终态 sha a84b1c84e49c）：翻译零标记/机械首轮零修复/裁定 8 保留/审校 3 轮（b 半块第 2 轮即零且 fresh 存续——**半块隔离机器化实证**）/累计修复 34 处/第 2 配额窗实录 |
-| chunk 03 全流程 | ✅ done 3/5（终态 sha 9cf190e35f57）：3 轮审校+终态确认轮；精选表 #7 兑现；批引残 2 起+终修代价结构已登观测 9/10 |
-| chunk 04 全流程 | ✅ done 4/5（终态 sha 7b9ddcc95cf1）：3 轮+终态确认；PRs 数据修（Teams 族第二例）；批引残第 4 起（子句级）+staging 槽位漂移（观察 11） |
-| chunk 05 全流程 | ✅ done 5/5（22.7h/4 窗）：审校 2 轮+终态确认；Intent.md 笔误族（waiver/diff scope/10pm）全解；批引残第 5 起（同行双从句） |
-| M4 收官 | ✅ 终检二跑 PASS 交付（c88afa0d8101）；红队 4 全捕获；验收 10 条全绿；skill 修复 6 项；详见 m4-outbox/M4-验收记录.md |
-| **下一步 = M5** | refined-stock CLAUDE.md 约定表加 xl 条目 / translator description 边界互指 / 中间态 gitignore 复核 / 两 skill 触发测试（DESIGN §6 M5 行） |
-| Step 3-10 | ⬜ 逐 chunk 流水（每 chunk：翻译→裁定→机械→四维审校→修复闭环）→ merge/统稿 → 冷读/PM → final-gate |
-| 演练 + 红队 + 验收 10 条 | ⬜ 按 m4-outbox/演练规程.md 执行（穿插进行） |
+| M1a-M1c + M2 + M3 | ✅ 已提交（DESIGN §6 各行已收口） |
+| **M4 全量验收** | ✅ **2026-09-15~17 全绿收官**（DESIGN §6 M4 行已收口）：playbook-r2 全流程重跑 5 chunk / 终检二跑 PASS / 交付物 `translated-AI-Native-SDLC-playbook-r2-zh.md`（sha `c88afa0d8101`）/ 验收 10 条全绿 / 红队 4 全捕获 / 演练 6 全过 / skill 修复 6 项（①PASS 消解挂起旗标 ②B2 回归测试 ③围栏两族分流 ④verify CLI --chunk-nn/--waiver ⑤final-gate waiver 持久登记 handoff/waivers.md ⑥final-gate 内部 chunkNn 透传——全套件 160 测试绿） |
+| **M5 部署收尾** | ⬜ **= 你的任务**（§0 四项 + 触发测试） |
 
-**续跑口令**（用户视角）：`继续翻译 AI-Native-SDLC-playbook-r2` / `翻译进度` / `停止翻译 …` / `重新翻译 …`。
-**编排侧冷启动**：`node <skill_dir>/scripts/status.mjs <workdir> [--verb progress]`——状态纯落盘推导（C3 后默认 view 零副作用）。
+**关键事实**：
+- M4 详情：运行仓库 `xl-translator/m4-outbox/M4-验收记录.md`（30+ 单元台账 + 验收 10 条终判 + 终账）；M3 对照译本仍在 `xl-translator/AI-Native-SDLC-playbook/`（同源两译本并存，均有效交付）。
+- 移交用户 3 项源料缺陷（M4 REPORT 记录）：发布时间 2001-08-21 疑错年 / chunk 05 尾段文档列表源缺失 / Traditional 段首连写形。
+- refined-stock 发布链：SessionEnd → gen-html（classify 扫描）→ publish（git push）。M4 已实测 r2 半径仅交付物渲染。
+- refined-stock 的 CLAUDE.md 约定表现状：**尚无 xl-translator 条目**（M5 要加）。
 
-## 3. 已完成的关键事实（换机后必读）
+## 3. 下一步动作（M5 执行序）
 
-- 原文 sha1 前 12 = `9bdcc5278c2b`（=== M3，分母钉死）；5 chunk（unitTarget 12KB 一次过，与 M3 同边界）。
-- **skill 侧已修 4 项**（均已提交 + 测试绿）：①final-gate PASS 消解 pending.md 挂起旗标 ②B2 最长匹配回归测试 ③围栏两族分流 ④verify-mech CLI --chunk-nn 入口 + runCli 透传（B4 scope 的 CLI 缺口）。
-- M3 工作目录的陈旧 pending.md 已清（status 现正确报"已交付"）。
-- 评审第 1 轮要点（已修）：glossary 补 harness/loop/governance/control 等核心条、keep-list 幽灵词、Western Electric 双收、围栏散文 mock 块口径（7 处照译）、special-phrases 增收 L416、analysis 6 处 chunk 定位。详见 workdir review-pre-translation.md。
-- 全局 terms.md 冲突处置：agentic AI 对齐"智能体式 AI"；artifact 本篇覆盖为"产物"（REPORT 披露）。
-- 低内存纪律：subagent 串行派发（审校波次 ≤5 两波制）；每次派发唯一，等回传。
+1. refined-stock `CLAUDE.md`：约定表加 xl-translator 行（工作目录 `xl-translator/<title>/`；动词"继续翻译/翻译进度/重翻第 N 章/重新翻译"归 xl；≤40KB 走 translator）
+2. translator `SKILL.md` description：加"大文档（>40KB）请用 yiyue31-xl-translator"（若已有则核对措辞）
+3. gitignore 复核：确认 `xl-translator/` 中间产物无 `summary-/talk-/merge-/final-/recommendation-` 前缀与 `-zh.md` 后缀（M4 红队已证此二形是唯一真实泄漏向量）
+4. 触发测试：小文章（<40KB）仍走 translator、大文章触发 xl（两条 description 互指生效）
+5. 收口：DESIGN §6 M5 行 + 本 HANDOFF 更新为"M5 完成/项目终态"；两仓库 commit + push
+6. 测试纪律：skill 侧改动后跑 `bash <skill_dir>/scripts/test/run.sh`（当前 160 项，须全绿）
 
-## 4. 单元台账（最近单元，完整版见 m4-outbox/M4-验收记录.md）
+## 4. 单元台账（M5 期间逐项追加）
 
 | # | 单元 | 状态 | 备注 |
 |---|---|---|---|
-| 00 | 译前评审第 1 轮 | ✅ 打回·轻（36 条） | 报告 review-pre-translation.md |
-| 00b | 修复（6 类必改全落） | ✅ | glossary 171→187 |
-| 00c | 评审第 2 轮复核 | ✅ 修后免复审 | 报告"第 2 轮复核"节；遗留 2+1 全修 |
-| 01 | chunk 01 翻译（阶段A） | ✅ 911s | 锚 9/9、精选 5/5、自裁定 7 条全不入表 |
-| 02 | chunk 01 裁定（阶段B） | ✅ 366s | 保留 10/删 2；台账 10 行；G3 同源自检 PASS |
-| 03 | chunk 01 机械校验 | ✅ FAIL 3→修→PASS | 缺陷#3 围栏两族分流入库（全套件绿） |
-| 04 | chunk 01 审校首轮+探针 | ✅ 探针 4/4 命中；429[1308] 击杀 2 探针（零半成品，窗后重派双中） | D1 实录+C2 去重首跑 |
-| 05 | 修复批 1-3（53 处）+ 机械重跑 ×3 | ✅ 全 PASS | 跨维张力 1 例（人手写→靠手写）；精选表 2 句形变同步 |
-| 06 | chunk 01 终审轮 3/3 | ⏳ 波 1/2（5 在途） | sha a=248d17afeefd b=323e2d07a94c |
+| — | （待 M5 开工） | ⬜ | |
 
 ## 5. 环境注意（跨机器通用）
 
-- 测试串行入口：`bash <skill_dir>/scripts/test/run.sh`（当前 160 项绿）。
-- node -e 内联脚本转义在部分 shell 不可靠 → 非平凡脚本写临时 .mjs/.py 文件再跑。
-- API 限流处置模板见 SKILL.md D1（429[1302] 补派 / [1308] 等窗 / 流停滞核验后重派 / ≤5 两波制）。
-- 派发纪律：inputs/outputs 一律绝对路径；审校派发按 C4 模板（staging 总行数 + 起止标题 + 节名枚举 + grep 核对）；禁 web 条款随派发附。
-- `agent`（AI 义）译"智能体"、`token`（AI 义）译"词元"。
+- 测试串行入口：`bash <skill_dir>/scripts/test/run.sh`；非平凡脚本写临时文件再跑（内联转义不可靠）。
+- 低内存纪律：subagent 串行（审校两波制 ≤5 需 Yiyue 授权——M4 已授权过，M5 无审校需求）；每会话预算干净退出。
+- API 限流处置（D1 模板）：429[1302] 补派 / [1308] 定时等窗（配额窗约 5h 一档，重置时刻见报错）/ 流停滞核验无半成品后原样重派。
+- 派发纪律：inputs/outputs 绝对路径；`agent`（AI 义）译"智能体"、`token`（AI 义）译"词元"。
+- M4 过程教训（供 M5 及后续参考）：批量 str.replace 后必跑叠字自扫；终审轮后不落词级修复（sha 刷新代价=半块 4 单元）；扫描 classify 一律以仓库根为根。
