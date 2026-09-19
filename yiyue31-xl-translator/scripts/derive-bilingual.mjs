@@ -40,8 +40,8 @@ const nn2 = (n) => String(n).padStart(2, "0");
 const isFenceLine = (l) => /^\s{0,3}(`{3,}|~{3,})/.test(l);
 // 锚行 = 单行弱化斜体 *English Heading*（Step 2 标题双语锚契约形态）
 const ANCHOR_RE = /^\*([^*]+)\*$/;
-// URL 集合指纹：排除空白/括号/引号/中文标点（截断于首个此类字符）
-const URL_RE = /https?:\/\/[^\s()[\]<>"'`、。，；：！？）】》]+/g;
+// URL 集合指纹：排除空白/括号/引号/中文标点（截断于首个此类字符）；scheme 大小写不敏感（i）
+const URL_RE = /https?:\/\/[^\s()[\]<>"'`、。，；：！？）】》]+/gi;
 
 function safeRead(p) {
   try {
@@ -49,6 +49,25 @@ function safeRead(p) {
   } catch {
     return null;
   }
+}
+
+// 结构分析前归一：CRLF→LF + 剥头部 BOM（HEAD_RE/ANCHOR_RE 的 `.` 不匹配 \r——CRLF 输入整体失配标题）。
+// 产物统一 LF（幂等不受影响：同输入同输出）。
+const readNorm = (p) => {
+  const t = safeRead(p);
+  return t == null ? null : t.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+};
+
+// URL 指纹归一：剥尾部 ASCII 句读（英文句点收尾 vs 中文句号收尾是翻译常态，不剥则伪降级）；
+// scheme+host 大小写归一（URL 语法里这两段大小写不敏感）
+function urlSet(text) {
+  const out = new Set();
+  for (const raw of text.match(URL_RE) ?? []) {
+    const u = raw.replace(/[.,;:!?]+$/, "");
+    const m = u.match(/^([a-zA-Z]+):\/\/([^/?#]*)(.*)$/);
+    out.add(m ? `${m[1].toLowerCase()}://${m[2].toLowerCase()}${m[3]}` : u);
+  }
+  return out;
 }
 
 // ---------- interleave 纯函数（测试复用点，仿 merge.assemble 被 final-gate 复用的先例） ----------
@@ -88,13 +107,12 @@ function splitBlocks(lines) {
   return blocks;
 }
 
-const urlSet = (text) => new Set(text.match(URL_RE) ?? []);
-
 export function interleave(origText, zhText, opts = {}) {
   const anchor = opts.anchor !== false;
   const label = opts.label ?? "chunk";
-  const origLines = origText.split("\n");
-  const zhLines = zhText.split("\n");
+  // 结构分析前归一：CRLF→LF + 剥 BOM（HEAD_RE/ANCHOR_RE 的 `.` 不匹配 \r，CRLF/BOM 输入会整体失配标题）
+  const origLines = String(origText).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").split("\n");
+  const zhLines = String(zhText).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").split("\n");
   const origH = fenceAwareHeadings(origLines);
   const zhH = fenceAwareHeadings(zhLines);
 
@@ -154,14 +172,17 @@ export function interleave(origText, zhText, opts = {}) {
     const os = origSecs[origIndexOf(i)];
     const zTitle = zs.heading?.title ?? `${label}（标题前内容）`;
 
-    // 标题呈现（B6）：中文标题行 + 锚行原样保留；锚行缺失（锚关或缺锚）时插 *English*——英文标题恰好一次
+    // 标题呈现（B6）：中文标题行 + 锚行保留；锚行仅当逐字 === 配对原文标题的 *…* 形态才保留
+    // （防 CJK 斜体行/错锚行被吞作锚——偷走内容块或顶掉真英文标题；评审②-10/R3-7），
+    // 否则插合成 *English*——英文标题恰好一次
     const head = [];
     let bodyFrom = zs.s;
     if (zs.heading) {
       head.push(zhLines[zs.heading.lineIdx]);
       const next = zhLines[zs.heading.lineIdx + 1] ?? "";
-      if (ANCHOR_RE.test(next)) { head.push(next); bodyFrom = zs.heading.lineIdx + 2; }
-      else { head.push(`*${os.heading.title}*`); bodyFrom = zs.heading.lineIdx + 1; }
+      const synth = `*${os.heading.title}*`;
+      if (next === synth) { head.push(next); bodyFrom = zs.heading.lineIdx + 2; }
+      else { head.push(synth); bodyFrom = zs.heading.lineIdx + 1; }
     }
 
     // 节内块切分（B5）：zh 侧去标题/锚行；en 侧去标题行；preamble 两侧全量
@@ -204,6 +225,7 @@ export function runDerive(dir, opts = {}) {
     return { exitCode: 3, errors: [`无交付物 ${deliverable}——双语派生是 PASS 后视图，先走完终检（绝不静默拼视图）`] };
   }
   const deliverableSha = fileSha(deliverablePath);
+  const deliverableText = deliverableRaw.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n"); // sha 用原始字节，结构处理用归一文本
   const warns = [];
 
   // B2：chunk 配对精确（manifest NN 连续 × chunks 实文件 sha × translated 存在性）
@@ -221,9 +243,14 @@ export function runDerive(dir, opts = {}) {
     return { exitCode: 3, errors: [`多余译文 chunk ${extra.map(nn2).join(", ")}：不在 manifest 登记内——先清理`] };
   }
   const shaBad = [];
+  const chunkMissing = [];
   for (const row of manifestChunkShas(inv.manifest)) {
     const p = path.join(dir, "chunks", row.name);
-    if (fs.existsSync(p) && fileSha(p) !== row.sha) shaBad.push(row.name);
+    if (!fs.existsSync(p)) chunkMissing.push(row.name); // 评审②-2：实文件缺失同样 = 配对失败，绝不静默拼空视图
+    else if (fileSha(p) !== row.sha) shaBad.push(row.name);
+  }
+  if (chunkMissing.length) {
+    return { exitCode: 3, errors: [`缺原文 chunk 文件：manifest 登记的 ${chunkMissing.join(", ")} 在 chunks/ 不存在——配对失败（绝不静默拼空原文侧）`] };
   }
   if (shaBad.length) {
     return { exitCode: 3, errors: [`sha 不符：manifest 记录与 chunks/ 实文件不一致（${shaBad.join(", ")}）——分母被改动，配对失败`] };
@@ -239,8 +266,9 @@ export function runDerive(dir, opts = {}) {
       warns.push(`交付物 sha ${deliverableSha} ≠ REPORT 锚 ${anchorSha}（疑手改）——派生只读不覆盖交付物，本行即止`);
     }
   }
-  const assembled = assemble(nns.map((n) => ({ nn: n, text: inv.translated[n].text }))).merged;
-  if (assembled !== stripMetaHeader(deliverableRaw)) {
+  const assembled = assemble(nns.map((n) => ({ nn: n, text: inv.translated[n].text }))).merged
+    .replace(/^\uFEFF/, "").replace(/\r\n/g, "\n"); // 与交付物同口径归一后比对（CRLF 输入不误报）
+  if (assembled !== stripMetaHeader(deliverableText)) {
     warns.push("交付物正文 ≠ assemble(translated-chunks)——双语版基于管线产物（translated-chunks），与交付物手修部分不一致");
   }
 
@@ -258,7 +286,7 @@ export function runDerive(dir, opts = {}) {
   }
 
   // 头部（B6）：交付物头部照抄（至首个 --- 行含）+ 引用块内追加双语版行（源交付物 sha——status 三态数据源，C3）
-  const lines = deliverableRaw.split("\n");
+  const lines = deliverableText.split("\n");
   const hrIdx = lines.findIndex((l) => /^---\s*$/.test(l));
   const bilingualLine = `> **双语版**：由源交付物与原文机械交错的只读派生视图（非交付物、不经终检、不受手修保护）——源交付物 sha1（前 12）：${deliverableSha}；重说「双语对照 ${title}」可幂等重生成`;
   let header;

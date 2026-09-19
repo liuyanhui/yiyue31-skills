@@ -33,10 +33,11 @@ const crypto = require("crypto");
 const sha12 = (s) => crypto.createHash("sha1").update(s, "utf-8").digest("hex").slice(0, 12);
 const fileSha = (p) => sha12(fs.readFileSync(p, "utf-8"));
 const isFenceLine = (l) => /^\s{0,3}(`{3,}|~{3,})/.test(l);
-// 锚行候选 = 单行弱化斜体 *...*（xl 标题双语锚同形态；translator 语境下须无 CJK 才认——
-// 中文斜体行是译文内容，吞作锚行会偷走一个内容块）
+// 锚行候选 = 单行弱化斜体 *...*（xl 标题双语锚同形态）；仅当逐字 === 原文标题的 *…* 形态才作锚行
+// 消费（评审②-10/R3-7：CJK 斜体行是译文内容，吞作锚行会偷走一个内容块）
 const ANCHOR_RE = /^\*([^*]+)\*$/;
-const URL_RE = /https?:\/\/[^\s()[\]<>"'`、。，；：！？）】》]+/g;
+// URL 集合指纹：排除空白/括号/引号/中文标点；scheme 大小写不敏感（i）
+const URL_RE = /https?:\/\/[^\s()[\]<>"'`、。，；：！？）】》]+/gi;
 
 function safeRead(p) {
   try {
@@ -44,6 +45,25 @@ function safeRead(p) {
   } catch (_e) {
     return null;
   }
+}
+
+// 结构分析前归一：CRLF→LF + 剥头部 BOM（HEAD_RE/ANCHOR_RE 的 `.` 不匹配 \r——CRLF 输入整体失配标题）。
+// 产物统一 LF（幂等不受影响：同输入同输出）。
+const readNorm = (p) => {
+  const t = safeRead(p);
+  return t == null ? null : t.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+};
+
+// URL 指纹归一：剥尾部 ASCII 句读（英文句点收尾 vs 中文句号收尾是翻译常态，不剥则伪降级）；
+// scheme+host 大小写归一（URL 语法里这两段大小写不敏感）
+function urlSet(text) {
+  const out = new Set();
+  for (const raw of text.match(URL_RE) || []) {
+    const u = raw.replace(/[.,;:!?]+$/, "");
+    const m = u.match(/^([a-zA-Z]+):\/\/([^/?#]*)(.*)$/);
+    out.add(m ? `${m[1].toLowerCase()}://${m[2].toLowerCase()}${m[3]}` : u);
+  }
+  return out;
 }
 
 // ---------- fork 自 xl segment.mjs（fence 感知标题 + 保护区识别） ----------
@@ -146,16 +166,15 @@ function splitBlocks(lines) {
   return blocks;
 }
 
-const urlSet = (text) => new Set(text.match(URL_RE) || []);
-
 // ---------- interleave 纯函数 ----------
 //
 // 整篇交错：origText（original-{title}.md 全文）× zhText（交付物去元信息头后的正文）。
 // 返回 { text, totalSections, degraded }；degraded = [{ title, reason }]（B8 清单数据源）。
 
 function interleave(origText, zhText) {
-  const origLines = origText.split("\n");
-  const zhLines = zhText.split("\n");
+  // 结构分析前归一：CRLF→LF + 剥 BOM（评审②-3/②-4/②-9）
+  const origLines = String(origText).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").split("\n");
+  const zhLines = String(zhText).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").split("\n");
   const origH = fenceAwareHeadings(origLines);
   const zhH = fenceAwareHeadings(zhLines);
 
@@ -187,15 +206,18 @@ function interleave(origText, zhText) {
     const os = origSecs[i]; // 顺序配对（标题数相等 ⇒ 两两平行）
     const zTitle = zs.heading ? zs.heading.title : "（标题前内容）";
 
-    // 标题呈现（B6）：中文标题行 + 无 CJK 斜体锚行保留；否则插合成 *English*——英文标题恰好一次
+    // 标题呈现（B6）：中文标题行 + 锚行保留；锚行仅当逐字 === 原文标题的 *…* 形态才保留
+    // （评审②-1/②-10：else 分支必须推 bodyFrom 过标题行——fork 时遗漏导致常规无锚译文
+    //  把标题行计入内容块，几乎全量伪降级或零警告错配；CJK 斜体/错锚行同理不吞），
+    // 否则插合成 *English*——英文标题恰好一次
     const head = [];
     let bodyFrom = zs.s;
     if (zs.heading) {
       head.push(zhLines[zs.heading.lineIdx]);
       const next = zhLines[zs.heading.lineIdx + 1] || "";
-      const m = next.match(ANCHOR_RE);
-      if (m && !/[一-鿿]/.test(m[1])) { head.push(next); bodyFrom = zs.heading.lineIdx + 2; }
-      else head.push(`*${os.heading.title}*`);
+      const synth = `*${os.heading.title}*`;
+      if (next === synth) { head.push(next); bodyFrom = zs.heading.lineIdx + 2; }
+      else { head.push(synth); bodyFrom = zs.heading.lineIdx + 1; }
     }
 
     // 节内块切分与配对（B5）
@@ -227,11 +249,12 @@ function interleave(origText, zhText) {
 // ---------- 主流程 ----------
 
 // 交付物去元信息头：块以首个 `> **` 行区起、首个 `---` 行止（v3.0.0 头 = 引用块 + ---；
-// 旧形态 H1 在头前亦兼容——切至首个 --- 之后的正文）。
+// 旧形态 H1 在头前亦兼容）。头边界前置条件：--- 前须有 > 引用行——正文里的 --- 分隔线
+// 不作头边界（评审②-14：无头交付物的首个正文 --- 误切会把标题并进"头"）。
 function stripMetaHeader(text) {
   const lines = text.split(/\r?\n/);
   const hrIdx = lines.findIndex((l) => /^---\s*$/.test(l));
-  if (hrIdx === -1) return { body: text, headerLines: null };
+  if (hrIdx === -1 || !lines.slice(0, hrIdx).some((l) => /^>/.test(l))) return { body: text, headerLines: null };
   return { body: lines.slice(hrIdx + 1).join("\n").replace(/^\n/, ""), headerLines: lines.slice(0, hrIdx + 1) };
 }
 
@@ -250,7 +273,7 @@ function runDerive(dir, opts = {}) {
   }
   const deliverableName = `translated-${title}-zh.md`;
   const deliverablePath = path.join(dir, deliverableName);
-  const deliverableRaw = safeRead(deliverablePath);
+  const deliverableRaw = readNorm(deliverablePath);
   if (deliverableRaw == null) {
     return { exitCode: 3, errors: [`无交付物 ${deliverableName}——双语派生是交付后视图（先走完 Step 10/12）`] };
   }
@@ -258,7 +281,7 @@ function runDerive(dir, opts = {}) {
   const warns = [];
 
   const { body: zhBody, headerLines } = stripMetaHeader(deliverableRaw);
-  const r = interleave(safeRead(path.join(dir, `original-${title}.md`)) || "", zhBody);
+  const r = interleave(readNorm(path.join(dir, `original-${title}.md`)) || "", zhBody);
 
   // 头部（B6）：交付物头照抄（至首个 --- 含）+ 引用块内追加双语版行（源交付物 sha——确定性字段）
   const bilingualLine = `> **双语版**：由源交付物与原文机械交错的只读派生视图（非交付物、不经终检、不受手修保护）——源交付物 sha1（前 12）：${deliverableSha}；重说「要双语对照」可幂等重生成`;

@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
-description: 当用户要求翻译英文内容（小文章 ≤40KB）时启用。触发词：翻译、translate、改成中文、要双语对照。输入形式：URL、文件路径、粘贴内容。超过 40KB 的大文档请用 yiyue31-xl-translator（说「翻译大文档」）。
-version: 3.0.0
+description: 当用户要求翻译英文内容（小文章 ≤40KB）时启用。触发词：翻译、translate、改成中文、要双语对照、双语对照。输入形式：URL、文件路径、粘贴内容。超过 40KB 的大文档请用 yiyue31-xl-translator（说「翻译大文档」）。
+version: 3.0.1
 author: Yiyue31
 ---
 
@@ -16,6 +16,8 @@ author: Yiyue31
 ## Directory
 
 `{skill-dir}` = this SKILL.md's directory path.
+
+**cwd 纪律**：全程以发起目录（含 `{title}/` 的目录）为 cwd 运行脚本；派发给 subagent 的路径一律转绝对路径（subagent cwd 不定）。
 
 ---
 
@@ -42,7 +44,7 @@ author: Yiyue31
 |---|---|---|---|
 | 全文 | `original-{title}.md` | `translated-draft.md`（工作稿）→ `translated-{title}-zh.md`（交付物，Step 10 定稿） | `review-{type}.md` |
 
-- 共享路径：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`
+- 共享路径（均在 `{title}/translation/` 根）：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`、`keep-list-{title}.json`（Step 2 产、Step 4.6 消费）、`pm-review-{title}.md`（Step 11 产）
 
 ### Step 2: 文章分析 + 生成术语表
 
@@ -95,7 +97,7 @@ author: Yiyue31
 - **术语规范**：使用标准译法；术语表 `[KEEP]` 项原样保留英文，其余按术语表统一译法。
 - **修辞处理**：隐喻、习语等修辞性表达，按实际意图翻译而非逐字直译。若源语言意在目标语言中内涵不同，替换为表意、情感效果一致的自然表达。
 - **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）。
-- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语使用临时标记：`**{golden quote}**` 和 `**{slang/idiom}**`。**重要**：这些是临时处理标记，必须在 Step 10 合并译文时清理为纯加粗格式。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
+- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语使用临时标记：`**{golden quote}**` 和 `**{slang/idiom}**`。**重要**：这些是临时处理标记，必须在 Step 10 定稿时清理为纯加粗格式。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
 - **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` → `[译文](https://example.com)`。
 
 
@@ -196,14 +198,14 @@ PM（执行本 skill 的主 agent）亲自验收最终产物。这是修"PM 转�
 node {skill-dir}/scripts/verify-pipeline.js "{title}/translation"
 ```
 
-脚本从文件系统事实核验过程真实性（单文件模式：完备性矩阵 / 模板占位符 / 尺寸下限 / 批量写入签名 / 时序 / 机械校验落盘；同维度查重仅旧多 chunk 结构回放时有对象——七类检查逐项去留见脚本顶部说明），产出 `verify-pipeline-report.md` + `verify-report.json`。**FAIL = 不得交付**——终检不过说明存在未披露的步骤缺失或伪造签名，先按报告定位问题打回对应步骤。机械校验的注释密度 WARN → 列为下方人工通读候选。
+脚本从文件系统事实核验过程真实性（单文件模式：完备性矩阵 / 模板占位符 / 尺寸下限 / 批量写入签名 / 时序 / 机械校验落盘；同维度查重仅旧多 chunk 结构回放时有对象——七类检查逐项去留见脚本顶部说明），产出 `verify-pipeline-report.md` + `verify-report.json`（终检报告——与 Step 4.6 的机械校验流水 `verify-results.json` 是两个文件：前者终检产出、后者逐次校验追加）。单文件模式下终检还会**以当前工作稿 × 原文重跑一遍机械校验**（不信明文流水记录）——改稿后未重跑 Step 4.6 会被此处抓回。**FAIL = 不得交付**——终检不过说明存在未披露的步骤缺失或伪造签名，先按报告定位问题打回对应步骤。机械校验的注释密度 WARN → 列为下方人工通读候选。
 
 **② 风险定向抽样通读**：PM 以读者视角**通读 ≥2 个章节（短文可全文）+ 密度 WARN 触发段**。判断范围：clutter 消除、流畅、顺眼可见的明显错（错数字/明显误译）。**不系统重校每个数据点**——那是 Step 5 的活。
 
 **③ 留痕 + 裁定**：把验收记录写到 `pm-review-{title}.md`，**必须包含步骤完成合规表**——每步一行：`步骤 | ✅ 完成 | 产物`，跳过的维度写 `⏭️ SKIPPED(原因)`（见审校纪律"资源约束下的合法降级"）。合规表是终检脚本判定"披露跳过（WARN）vs 静默缺失（FAIL）"的依据。附 verify-pipeline 终判结论。
 
 - **pass** → 交付 `translated-{title}-zh.md`，**交付即止**：不自动运行下游管线（如 refined-stock publish），仅在交付信息中提示其入口由用户自行执行。
-- **双语对照（两种触发）**：① 发起翻译时用户说了要双语 → 交付后自动跑 `node {skill-dir}/scripts/derive-bilingual.js "{title}/translation"`；② 交付后随时补说"要双语对照" → 同命令幂等重生成。产物 `translated-{title}-bilingual.md` = （交付物 × 原文）机械交错的只读派生视图（非交付物、不经终检、中文在上英文在下、配不齐的节降级为节级对照并随文件尾披露覆盖率）。
+- **双语对照（两种触发）**：① 发起翻译时用户说了要双语 → 交付后自动跑 `node {skill-dir}/scripts/derive-bilingual.js "{title}/translation"`；② 交付后随时补说"要双语对照"或"双语对照 <title>"（两种说法等价；按工程布局路由——`{title}/translation/` 走本 skill，`xl-translator/<title>/` 布局走 yiyue31-xl-translator）→ 同命令幂等重生成。发起意图以会话为准，会话中断丢失时靠②补说兜底（幂等无损）。产物 `translated-{title}-bilingual.md` = （交付物 × 原文）机械交错的只读派生视图（非交付物、不经终检、中文在上英文在下、配不齐的节降级为节级对照并随文件尾披露覆盖率）。
 - **rework** → 把问题打回对应步骤（clutter→Step 6、准确性→Step 5），修完重跑本步。
 
 ---

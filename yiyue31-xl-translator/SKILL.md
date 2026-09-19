@@ -1,6 +1,6 @@
 ---
 name: yiyue31-xl-translator
-description: 翻译大英文文档（>40KB）为中文时启用。触发词：翻译大文档、大文档翻译、继续翻译、resume、翻译进度、翻到哪了、停止翻译、重翻第 N 章、重新翻译、双语对照、审计翻译、查翻译质量。小于 40KB 的文章请用 yiyue31-translator。
+description: 翻译大英文文档（>40KB）为中文时启用。触发词：翻译大文档、大文档翻译、继续翻译、resume、翻译进度、翻到哪了、停止翻译、重翻第 N 章、重新翻译、双语对照、先翻第 N 章、出样张、审计翻译、查翻译质量。小于 40KB 的文章请用 yiyue31-translator。
 version: 0.4.0
 author: Yiyue31
 ---
@@ -17,9 +17,9 @@ author: Yiyue31
 
 ## Directory
 
-- `{skill-dir}` = 本 SKILL.md 所在目录。引用文件封闭集（引用格式 `{skill-dir}/references/<file>`、`{skill-dir}/scripts/<file>`）：
+- `{skill-dir}` = 本 SKILL.md 所在目录；`{translator-skill-dir}` = 兄弟 skill 目录 `../yiyue31-translator`（Step 0 自动交接用，读不到时按既定退化路径处理）。引用文件封闭集（引用格式 `{skill-dir}/references/<file>`、`{skill-dir}/scripts/<file>`）：
   - **references/（9）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md。（terms.md 系运行时用户态：首次从 translator 一次性拷贝种子至工作目录，非本目录资产。）
-  - **scripts/（10）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、derive-bilingual.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs。
+  - **scripts/（10，运行时封闭集）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、derive-bilingual.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs。另有 `test/`（开发期测试资产，判据契约登记于其 README——SKILL 正文所指"判据契约见 scripts/test/README.md"即此，不计入运行时封闭集）。
 - 工作目录 `xl-translator/<title>/`（refined-stock 仓库根下）；文件命名遵循下方命名三条红线，status/final-gate 按脚本内建 glob 工作。
 - 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生——PASS 前全目录不得命中任何发布模式；`translated-<title>-bilingual.md` 为 PASS 后机械派生的**只读视图**（非交付物、不经终检、sha 不锚、不受手修保护、幂等可重生成，命名永不以 `-zh.md` 结尾）。
 - 报告/台账的机器解析格式：各 prompt 与产物按 `{skill-dir}/references/` 对应文件的契约逐字执行，不得改写格式。
@@ -112,7 +112,7 @@ author: Yiyue31
   - 并发纪律：**≤5 两波制**（首波 5 + 回传 1-2 后派次波 3-4；8 并发实测触发突发限流）
 - **探针注入**：run 开始时主 agent 跑 `{skill-dir}/scripts/probe.mjs` 生成源侧 truth（`probe/truth/<run>.json`，不落工作区）；status.mjs 派发注入与 final-gate.mjs 命中比对均以 `--probe-truth` 传入。
 - **派发纪律**：派发指令中的 inputs/outputs 一律转**绝对路径**（status 输出为相对路径，subagent cwd 不定）；各 prompt 内的相对路径均以派发指令为准。
-- **用户动词表**（全部挂状态命令）：`继续翻译 <title>`（续跑；封存态下 = 解封续跑）/ `翻译进度`、`<title> 翻到哪了`（人话进度）/ `停止翻译 <title>`（封存标记 + 一行总结）/ `重翻 <title> 第 N 章`（执行前一行披露章↔chunk 映射如"第 3 章 = chunk 05-06"；作废范围按 re-keying 冻结语义）/ `重新翻译 <title>`（新起全量，与封存后"继续"两出口在 status.md 写明）/ `先翻 <title> 第 N 章`（样张）/ `双语对照 <title>`（幂等生成/重生成双语派生视图——存量已交付项目随时可说；status 已交付态三态提示未生成/已生成/已过期）。
+- **用户动词表**（全部挂状态命令）：`继续翻译 <title>`（续跑；封存态下 = 解封续跑）/ `翻译进度`、`<title> 翻到哪了`（人话进度）/ `停止翻译 <title>`（封存标记 + 一行总结）/ `重翻 <title> 第 N 章`（执行前一行披露章↔chunk 映射如"第 3 章 = chunk 05-06"；作废范围按 re-keying 冻结语义）/ `重新翻译 <title>`（新起全量，与封存后"继续"两出口在 status.md 写明）/ `先翻 <title> 第 N 章`（样张）/ `双语对照 <title>`（幂等生成/重生成双语派生视图——存量已交付项目随时可说；status 已交付态三态提示未生成/已生成/已过期。若 <title> 是 translator 布局工程（`{title}/translation/`）则改由 yiyue31-translator 的 derive-bilingual.js 执行）。
 - **brief 中途变更按性质分类**：注释密度档→不重翻（`«»` 标记仍在，仅按新档重跑 Step 4 裁定）；文风类→仅下游生效 + 变更点登记统稿重点扫描；根本类（受众/用途）→披露代价由用户选范围。brief.md 更新落盘，status.md 记变更点。
 - **会话预算**：每会话处理 N 单元后干净退出；每单元幂等；N 同时约束内存与主会话上下文增长（默认值 M3 标定）；**单元 = 一次 subagent 调用**（基线 ~11 单元/chunk）。
 - **subagent 回传纪律**：仅回传 落盘路径 + 一行结论 + FAIL 项计数，报告/产物全文只落盘——保主上下文 O(1)。

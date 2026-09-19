@@ -379,7 +379,53 @@ test("brief 锚关 → 顺序配对（anchorPairing=false，仍可对齐）", ()
   }
 });
 
-// ---------- CLI 冒烟（守卫真实性：Windows 入口假绿教训） ----------
+// ---------- 实施后评审回归（角色②高危/中危 + R3-7，2026-09-19） ----------
+
+test("评审②-2：manifest 登记但 chunks/ 实文件缺失 → 退出码 3，绝不静默拼空原文侧", () => {
+  const dir = makeDir();
+  try {
+    fs.rmSync(path.join(dir, "chunks", "chunk-02-beta.md"));
+    const r = runDerive(dir);
+    assert.equal(r.exitCode, 3);
+    assert.ok(r.errors.join("").includes("chunk-02-beta.md"), "报错点名缺失文件");
+    assert.ok(!fs.existsSync(path.join(dir, "translated-demo-bilingual.md")), "不落盘");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("评审②-3/②-9：CRLF 与 BOM 输入 → 标题识别正常、对齐不降级（产物统一 LF）", () => {
+  const crlfOrig = C1_ORIG.replace(/\n/g, "\r\n");
+  const crlfZh = C1_ZH.replace(/\n/g, "\r\n");
+  const r = interleave(crlfOrig, crlfZh);
+  assert.deepEqual(r.degraded, []);
+  assert.equal(r.totalSections, 2);
+  assert.ok(r.text.includes("# 阿尔法导言\n*Alpha Intro*"), "CRLF 归一后标题/锚行照常识别");
+  const bom = interleave("﻿" + C1_ORIG, C1_ZH);
+  assert.deepEqual(bom.degraded, [], "BOM 剥除");
+});
+
+test("评审②-5：URL 指纹归一——英文句点收尾 vs 中文句号收尾、scheme/host 大小写不等价", () => {
+  const orig = `# T\n\nSee https://Example.com/docs. for details.\n`;
+  const zh = `# 题\n*T*\n\n见 HTTPS://EXAMPLE.com/docs 了解详情。\n`;
+  const r = interleave(orig, zh);
+  assert.deepEqual(r.degraded, [], "句尾标点与大小写归一后不伪降级");
+});
+
+test("评审②-10/R3-7：CJK 斜体行不被吞作锚行（锚关顺序配对）——内容块不丢、英文标题由合成行给出", () => {
+  const orig = `# T\n\nemphasis text\n\nbody2\n`;
+  const zh = `# 题\n*重点强调*\n\n体2\n`;
+  const r = interleave(orig, zh, { anchor: false });
+  assert.deepEqual(r.degraded, [], "斜体行保留为内容块，块数两侧一致");
+  assert.ok(r.text.includes("*T*"), "合成英文标题行在位");
+  assert.ok(r.text.includes("*重点强调*"), "CJK 斜体行未被吞");
+  // 锚开模式下错锚行（不在原文标题集）→ 整体回退顺序 + 合成行
+  const r2 = interleave(orig, `# 题\n*NotInOrig*\n\n体2\n`);
+  assert.equal(r2.mode, "order");
+  assert.ok(r2.text.includes("*T*") && r2.text.includes("*NotInOrig*"), "错锚行保留为内容、真英文标题由合成行补位");
+});
+
+
 
 test("CLI：真实执行（产物落盘 + stdout 结论），非静默空转", () => {
   const dir = makeDir();

@@ -246,9 +246,12 @@ function appendResultLog(translatedPath, record) {
     let entries = [];
     try {
       entries = JSON.parse(fs.readFileSync(logPath, "utf-8"));
-      if (!Array.isArray(entries)) entries = [];
+      if (!Array.isArray(entries)) throw new Error("not array");
     } catch (_e) {
-      entries = []; // 不存在或损坏 → 重建
+      // 损坏/非数组（含 xl {results} 结构）：先备份再重建（评审②-13——静默清空会让历史记录蒸发无痕）
+      try { fs.renameSync(logPath, logPath + ".corrupt"); } catch (_e2) { /* 备份失败不阻塞重建 */ }
+      console.warn(`⚠ verify-results.json 损坏或非数组，已备份为 ${path.basename(logPath)}.corrupt 并重建`);
+      entries = [];
     }
     entries.push(record);
     fs.writeFileSync(logPath, JSON.stringify(entries, null, 2));
