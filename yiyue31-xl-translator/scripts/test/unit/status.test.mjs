@@ -378,6 +378,33 @@ test("chapterMap：H2 章结构解析；全局阶段推进", () => {
   }
 });
 
+// ---------- 双语派生视图三态（C3，Phase 1） ----------
+
+test("双语版三态：未生成 / 已生成（基于当前交付物）/ 已过期（重说动词再生成）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    const dv = path.join(dir, "translated-testdoc-zh.md");
+    fs.writeFileSync(dv, "> **原文**：T\n\n---\n\n正文。\n", "utf-8");
+    let r = run(dir, {});
+    assert.equal(r.state.global, "delivered");
+    assert.ok(r.statusText.includes("双语版：未生成"), "未生成态提示动词");
+    // 生成后：头部源交付物 sha === 当前交付物 → fresh
+    fs.writeFileSync(
+      path.join(dir, "translated-testdoc-bilingual.md"),
+      `> **双语版**：只读派生视图——源交付物 sha1（前 12）：${sha12Of(dv)}；重说可再生成\n\n---\n\n正文。\n`,
+      "utf-8"
+    );
+    r = run(dir, {});
+    assert.ok(r.statusText.includes("双语版：已生成"), r.statusText);
+    // 交付物更新 → 头部锚过期（restart / 术语统一再 PASS / re-keying 三路径的静默滞留即此态）
+    fs.writeFileSync(dv, "> **原文**：T\n\n---\n\n正文（更新）。\n", "utf-8");
+    r = run(dir, {});
+    assert.ok(r.statusText.includes("双语版：已过期"), r.statusText);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ---------- CLI 冒烟（守卫真实性：Windows pathname 坑曾使 M1b CLI 静默空转、退出码 0） ----------
 
 test("CLI：真实执行（status.md 落盘 + stdout 输出），非静默空转", () => {

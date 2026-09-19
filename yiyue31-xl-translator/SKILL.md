@@ -1,7 +1,7 @@
 ---
 name: yiyue31-xl-translator
-description: 翻译大英文文档（>40KB）为中文时启用。触发词：翻译大文档、大文档翻译、继续翻译、resume、翻译进度、翻到哪了、停止翻译、重翻第 N 章、重新翻译、审计翻译、查翻译质量。小于 40KB 的文章请用 yiyue31-translator。
-version: 0.3.3
+description: 翻译大英文文档（>40KB）为中文时启用。触发词：翻译大文档、大文档翻译、继续翻译、resume、翻译进度、翻到哪了、停止翻译、重翻第 N 章、重新翻译、双语对照、审计翻译、查翻译质量。小于 40KB 的文章请用 yiyue31-translator。
+version: 0.4.0
 author: Yiyue31
 ---
 
@@ -19,9 +19,9 @@ author: Yiyue31
 
 - `{skill-dir}` = 本 SKILL.md 所在目录。引用文件封闭集（引用格式 `{skill-dir}/references/<file>`、`{skill-dir}/scripts/<file>`）：
   - **references/（9）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md。（terms.md 系运行时用户态：首次从 translator 一次性拷贝种子至工作目录，非本目录资产。）
-  - **scripts/（9）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs。
+  - **scripts/（10）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、derive-bilingual.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs。
 - 工作目录 `xl-translator/<title>/`（refined-stock 仓库根下）；文件命名遵循下方命名三条红线，status/final-gate 按脚本内建 glob 工作。
-- 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生——PASS 前全目录不得命中任何发布模式。
+- 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生——PASS 前全目录不得命中任何发布模式；`translated-<title>-bilingual.md` 为 PASS 后机械派生的**只读视图**（非交付物、不经终检、sha 不锚、不受手修保护、幂等可重生成，命名永不以 `-zh.md` 结尾）。
 - 报告/台账的机器解析格式：各 prompt 与产物按 `{skill-dir}/references/` 对应文件的契约逐字执行，不得改写格式。
 
 ## 工作流程
@@ -29,9 +29,10 @@ author: Yiyue31
 > 执行者：`[脚本]` 确定性、零信任；`[subagent]` 独立调用（**严格串行**，一次一个，等返回再派下一个）；`[主]` 主 agent 编排与本地轻活。
 
 ### Step 0 发起与预检 `[主+脚本]`
-- 取文→markdown 化→落 `original-<title>.md`（**落盘即统一归一 LF**——一切 sha 按落盘文件字节原样计算，防 CRLF 假错死锁）。brief 缺省默认值（技术读者/意译/中等注释密度/发布用途/**标题双语锚开**）直接落盘——**不问用户**；取文可得时附可选行 `来源:`/`作者:`（终检 PASS 前置元信息头的字段源）。
+- 取文→markdown 化→落 `original-<title>.md`（**落盘即统一归一 LF**——一切 sha 按落盘文件字节原样计算，防 CRLF 假错死锁）。brief 缺省默认值（技术读者/意译/中等注释密度/发布用途/**标题双语锚开**/**双语对照关**）直接落盘——**不问用户**；取文可得时附可选行 `来源:`/`作者:`（终检 PASS 前置元信息头的字段源）。
 - 规模预检（`word-counter.mjs`）：**>40KB 单条件**才走 xl，否则自动交接 translator（读 `{translator-skill-dir}/SKILL.md` 按其执行 + 一行披露"已自动交接 translator"；不可读时退化本 skill 单 chunk 模式跑完并披露——零跨 skill 运行时依赖）；`--xl-force` 为测试/标定旁路。
-- 原文完整性 WARN（末句截断/围栏不配对，提示不阻塞）；预算公告（chunk 数、subagent 调用基线、预计会话数 + **一行 brief 披露**："按技术读者/意译/中等注释密度/发布用途/标题双语锚开处理——注释密度即术语后附英文括注的多少（低/中/高）——想改就说'换成直译/注释少点/标题不加英文'"——通知非询问）+ **原文 sha1（前 12 位）与 chunk 数**（聊天留痕 = 工作区外分母锚，交付时回显对照）+ **喊停方式与样张入口**：公告末附一行如何中断；支持"先翻第 N 章出样张"，用户确认风格后放全量。
+- brief 扁平 key:value 逐行落盘，`双语对照: 关` 为缺省行（交付配置非翻译参数——见「交付」节；解析仿 `标题双语锚` 先例，不入 KEYMAP、机械校验零可见）。
+- 原文完整性 WARN（末句截断/围栏不配对，提示不阻塞）；预算公告（chunk 数、subagent 调用基线、预计会话数 + **一行 brief 披露**："按技术读者/意译/中等注释密度/发布用途/标题双语锚开/双语对照关处理——注释密度即术语后附英文括注的多少（低/中/高）——想改就说'换成直译/注释少点/标题不加英文/要双语对照'"——通知非询问——用户须从此处知晓全部可改项）+ **原文 sha1（前 12 位）与 chunk 数**（聊天留痕 = 工作区外分母锚，交付时回显对照）+ **喊停方式与样张入口**：公告末附一行如何中断；支持"先翻第 N 章出样张"，用户确认风格后放全量。
 - 关卡：无（本步不改翻译产物）。
 
 ### Step 1 分段 `[脚本]`
@@ -111,7 +112,7 @@ author: Yiyue31
   - 并发纪律：**≤5 两波制**（首波 5 + 回传 1-2 后派次波 3-4；8 并发实测触发突发限流）
 - **探针注入**：run 开始时主 agent 跑 `{skill-dir}/scripts/probe.mjs` 生成源侧 truth（`probe/truth/<run>.json`，不落工作区）；status.mjs 派发注入与 final-gate.mjs 命中比对均以 `--probe-truth` 传入。
 - **派发纪律**：派发指令中的 inputs/outputs 一律转**绝对路径**（status 输出为相对路径，subagent cwd 不定）；各 prompt 内的相对路径均以派发指令为准。
-- **用户动词表**（全部挂状态命令）：`继续翻译 <title>`（续跑；封存态下 = 解封续跑）/ `翻译进度`、`<title> 翻到哪了`（人话进度）/ `停止翻译 <title>`（封存标记 + 一行总结）/ `重翻 <title> 第 N 章`（执行前一行披露章↔chunk 映射如"第 3 章 = chunk 05-06"；作废范围按 re-keying 冻结语义）/ `重新翻译 <title>`（新起全量，与封存后"继续"两出口在 status.md 写明）/ `先翻 <title> 第 N 章`（样张）。
+- **用户动词表**（全部挂状态命令）：`继续翻译 <title>`（续跑；封存态下 = 解封续跑）/ `翻译进度`、`<title> 翻到哪了`（人话进度）/ `停止翻译 <title>`（封存标记 + 一行总结）/ `重翻 <title> 第 N 章`（执行前一行披露章↔chunk 映射如"第 3 章 = chunk 05-06"；作废范围按 re-keying 冻结语义）/ `重新翻译 <title>`（新起全量，与封存后"继续"两出口在 status.md 写明）/ `先翻 <title> 第 N 章`（样张）/ `双语对照 <title>`（幂等生成/重生成双语派生视图——存量已交付项目随时可说；status 已交付态三态提示未生成/已生成/已过期）。
 - **brief 中途变更按性质分类**：注释密度档→不重翻（`«»` 标记仍在，仅按新档重跑 Step 4 裁定）；文风类→仅下游生效 + 变更点登记统稿重点扫描；根本类（受众/用途）→披露代价由用户选范围。brief.md 更新落盘，status.md 记变更点。
 - **会话预算**：每会话处理 N 单元后干净退出；每单元幂等；N 同时约束内存与主会话上下文增长（默认值 M3 标定）；**单元 = 一次 subagent 调用**（基线 ~11 单元/chunk）。
 - **subagent 回传纪律**：仅回传 落盘路径 + 一行结论 + FAIL 项计数，报告/产物全文只落盘——保主上下文 O(1)。
@@ -124,6 +125,7 @@ author: Yiyue31
 
 ## 交付
 
-- 交付即止：不自动触发发布管线——refined-stock 的 Stop/SessionEnd hook 会自然发布 PASS 后的交付物。
+- 交付即止：不自动触发发布管线——refined-stock 的 Stop/SessionEnd hook 会自然发布 PASS 后的交付物（只发 `-zh.md` 交付物；bilingual 派生视图不以 `-zh.md` 结尾、不命中发布模式）。
+- **双语对照**：入口两形态——发起时 brief `双语对照: 开`（PASS 后主 agent 查 brief，开则跑 `{skill-dir}/scripts/derive-bilingual.mjs <workdir>`）或交付后随时说动词 `双语对照 <title>`（幂等重生成）。产物 `translated-<title>-bilingual.md` = （交付物 × 原文）机械交错的只读派生视图：中文在上英文在下，节配对锚优先/配不齐降级节级对照，降级清单随文件尾注释与 stdout 可见；头部嵌源交付物 sha——status 已交付态据此三态显示（未生成/已生成·基于当前交付物/已过期·重说动词再生成）。双语字段归交付配置非翻译参数（解耦不变量：双语模式下不放宽注释政策）。**派生视图生成不触发 sha 不符询问——派生只读不覆盖交付物，WARN 一行即止**（与「交付后」"再入不符 = 询问"规则不相干——后者只护交付物本体）。
 - 动词 `审计翻译` / `查翻译质量`：以 REPORT.md 使用说明兜底（audit 脚本未实现）。
 - `REPORT.md`：final-gate 渲染机器段（首屏结论/覆盖矩阵/sha 锚/FAIL 清单）+ 主 agent 按 `{skill-dir}/references/delivery-template.md` 追加人工段；内部术语附人话括注（如"探针 4 次 = 故意埋 4 处错看审校能否全抓到"）。

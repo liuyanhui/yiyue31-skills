@@ -12,7 +12,7 @@
 | 1 | 沟通记录存档（讨论记录 + 用户输入逐字存档，后者不可修改） | `docs/` 两份文档 | ✅ 完成 |
 | 2 | 设计文档 commit + push（此后每任务/Phase 均执行同步纪律） | origin/master | ✅ 完成 |
 | 3 | **三角色 subagent 评审（Phase 0）——冷启动后第一个任务** | §2 | ✅ 完成（2026-09-19，修订已并入本文档） |
-| 4 | yiyue31-xl-translator 实现双语输出 | Phase 1（§3） | ⬜ 待开工 |
+| 4 | yiyue31-xl-translator 实现双语输出 | Phase 1（§3） | ✅ 完成（2026-09-19：B1-B8 测试 19 项 + final-gate 回归 fixture + status 三态；真实 workdir commerce-agents-anatomy 已生成双语版，覆盖率 29/32 节） |
 | 5 | yiyue31-translator 移除大文档（多 chunk）功能 | Phase 2（§4） | ⬜ 待开工 |
 | 6 | yiyue31-translator 双语输出 | Phase 2 T2.4（§4） | ⬜ 待开工 |
 | 7 | 实施完成后开发期文档清理（用户逐字存档永久保留） | §6 | ⬜ 待实施 |
@@ -90,6 +90,8 @@
 - **T1.6** SKILL.md 版本 bump（0.3.x → 0.4.0）。
 
 **验收**：`run.sh` 全绿；在一个真实已交付 workdir 上跑动词生成双语版并人工抽查交错正确性；模拟术语统一轻命令的终检重入，确认 bilingual 文件零影响。
+
+**执行记录（2026-09-19，Phase 1 完成）**：T1.3-T1.6 全部落地，`run.sh` 全绿（新增 derive-bilingual.test.mjs 19 项、final-gate T1.1 回归 fixture、status 三态测试）。真实 workdir commerce-agents-anatomy 双语版已生成（对齐覆盖率 29/32 节，90.6%）；副本终检重入 PASS 不变。**真实世界观测**：3 个降级节均同源——原文把图片行直接粘在列表项后（无空行），译文规整出空行 → 块数差 1，按定稿算法诚实降级；若后续 workdir 降级率证实过高，升级路径走 §1.3 人工锚点条款（须用户拍板，未擅改算法）。
 
 ## 4. Phase 2：yiyue31-translator 瘦身 + 双语
 

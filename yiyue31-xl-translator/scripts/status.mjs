@@ -228,7 +228,12 @@ export function scanWorkdir(dir) {
     pmReview: fs.readdirSync(dir).some((f) => /^pm-review-/.test(f)),
     report: fs.existsSync(path.join(dir, "REPORT.md")),
     delivered: fs.readdirSync(dir).some((f) => new RegExp(`^translated-${inv.title}-zh\\.md$`).test(f)),
+    bilingual: fs.readdirSync(dir).some((f) => new RegExp(`^translated-${inv.title}-bilingual\\.md$`).test(f)),
   };
+  // 双语派生视图三态数据源（C3）：头部嵌源交付物 sha（derive-bilingual 写入，正则与之间同源耦合）
+  inv.bilingualSrcSha = inv.globals.bilingual
+    ? (safeRead(path.join(dir, `translated-${inv.title}-bilingual.md`))?.match(/源交付物 sha1（前 12）：([0-9a-f]{12})/)?.[1] ?? null)
+    : null;
   inv.pending = null;
   if (fs.existsSync(path.join(dir, PENDING))) {
     const t = safeRead(path.join(dir, PENDING))?.match(/type:\s*(\S+)/);
@@ -443,6 +448,15 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
     L.push(`本会话预算 ${budget} 单元已用完（干净退出点）。进度 ${done}/${total} chunk，已耗时 ${elapsedH}h。下次对我说：继续翻译 ${state.title}。`);
   } else if (state.global === "delivered") {
     L.push(`已交付（translated-${state.title}-zh.md）。`);
+    // 双语版三态（C3）：restart / 术语统一再 PASS / re-keying 三路径都会让旧双语版静默滞留——
+    // "是否已生成"一字段会掩盖过期，故按头部源交付物 sha 对当前交付物判 fresh/stale
+    if (!inv.globals.bilingual) {
+      L.push(`双语版：未生成——说"双语对照 ${state.title}"可派生只读双语对照视图。`);
+    } else if (inv.bilingualSrcSha === fileSha(path.join(dir, `translated-${state.title}-zh.md`))) {
+      L.push(`双语版：已生成（translated-${state.title}-bilingual.md，基于当前交付物）。`);
+    } else {
+      L.push(`双语版：已过期（交付物已更新）——重说"双语对照 ${state.title}"再生成。`);
+    }
   } else if (state.global !== "per-chunk") {
     L.push(`全部 ${total} chunk 过审，当前全局阶段：${state.global}，已耗时 ${elapsedH}h。下次对我说：继续翻译 ${state.title}。`);
   } else if (cur) {

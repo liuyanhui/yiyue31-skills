@@ -26,6 +26,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { runMerge } from "../../merge.mjs";
+import { runDerive } from "../../derive-bilingual.mjs";
 import { generate } from "../../probe.mjs";
 import {
   runGate,
@@ -359,6 +360,26 @@ test("裁决 B：幂等重入——PASS 后再跑（merged-draft 已删）→ �
     assert.equal(second.passed, true);
     assert.equal(second.delivered, true);
     assert.ok(!second.fails.some((f) => f.check === "deliverable-guard"), "不得误报手改（R18-⑥）");
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// T1.4 回归 fixture（兑现 T1.1 勘察）：术语统一轻命令的终检重入模拟——PASS 后根级出现
+// bilingual 派生文件再跑 runGate，判定必须不变（bilingual 不命中任何判定输入）
+test("T1.1 兑现：PASS 后生成双语派生文件再跑终检 → 判定不变（bilingual 零影响）", () => {
+  const { dir, truthFile } = greenDir();
+  try {
+    const first = runGate(dir, { probeTruth: truthFile });
+    assert.equal(first.exitCode, 0, JSON.stringify(first.fails, null, 2));
+    const d = runDerive(dir);
+    assert.equal(d.exitCode, 0, JSON.stringify(d.errors));
+    assert.ok(fs.existsSync(path.join(dir, "translated-fintest-bilingual.md")), "双语派生文件在位");
+    const second = runGate(dir, { probeTruth: truthFile });
+    assert.equal(second.exitCode, 0, JSON.stringify(second.fails, null, 2));
+    assert.equal(second.passed, true);
+    assert.ok(!JSON.stringify(second.fails).includes("bilingual"), "bilingual 文件不得进入任何判定");
   } finally {
     fs.rmSync(truthFile, { force: true });
     fs.rmSync(dir, { recursive: true, force: true });
