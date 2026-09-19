@@ -1,0 +1,34 @@
+[
+  {
+    "virtualNn": 901,
+    "dim": "accuracy",
+    "half": "a",
+    "text": "整个迁移过程耗时 3 小时，其中仅数据校验一步就花了 2.5 天。",
+    "defectType": "量级自相矛盾：整体 3 小时却含单步 2.5 天（部分大于整体，译文侧可判）",
+    "expectedHit": "2.5 天"
+  },
+  {
+    "virtualNn": 902,
+    "dim": "translationese",
+    "half": "b",
+    "text": "该模块依赖它，它又调用了它，因此它的稳定性决定了它的上限。",
+    "defectType": "指代衔接：连续「它」无先行词消解",
+    "expectedHit": "它"
+  },
+  {
+    "virtualNn": 903,
+    "dim": "ai-tone",
+    "half": "a",
+    "text": "毫无疑问，这一设计堪称优雅，充分体现了卓越的工程智慧，令人印象深刻。",
+    "defectType": "AI 味空洞赞美（无信息量的形容词堆叠）",
+    "expectedHit": "毫无疑问"
+  },
+  {
+    "virtualNn": 904,
+    "dim": "readability",
+    "half": "a",
+    "text": "鉴于此，不难发现，其在某种程度上，于特定场景下，就某些方面而言，具有一定的可行性。",
+    "defectType": "层层 hedging 冗语（信息密度趋零）",
+    "expectedHit": "某些方面"
+  }
+]
