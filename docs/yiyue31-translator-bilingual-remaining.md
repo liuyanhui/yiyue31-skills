@@ -4,7 +4,7 @@
 
 ## 待办
 
-- [ ] **真实任务验证 v3.0.1 全流程**（最重要）：找一篇 ≤40KB 英文文章说"翻译 <文章>"，走 translator Step 1→11 全程。已验证：脚本机械链（合成 workdir + 评审夹具）；未验证：LLM 环节（subagent 派发口径、`review-{type}.md` 报告命名、pm-review 合规表实际形态、终检全链在真产物上的判定）。顺带观察两处纯规则条款的运行时行为：>40KB 规模门零落盘、旧 chunks/ 结构披露出口。
+- [x] **真实任务验证 v3.0.1 全流程**：✅ 2026-09-19 完成——abc-legal-builder-agents（16.4KB）全流程走通，终检 PASS、双语 7/8 节幂等、4 条非阻断发现（2 条待用户裁量：frontmatter 处置口径、terms 首现括注口径）。过程与结果：`~/project/translator-v301-test/`（TEST-PLAN/PROCESS/RESULTS）。
 - [ ] **xl 侧 brief `双语对照: 开` 路径真跑**：v0.4.0 新接线（动词/brief/status 三态）中，derive 本体已在真实 workdir 验证，但"发起时开 brief → PASS 后自动跑"的组合未走过真实项目。
 - [ ] **双语降级率样本积累**：AI-Native-SDLC-playbook / -r2 两个已交付 workdir 未生成双语版（说"双语对照 <title>"即可，幂等）。3 个样本齐后决定是否升格人工锚点（设计预留的升级路径，**需用户拍板**）。已知 1/3 样本 = 29/32 节（90.6%），成因是源文档图片行粘列表项的格式怪癖。
 - [ ] **refined-stock 未提交变更**（设计内）：commerce-agents-anatomy 的双语版 + status.md 刷新 + events.jsonl 追加——由用户处置提交。
