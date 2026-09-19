@@ -62,8 +62,19 @@
 
 **前置核验（动手第一步，结论写进提交信息）**：
 
-- **T1.1** grep `final-gate.mjs` 的根目录文件枚举与重入前置条件——确认工作目录根多出 bilingual 文件不触发任何判定变化（现有证据：final-gate.mjs:487 只扫 `translated-chunks/chunks/adjudications/reviews` 子目录）。若发现冲突，处理优先级：豁免 glob 精确到该文件名 > 重入前先删后重生成（最下策）。
-- **T1.2** 查 `segment/` 是否导出 fence 感知、块粒度的解析函数——**能 import 就复用；需重构 segment.mjs 才能复用就在新脚本内独立写**（约百行）。不为复用动 segment 内部结构（"拼接 sha === 原文 sha"关卡是全 skill 最承重墙）。
+- **T1.1 ✅ 已核验（2026-09-19）**：final-gate.mjs 根目录枚举仅两处且均定向——:289（`glossary-` find）与 :491（`manifest.md` + `cold-read-*` 过滤）；新鲜度 walk（:487-491）只扫 `translated-chunks/chunks/adjudications/reviews` 四子目录 + manifest + cold-read-*。根级 `translated-<title>-bilingual.md` 零命中任何判定输入，EXEMPT_GLOBS 无需动，**无冲突**；T1.4 回归 fixture 仍照做（以测试钉死，非推断放行）。
+- **T1.2 ✅ 已核验（2026-09-19）**：segment.mjs 导出 `fenceAwareHeadings(lines)`（:96——fence 感知标题 → `[{lineIdx, level, title}]`）与 `protectedRanges(lines)`（:118——围栏/HTML 表/管道表行区间 `[s,e]`）——**import 复用，零改动 segment.mjs**。另复用 merge.mjs 的 `manifestChunkShas(manifestText)`（:78——Chunk 表 → `{nn, atomic, name, sha}`）；derive import merge 级联 import status.mjs 无副作用（final-gate 同款先例）。
+
+**勘察结论（2026-09-19 Phase 1 开工勘察，新会话免重查）**：
+
+- **算法定稿**：译文侧输入 = `translated-chunks/`（管线产物）× `chunks/` 逐对交错——交付物未手改时 assemble(translated-chunks) === 交付物正文，等价于"交付物 × 原文"；手改时照跑 + WARN，双语版基于管线产物（§1.7）。流水线 = manifestChunkShas 校验分母 sha → 逐对 `interleave`（**导出纯函数**，仿 merge.assemble 先例）→ NN 数值序 join。
+- **interleave 节配对**：锚开优先锚行（译文标题次行 `*…*` 剥星号逐字 === 原文标题，一对一）；锚关或任一锚行缺失 → 整体回退标题顺序配对；en 侧配不齐（标题数不等）→ 整 chunk 降级为对照。节内块切分 = protectedRanges 整块 + 其余空行分段；块级指纹 = 代码块逐字相等 + isCode 一致；**节级指纹 = URL 集合相等**（块级 URL 会因段落重组误伤）；块数不匹配或指纹不符 → 该节降级为节级对照（`<!-- … -->` 注释标记 + 文件尾清单 + 对齐覆盖率；宁降级不误导——任务级裁量：按序错配的交错比对照更害读者）。
+- **呈现**：中文标题行 + 锚行原样保留；锚关时插英文标题行（英文标题信息恰好出现一次，不与锚行重复）；块交错中文在上英文在下；头部 = 交付物头部照抄（至首个 `---` 行含）+ 引用块内追加一行 `> **双语版**：…源交付物 sha1（前 12）：<sha>…`（C3——status.mjs 三态判定的提取正则与此同源：`/源交付物 sha1（前 12）：([0-9a-f]{12})/`）。
+- **格式实证**（样板 workdir：`/home/claude/project/refined-stock/xl-translator/commerce-agents-anatomy/`）：chunk 对 = `chunks/chunk-NN-<slug>.md` × `translated-chunks/translated-chunk-NN.md`；译文 chunk 首行 `# 中文标题` + 次行锚 `*English Heading*`；manifest Chunk 表列 `| NN | 文件 | KB | 行 | sha1 |`（sha = 原文 chunk 分母锚）；交付物头部 = 6 行 `> **…**` 引用块 + 空行 + `---`；REPORT 锚行形态 `交付物：translated-<title>-zh.md（sha1 前 12：<12hex>）`；brief 扁平 `标题双语锚：开`（关判正则 `/标题双语锚[：:]\s*(off|false|关|关闭)/`；brief 缺失按开，SKILL 默认）。
+- **脚本骨架对齐 merge.mjs**：头部注释判据 B1-B8（**先登记 test README 后编码**——README 维护规约 1/3）；CLI `node derive-bilingual.mjs <workdir> [--json]`；退出码 0 成功 / 1 用法 / 2 目录异常 / 3 输入损坏（无交付物、chunk 配对失败——M6 同款绝不静默）；fileURLToPath CLI 守卫（Windows 入口假绿教训）；stdout `✅/⚠` 风格对齐 merge。
+- **判据 B1-B8 草案**：B1 只读纪律（唯一产物 bilingual 文件）；B2 chunk 配对精确（manifest sha × chunks 实文件 × translated 存在性）；B3 交付物 sha ≠ REPORT 锚 → 照跑 + WARN 一行；B4 fence 感知节切分（锚优先/顺序兜底/配不齐 chunk 级降级）；B5 节内块按序配对 + 双级指纹 + 降级；B6 交错格式（头部仅一次/锚行保留/只交错不改动块内容）；B7 幂等（无时间戳无随机）；B8 降级清单随输出可见（文件尾注释 + stdout + 覆盖率）。
+- **测试挂点**：`unit/derive-bilingual.test.mjs` 仿 merge.test.mjs（mkdtemp 合成 workdir + interleave 纯函数直测 + runDerive + CLI spawnSync 冒烟）；final-gate 回归 fixture 挂在 final-gate.test.mjs 现有"PASS 后再跑（幂等重入）"先例（:351）上——PASS 后写入 bilingual 文件再跑 runGate，判定不变（= 术语统一轻命令终检重入模拟）。
+- **status.mjs 接线**：scanWorkdir globals 段（:221-231）加 `bilingualFile`/`bilingualSrcSha` 盘点（精确文件名正则 + 头部源 sha 提取）；人话行已交付分支（:444-445）追加三态行（未生成 / 已生成·基于当前交付物 / 已过期·重说动词）。
 
 **主体任务**：
 
