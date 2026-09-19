@@ -2,24 +2,31 @@
 
 // verify-pipeline.js — 过程真实性终检（Step 12 强制关卡）
 //
-// 定位：任务结束时由脚本从文件系统事实生成"任务报告"，验证 12 步流程的过程真实性，
+// 定位：任务结束时由脚本从文件系统事实生成"任务报告"，验证流程的过程真实性，
 // 不依赖 LLM 自我汇报。对抗两类已实际发生的失败（2026-08 harness-v2 / abc-legal 事故）：
 //   A. 静默跳过：某质检维度整维未执行、无报告产物（abc-legal 形态）
 //   B. 伪造通过：批量生成的模板空壳报告（harness-v2 形态：同维度字节级相同、占位符未替换、
 //      一分钟内几十份"通过快速审校"）
 //
-// 七类检查：
-//   1. 完备性矩阵（FAIL）：按 chunks 清单枚举应存在产物——每 chunk 译文 + 四维审校报告
-//      （Step 5/6/7/9）+ 共享产物（analysis/glossary/keep-list/special-phrases/最终译文/pm-review）。
+// 双模式（v3.0.0）：目录无 chunks/ → **单文件模式**（译文 = translated-{title}-zh.md 全文一份，
+// 工作稿 = translated-draft.md，报告 = review-{dimension}.md）；有 chunks/ → 旧多 chunk 模式
+// （仅供存量工程回放核验，v3.0.0 起不再产生该结构——见 SKILL.md 旧结构披露）。
+//
+// 七类检查在单文件模式下的去留（反伪造骨架保留，逐项明示）：
+//   1. 完备性矩阵（FAIL）：四维审校报告（review-{dimension}.md，Step 5/6/7/9）+ 共享产物
+//      （analysis/glossary/keep-list/special-phrases/最终译文/pm-review）。
 //      维度级缺失若在 pm-review 合规表有跳过披露（⏭️ SKIPPED(原因) / "跳过"）→ WARN-SKIPPED（合法降级）；
-//      未披露 → FAIL（作弊）。
-//   2. 占位符检测（FAIL）：报告含未替换的 `Chunk XX`、`{title}` 等模板变量。
-//   3. 同维度查重（FAIL）：同维度报告 MD5 相同（不同 chunk 的真实审校不可能字节级一致）。
-//   4. 尺寸下限（FAIL）：报告字节数 < max(200, 对应原文 chunk 字节/25)。
-//   5. 批量写入签名（WARN）：同维度 ≥5 份报告 mtime 落在同一 60 秒窗口（物理上不可能是独立 subagent）。
-//   6. 时序一致性（WARN）：审校报告 mtime 早于对应译文 mtime（先有译文才能审校；同步/搬运会造成误报，故仅 WARN）。
-//   7. 机械校验落盘核验（FAIL/可降 WARN）：verify-results.json 中每 chunk 最新记录须 passed=true；
-//      无记录文件 → WARN（旧运行兼容）。杀"声称 verify-mechanical 已跑"式伪证。
+//      未披露 → FAIL（作弊）。【保留】
+//   2. 占位符检测（FAIL）：报告含未替换的 `Chunk XX`、`{title}` 等模板变量。【保留】
+//   3. 同维度查重（FAIL）：单文件下每维度仅一份报告，无跨单元比对对象 → 自动不触发
+//      （代码保留，旧多 chunk 回放时仍生效）。
+//   4. 尺寸下限（FAIL）：报告字节数 < max(200, 原文整篇字节/25)——判定对象从 chunk 换成整篇。【保留】
+//   5. 批量写入签名（WARN）：单文件下改判"四维报告全部落在同一 60 秒窗口"（串行独立 subagent
+//      物理上做不到）；旧模式维持同维度 ≥5 份同窗。【保留，对象重定义】
+//   6. 时序一致性（WARN）：审校报告 mtime 早于工作稿 translated-draft.md mtime（= 修复后未重审
+//      的信号；最终交付物被 Step 10 重写过，不作比对对象）。【保留，对象换工作稿】
+//   7. 机械校验落盘核验（FAIL/可降 WARN）：verify-results.json 中该原文（original-{title}.md）
+//      最新记录须 passed=true；无记录文件 → WARN（旧运行兼容）。杀"声称已跑"式伪证。【保留】
 //
 // CLI: node verify-pipeline.js <translation-dir> [--stdout]
 //   --stdout  只打印报告，不写文件（回放验证用，避免污染现场）
@@ -110,17 +117,19 @@ function fileBytes(p) {
 function analyze(dir) {
   const fails = [];
   const warns = [];
-  const summary = { chunks: 0, dims: {}, shared: [] };
+  const summary = { mode: null, chunks: 0, dims: {}, shared: [] };
   const title = discoverTitle(dir);
   if (!title) {
     fails.push({ check: "scene", message: "目录中找不到 original-{title}.md，不是有效的 translation 目录" });
     return { title: null, dir, fails, warns, skippedDims: new Set(), summary };
   }
   const chunks = loadChunks(dir);
-  if (chunks.length === 0) {
+  const single = chunks.length === 0 && !fs.existsSync(path.join(dir, "chunks"));
+  if (chunks.length === 0 && !single) {
     fails.push({ check: "scene", message: "chunks/ 下无 chunk 清单（progress.json 与文件名均未发现）" });
   }
-  summary.chunks = chunks.length;
+  summary.mode = single ? "single" : "chunk";
+  summary.chunks = single ? 1 : chunks.length;
 
   // 共享产物
   const sharedExpected = [
@@ -143,42 +152,49 @@ function analyze(dir) {
   const pmText = fs.existsSync(pmPath) ? fs.readFileSync(pmPath, "utf-8") : null;
   const skippedDims = disclosedSkipDims(pmText);
 
+  // 单文件模式的判定对象：原文整篇（尺寸下限基准）与工作稿（时序基准）
+  const singleOriginalPath = path.join(dir, `original-${title}.md`);
+  const draftPath = path.join(dir, "translated-draft.md");
+  const crossDimMtimes = []; // 单文件模式批量写入签名对象（四维报告同窗）
+
   // 1+2+3+4+6：逐维度完备性 + 真实性
   for (const dim of DIMENSIONS) {
-    const info = { expected: chunks.length, found: 0, missing: [], placeholder: [], duplicates: [], undersize: [], lateWrite: [] };
+    const units = single ? [null] : chunks.map((c) => c.nn);
+    const info = { expected: units.length, found: 0, missing: [], placeholder: [], duplicates: [], undersize: [], lateWrite: [] };
     const hashes = new Map();
     const mtimes = [];
-    for (const c of chunks) {
-      const p = path.join(dir, `${dim.file}-${c.nn}.md`);
+    for (const nn of units) {
+      const p = single ? path.join(dir, `review-${dim.key}.md`) : path.join(dir, `${dim.file}-${nn}.md`);
       if (!fs.existsSync(p)) {
-        info.missing.push(c.nn);
+        info.missing.push(single ? "全文" : nn);
         continue;
       }
       info.found++;
       const content = fs.readFileSync(p, "utf-8");
       const bytes = Buffer.byteLength(content, "utf-8");
       // 占位符
-      if (PLACEHOLDER_RE.test(content)) info.placeholder.push(c.nn);
-      // 查重
+      if (PLACEHOLDER_RE.test(content)) info.placeholder.push(single ? "全文" : nn);
+      // 查重（单文件每维一份，无跨单元对象——代码保留供旧结构回放）
       const h = md5(p);
       if (!hashes.has(h)) hashes.set(h, []);
-      hashes.get(h).push(c.nn);
-      // 尺寸下限（相对原文 chunk）
-      const chunkPath = path.join(dir, "chunks", c.filename || "");
-      if (fs.existsSync(chunkPath)) {
-        const floor = Math.max(200, Math.round(fileBytes(chunkPath) / 25));
-        if (bytes < floor) info.undersize.push(`${c.nn}(${bytes}B<${floor}B)`);
-        // 时序：报告须晚于译文
-        const translatedPath = path.join(dir, "translated-chunks", `translated-chunk-${c.nn}.md`);
-        if (fs.existsSync(translatedPath) && fs.statSync(p).mtimeMs < fs.statSync(translatedPath).mtimeMs - 1000) {
-          info.lateWrite.push(c.nn);
-        }
+      hashes.get(h).push(single ? "全文" : nn);
+      // 尺寸下限（相对原文：单文件=整篇；旧模式=对应 chunk）
+      const basisPath = single ? singleOriginalPath : path.join(dir, "chunks", chunks.find((c) => c.nn === nn)?.filename || "");
+      if (fs.existsSync(basisPath)) {
+        const floor = Math.max(200, Math.round(fileBytes(basisPath) / 25));
+        if (bytes < floor) info.undersize.push(`${single ? "全文" : nn}(${bytes}B<${floor}B)`);
+      }
+      // 时序：报告须晚于译文（单文件比对工作稿 translated-draft.md——最终交付物被 Step 10 重写过不作对象）
+      const translatedPath = single ? draftPath : path.join(dir, "translated-chunks", `translated-chunk-${nn}.md`);
+      if (fs.existsSync(translatedPath) && fs.statSync(p).mtimeMs < fs.statSync(translatedPath).mtimeMs - 1000) {
+        info.lateWrite.push(single ? "全文" : nn);
       }
       mtimes.push(fs.statSync(p).mtimeMs);
+      if (single) crossDimMtimes.push(fs.statSync(p).mtimeMs);
     }
     // 查重汇总
     for (const [h, nns] of hashes) if (nns.length > 1) info.duplicates.push(`${nns.length}×${nns.join(",")}`);
-    // 批量写入：60s 滑动窗口 ≥5 份
+    // 批量写入：旧模式 = 同维度 60s 窗口 ≥5 份；单文件 = 四维报告全落同一 60s 窗（crossDimMtimes 于文末判）
     mtimes.sort((a, b) => a - b);
     let massWrite = false;
     for (let i = 0; i + 4 < mtimes.length; i++) {
@@ -188,25 +204,37 @@ function analyze(dir) {
     const dimLabel = dim.label;
     if (info.missing.length > 0) {
       if (skippedDims.has(dim.key)) {
-        warns.push({ check: "skip-disclosed", message: `${dimLabel}：${info.missing.length}/${chunks.length} 份报告缺失，pm-review 已披露跳过 → 合法降级（WARN）` });
+        warns.push({ check: "skip-disclosed", message: `${dimLabel}：报告缺失，pm-review 已披露跳过 → 合法降级（WARN）` });
       } else {
-        fails.push({ check: "skip-silent", message: `${dimLabel}：${info.missing.length}/${chunks.length} 份报告缺失（${info.missing.join(",")}）且 pm-review 无跳过披露 → 疑似静默跳过/未产出` });
+        fails.push({ check: "skip-silent", message: `${dimLabel}：报告缺失（${info.missing.join(",")}）且 pm-review 无跳过披露 → 疑似静默跳过/未产出` });
       }
     }
     if (info.placeholder.length > 0) {
-      fails.push({ check: "placeholder", message: `${dimLabel}：${info.placeholder.length} 份报告含未替换模板占位符（Chunk XX / {title}）：chunk ${info.placeholder.join(",")} → 疑似批量伪造` });
+      fails.push({ check: "placeholder", message: `${dimLabel}：报告含未替换模板占位符（Chunk XX / {title}）→ 疑似批量伪造` });
     }
     if (info.duplicates.length > 0) fails.push({ check: "duplicate", message: `${dimLabel} 报告内容字节级重复：${info.duplicates.join("；")} → 疑似批量伪造` });
     if (info.undersize.length > 0) fails.push({ check: "undersize", message: `${dimLabel} 报告低于尺寸下限：${info.undersize.join(", ")}` });
     if (massWrite) warns.push({ check: "mass-write", message: `${dimLabel}：≥5 份报告落在同一 60 秒窗口内，物理上不可能是独立 subagent 审校 → 请人工核查` });
-    if (info.lateWrite.length > 0) warns.push({ check: "chronology", message: `${dimLabel}：chunk ${info.lateWrite.join(",")} 的报告时间早于译文（同步/搬运可能误报）` });
+    if (info.lateWrite.length > 0) warns.push({ check: "chronology", message: `${dimLabel}：${info.lateWrite.join(",")} 的报告时间早于译文（修复后未重审，或同步/搬运误报）` });
     summary.dims[dim.key] = info;
   }
 
-  // 译文 chunk 完备性（无披露豁免——译文本体缺失必 FAIL）
-  const missingTranslated = chunks.filter((c) => !fs.existsSync(path.join(dir, "translated-chunks", `translated-chunk-${c.nn}.md`)));
-  if (missingTranslated.length > 0) {
-    fails.push({ check: "translated-missing", message: `译文 chunk 缺失：${missingTranslated.map((c) => c.nn).join(",")}` });
+  // 单文件批量写入签名：四维报告全落同一 60 秒窗口（串行独立 subagent 物理上做不到）
+  if (single && crossDimMtimes.length >= DIMENSIONS.length) {
+    crossDimMtimes.sort((a, b) => a - b);
+    const last = crossDimMtimes[crossDimMtimes.length - 1];
+    const first = crossDimMtimes[0];
+    if (last - first <= 60_000) {
+      warns.push({ check: "mass-write", message: `四维审校报告全部落在同一 60 秒窗口内（${DIMENSIONS.length} 份），串行独立 subagent 物理上做不到 → 请人工核查` });
+    }
+  }
+
+  // 译文完备性（无披露豁免——译文本体缺失必 FAIL；单文件由共享产物 translated-{title}-zh.md 覆盖）
+  if (!single) {
+    const missingTranslated = chunks.filter((c) => !fs.existsSync(path.join(dir, "translated-chunks", `translated-chunk-${c.nn}.md`)));
+    if (missingTranslated.length > 0) {
+      fails.push({ check: "translated-missing", message: `译文 chunk 缺失：${missingTranslated.map((c) => c.nn).join(",")}` });
+    }
   }
 
   // 7. 机械校验落盘核验
@@ -214,16 +242,22 @@ function analyze(dir) {
   if (fs.existsSync(vrPath)) {
     try {
       const entries = JSON.parse(fs.readFileSync(vrPath, "utf-8"));
-      const latest = new Map(); // original chunk 文件名 → 最新记录
+      const latest = new Map(); // 原文文件名（chunk 模式归约为 NN）→ 最新记录
       for (const e of entries) {
         const key = String(e.original || "").replace(/^chunk-(\d+)-.*$/, "$1");
         latest.set(key, e);
       }
       const notPassed = [];
-      for (const c of chunks) {
-        const e = latest.get(c.nn);
-        if (!e) notPassed.push(`${c.nn}(无记录)`);
-        else if (!e.passed) notPassed.push(`${c.nn}(FAIL:${(e.failChecks || []).join("/")})`);
+      if (single) {
+        const e = latest.get(`original-${title}.md`);
+        if (!e) notPassed.push("全文(无记录)");
+        else if (!e.passed) notPassed.push(`全文(FAIL:${(e.failChecks || []).join("/")})`);
+      } else {
+        for (const c of chunks) {
+          const e = latest.get(c.nn);
+          if (!e) notPassed.push(`${c.nn}(无记录)`);
+          else if (!e.passed) notPassed.push(`${c.nn}(FAIL:${(e.failChecks || []).join("/")})`);
+        }
       }
       if (notPassed.length > 0) {
         fails.push({ check: "mechanical-log", message: `verify-mechanical 落盘记录不闭环：${notPassed.join(",")}` });
@@ -248,7 +282,7 @@ function buildReport(result) {
   lines.push("");
   lines.push(`- **目录**：${dir}`);
   lines.push(`- **生成时间**：${new Date().toISOString()}`);
-  lines.push(`- **chunks**：${summary.chunks}`);
+  lines.push(`- **模式**：${summary.mode === "single" ? "单文件（v3.0.0，全文 1 单元）" : "旧多 chunk（回放核验）"}`);
   lines.push(`- **终判**：${verdict}`);
   lines.push("");
   lines.push("## ① 完备性矩阵（按维度汇总）");
@@ -308,7 +342,7 @@ function runCli(args) {
     fs.writeFileSync(path.join(result.dir, "verify-pipeline-report.md"), text, "utf-8");
     fs.writeFileSync(
       path.join(result.dir, "verify-report.json"),
-      JSON.stringify({ title: result.title, dir: result.dir, generatedAt: new Date().toISOString(), verdict, fails: result.fails, warns: result.warns, skippedDims: [...result.skippedDims], summary: { chunks: result.summary.chunks, shared: result.summary.shared } }, null, 2),
+      JSON.stringify({ title: result.title, dir: result.dir, generatedAt: new Date().toISOString(), verdict, fails: result.fails, warns: result.warns, skippedDims: [...result.skippedDims], summary: { mode: result.summary.mode, chunks: result.summary.chunks, shared: result.summary.shared } }, null, 2),
       "utf-8"
     );
     console.log(text);

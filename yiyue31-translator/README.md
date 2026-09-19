@@ -1,6 +1,6 @@
 # yiyue31-translator
 
-英文技术文章翻译工具。自动翻译、评估纠错、维护术语纠正表。
+英文技术文章翻译工具（小文章 ≤40KB，全文单文件流水线）。自动翻译、评估纠错、维护术语纠正表。超过 40KB 的大文档请用 yiyue31-xl-translator（说「翻译大文档」）。
 
 ## 使用
 
@@ -8,23 +8,20 @@
 翻译 https://example.com/article
 翻译 ./article.md
 翻译 https://example.com/article --literal
+要双语对照 <已交付的 title>        # 交付后补生成双语派生视图（发起时说了要双语则交付后自动跑）
 ```
 
 默认意译风格。加 `--literal` 使用直译。
 
 ## 工作流程
 
-1. 抓取原文 → 2. 分析 + 术语表 + keep-list + 受众 → 3. 特殊词句 → 4. 翻译（阶段A 内联打标）→ 4.5 注释把关（阶段B）→ 4.6 机械校验关卡 → 5/6/7 翻译/翻译腔/AI 味检查 → 8. 术语维护 → 9. 可读性检查 → 10. 合并 → 11. 全局一致性
+1. 抓取原文（>40KB 提示改用 xl-translator 并停止）→ 2. 分析 + 术语表 + keep-list + 受众 → 3. 特殊词句 → 4. 翻译（阶段A 内联打标，整篇一次）→ 4.5 注释把关（阶段B，整篇一次）→ 4.6 机械校验关卡 → 5/6/7 翻译/翻译腔/AI 味检查（每维度一个 subagent 全文单次）→ 8. 术语维护 → 9. 可读性检查 → 10. 定稿（元信息头 + 临时标记清理 + 字数统计）→ 11. PM 验收（verify-pipeline 终检 + 抽样通读 + 留痕）
 
 ### 注释体系（v2.4）
 
 两阶段：翻译时对读者难推断的词内联插入 `«english»` 标记，阶段B 按 #1 词级标准裁定（保留→`中文（English）` / 删除）。机械类（代码/URL/SVG/缩写/[KEEP] 术语）内联原样保留，由 `scripts/verify-mechanical.js` 强制校验。优先级：准确 > 流畅地道 > 必要注释。
 
-### 文章分段
-
-doc_segmenter 自动处理：小文件（< 40KB）直接作为单 chunk，大文件按章节切分为多个 chunk。输出格式统一，下游无需区分。详见 `scripts/doc_segmenter/README.md`。
-
-全程自动，仅在开头（内容缺失/非英文）和末尾（汇报结果）交互。
+全程自动，仅在开头（内容缺失/非英文/超 40KB）和末尾（汇报结果）交互。
 
 ## 设计决策档案（为什么这么设计）
 
@@ -38,8 +35,7 @@ doc_segmenter 自动处理：小文件（< 40KB）直接作为单 chunk，大文
 - **机械校验硬判 / 密度仅 WARN**：代码/URL/SVG/keep-list/`«»` 残留硬判；密度无法区分金句原文与 spam，硬判留语义层（Step 6）。
 - **translationese 补"括号英文堆砌"**：本 skill 注释规则制造的头号毛病，原翻译腔清单未覆盖。
 - **审校纪律**：维度不可压缩（限流改串行不合并）、审校尽量异模型（同模型回音室）、偏离流程须报备。
-- **全局一致性不读整篇**：脚本扫全文产小清单，决策 subagent 只读清单——长文读整篇会上下文溢出。
-- **PM 验收 Step 12**：PM 亲自复核红旗 + 抽样通读 + 留痕——治"PM 转发报告、自己没看"。
+- **PM 验收 Step 11**：PM 亲自复核红旗 + 抽样通读 + 留痕——治"PM 转发报告、自己没看"。
 
 ## 纠正表
 
@@ -49,17 +45,16 @@ doc_segmenter 自动处理：小文件（< 40KB）直接作为单 chunk，大文
 
 | 脚本 | 作用 |
 |---|---|
-| `scripts/doc_segmenter/` | 文章分段（小文件单 chunk，大文件按章节切分）。 |
-| `scripts/verify-mechanical.js` | **Step 4.6 机械校验关卡**：代码/URL/SVG/keep-list 原样、`«»` 残留=0（硬判）；注释密度（WARN）。不过打回。 |
-| `scripts/consistency-checklist.js` | **Step 11 全局一致性**：扫合并全文产出小清单（术语裸英文残留 / 注释密度离群 / 格式），决策 subagent 只读清单下结论。 |
+| `scripts/verify-mechanical.js` | **Step 4.6 机械校验关卡**：代码/URL/SVG/keep-list 原样、`«»` 残留=0（硬判）；注释密度（WARN）。不过打回。结果落盘 `verify-results.json`。 |
+| `scripts/verify-pipeline.js` | **Step 11 过程真实性终检**：完备性矩阵 / 模板占位符 / 尺寸下限 / 批量写入签名 / 时序 / 机械校验落盘核验（单文件模式；旧多 chunk 目录自动切回放模式）。FAIL 阻断交付。 |
+| `scripts/derive-bilingual.js` | **双语对照派生视图**：交付物 × 原文机械交错，中文在上英文在下；配不齐的节降级为节级对照并披露覆盖率。只读、幂等。 |
 | `scripts/word-counter.js` | Step 10 字数统计。 |
 
 ## 依赖
 
 - Node.js v16+
-- Python >= 3.10
 - `web-access` skill（URL 抓取）
 
 ---
 
-详见 [SKILL.md](./SKILL.md)
+详见 [SKILL.md](./SKILL.md)、[CHANGELOG.md](./CHANGELOG.md)

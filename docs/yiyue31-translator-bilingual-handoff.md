@@ -13,8 +13,8 @@
 | 2 | 设计文档 commit + push（此后每任务/Phase 均执行同步纪律） | origin/master | ✅ 完成 |
 | 3 | **三角色 subagent 评审（Phase 0）——冷启动后第一个任务** | §2 | ✅ 完成（2026-09-19，修订已并入本文档） |
 | 4 | yiyue31-xl-translator 实现双语输出 | Phase 1（§3） | ✅ 完成（2026-09-19：B1-B8 测试 19 项 + final-gate 回归 fixture + status 三态；真实 workdir commerce-agents-anatomy 已生成双语版，覆盖率 29/32 节） |
-| 5 | yiyue31-translator 移除大文档（多 chunk）功能 | Phase 2（§4） | ⬜ 待开工 |
-| 6 | yiyue31-translator 双语输出 | Phase 2 T2.4（§4） | ⬜ 待开工 |
+| 5 | yiyue31-translator 移除大文档（多 chunk）功能 | Phase 2（§4） | ✅ 完成（2026-09-19） |
+| 6 | yiyue31-translator 双语输出 | Phase 2 T2.4（§4） | ✅ 完成（2026-09-19） |
 | 7 | 实施完成后开发期文档清理（用户逐字存档永久保留） | §6 | ⬜ 待实施 |
 
 ---
@@ -104,6 +104,8 @@
 - **T2.7** SKILL.md frontmatter：description 注明小文章定位与 >40KB 路由提示；版本 2.5.0 → 3.0.0（破坏性变更）；**translator/CHANGELOG.md 补 v3.0.0 条目**（M9/G2：删多 chunk/doc_segmenter/Step 11、>40KB 路由、双语派生、verify-results 链处置——该 CHANGELOG 逐版本活跃记录是 skill 自身惯例，原清单漏配）。
 
 **验收**：≤40KB 文章全流程跑通（行为与现状等价）；>40KB 触发提示+停止且零落盘；旧多 chunk 目录触发披露；双语派生在单文件 workdir 上可用。
+
+**执行记录（2026-09-19，Phase 2 完成）**：T2.1-T2.7 全部落地。验收实证（合成单文件 workdir 全机械链）：verify-mechanical 目录门放宽后 verify-results.json 落 translation 根 ✓；verify-pipeline 单文件模式 PASS（完备矩阵/尺寸下限/批量写入签名 WARN 如预期触发；旧多 chunk 目录自动切回放模式，harness-v2 复核仍 FAIL ✓）；机械 FAIL 记录 → 终检 mechanical-log FAIL（反伪造链闭环 ✓）；derive-bilingual.js 3/3 节对齐、幂等、中文在上 ✓。>40KB 规模门与旧结构披露为 SKILL.md 规则文本（agent 行为层，无脚本可测）。删除断链扫描：活动内容零悬空引用（余下命中均为 docs/ 开发期档案、CHANGELOG 历史条目、xl fork 溯源注释，按惯例保留）。
 
 ## 5. 实施纪律
 

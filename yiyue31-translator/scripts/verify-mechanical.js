@@ -15,9 +15,10 @@
 // CLI: node verify-mechanical.js <original.md> <translated.md> [--keep-list <path>] [--max-annotations N] [--json]
 // Module: const verify = require('./verify-mechanical.js')
 //
-// 结果落盘：CLI 模式下当 <translated.md> 位于 translated-chunks/ 子目录时，每次运行把结果
-// 追加到译文所在 translation 根目录的 verify-results.json（供 verify-pipeline.js 终检交叉核验，
-// 防"声称已跑"式伪证）。非该目录布局或写失败时静默跳过，不影响校验本身。
+// 结果落盘：CLI 模式下当 <translated.md> 位于 translated-chunks/ 子目录（旧多 chunk 结构）或
+// 直接位于 translation 根目录（v3.0.0 单文件结构——译文即 translated-{title}-zh.md）时，每次
+// 运行把结果追加到对应 translation 根目录的 verify-results.json（供 verify-pipeline.js 终检
+// 交叉核验，防"声称已跑"式伪证）。目录门识别失败或写失败时静默跳过，不影响校验本身。
 
 const fs = require("fs");
 const path = require("path");
@@ -227,12 +228,20 @@ function preview(s) {
 // ---------- 结果落盘 ----------
 
 // 追加一条运行记录到 translation 根目录的 verify-results.json。
-// 仅当译文位于 */translated-chunks/ 下时生效；任何异常静默跳过（落盘是旁路功能，不能拖垮校验）。
+// 目录门（v3.0.0 放宽，防单文件结构下反伪造链静默断裂）：译文位于 */translated-chunks/ 下
+// → 根 = 上级目录；译文直接位于 translation 根（旁有 original-*.md 佐证）→ 根 = 所在目录本身。
+// 其余布局或任何异常静默跳过（落盘是旁路功能，不能拖垮校验）。
 function appendResultLog(translatedPath, record) {
   try {
     const dir = path.dirname(translatedPath);
-    if (path.basename(dir) !== "translated-chunks") return null;
-    const root = path.resolve(dir, "..");
+    let root;
+    if (path.basename(dir) === "translated-chunks") {
+      root = path.resolve(dir, "..");
+    } else if (fs.readdirSync(dir).some((f) => /^original-.+\.md$/i.test(f))) {
+      root = dir;
+    } else {
+      return null;
+    }
     const logPath = path.join(root, "verify-results.json");
     let entries = [];
     try {

@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
-description: 当用户要求翻译英文内容时启用。触发词：翻译、translate、改成中文。输入形式：URL、文件路径、粘贴内容。
-version: 2.5.0
+description: 当用户要求翻译英文内容（小文章 ≤40KB）时启用。触发词：翻译、translate、改成中文、要双语对照。输入形式：URL、文件路径、粘贴内容。超过 40KB 的大文档请用 yiyue31-xl-translator（说「翻译大文档」）。
+version: 3.0.0
 author: Yiyue31
 ---
 
@@ -9,7 +9,7 @@ author: Yiyue31
 
 ## 功能描述
 
-你是专业的翻译项目经理，全权负责把英文译为中文的工作。你统筹分段、分析、翻译、审阅和术语维护，确保每个环节交给合适的 subagent 执行，交付高质量的译文。
+你是专业的翻译项目经理，全权负责把英文译为中文的工作。你统筹分析、翻译、审阅和术语维护，确保每个环节交给合适的 subagent 执行，交付高质量的译文。本 skill 只处理 ≤40KB 的小文章（全文单文件流水线）；大文档归 yiyue31-xl-translator。
 
 ---
 
@@ -29,29 +29,19 @@ author: Yiyue31
 
 **预处理：**
 
-1. 提取标题（优先级：文章标题 → 文件名 → 首句前几个词）。只需要字母、数字，不超过6个单词。title=标题。
-2. 如果 `{title}/translation/` 目录已存在：对比目录内 `original-{title}.md` 与本文——**相同则视为既有任务的断点，复用该目录续跑**（禁止嵌套新建 `{title}/translation/`）；不同才换一个标题新建目录。
-3. 内容超过 40KB 时（将进入多 chunk 路径）：先告知用户"本文将走多 chunk 流程，预计需要人工监督；建议分批发起或在本机一次跑完"，确认后再继续。
-4. 内容非 markdown 格式时，要转换为 markdown 格式。无法或不适合转换为 markdown 时，保留原始结构。
-5. 保存到 `{title}/translation/original-{title}.md`。
+1. **规模门（先于建目录/落盘——超限即零落盘）**：内容超过 40KB → 回一行"本文约 XX KB，超过 40KB 上限，本 skill 不再处理大文档——请对同一输入改说『翻译大文档』（yiyue31-xl-translator）"并**停止**。不建目录、不落任何文件。
+2. 提取标题（优先级：文章标题 → 文件名 → 首句前几个词）。只需要字母、数字，不超过6个单词。title=标题。
+3. 如果 `{title}/translation/` 目录已存在：对比目录内 `original-{title}.md` 与本文——**相同则视为既有任务的断点，复用该目录续跑**（禁止嵌套新建 `{title}/translation/`）；不同才换一个标题新建目录。
+4. **旧结构披露（不自动迁移）**：复用的目录若含 `chunks/` 多 chunk 结构（v2.x 旧版流程产物），披露"此工程由旧版流程创建（多 chunk 结构），本版本不再支持续跑"，给两个出口由用户选：① 用旧版 skill（git 历史版本）跑完 ② 删除该目录重新发起。不自动迁移、不在旧结构上继续。
+5. 内容非 markdown 格式时，要转换为 markdown 格式。无法或不适合转换为 markdown 时，保留原始结构。
+6. 保存到 `{title}/translation/original-{title}.md`。
 
-### Step 1.5: 文章分段
-
-```bash
-bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/original-{title}.md" --output-dir "{title}/translation/chunks" --max-size 40
-```
-
-**错误处理**：非零退出码时报告错误并停止（退出码含义见 `{skill-dir}/scripts/doc_segmenter/README.md`）。
-
-**输出**：`{title}/translation/chunks/` 目录下生成 chunk 文件、`manifest.md` 和 `progress.json`。
-
-读取 `progress.json` 的 `total_chunks` 确定工作流。以下路径约定适用于所有后续步骤（相对路径基于 `{title}/translation/`）：
+**路径约定（全文单文件，相对路径基于 `{title}/translation/`）：**
 
 | | 原文输入 | 译文输出 | 审阅报告 |
 |---|---|---|---|
-| chunk | `chunks/chunk-{NN}-xxx.md` | `translated-chunks/translated-chunk-{NN}.md` | `review-{type}-chunk-{NN}.md` |
+| 全文 | `original-{title}.md` | `translated-draft.md`（工作稿）→ `translated-{title}-zh.md`（交付物，Step 10 定稿） | `review-{type}.md` |
 
-- 按 `manifest.md` 有序列表遍历 chunks，Step 4 前创建 `translated-chunks/` 目录
 - 共享路径：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`
 
 ### Step 2: 文章分析 + 生成术语表
@@ -60,7 +50,7 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 2. 加载 `{skill-dir}/references/terms.md`，识别出现在本文中的术语。
 3. **语言检查**：如果文章主要是中文或非英文，提醒用户此 skill 设计用于英译中。
 4. 提取原文中的超链接。
-5. **生成 per-article 术语表**：只列出 LLM 可能处理不一致的词——纠正类、上下文相关译法、需统一处理的专有名词。不列 LLM 本来就能翻对的常见词。格式：`| English Term | Translation | Context |`（Translation 列用 `[KEEP]` 表示保留英文）。**一条一译**：每条必须落单一译法或 `[KEEP]`，禁止"译法A/译法B"双选条目——双选等于把裁决债务推给下游各 chunk 各翻各的。拿不定的直接裁定一种并在 Context 注明理由。
+5. **生成 per-article 术语表**：只列出 LLM 可能处理不一致的词——纠正类、上下文相关译法、需统一处理的专有名词。不列 LLM 本来就能翻对的常见词。格式：`| English Term | Translation | Context |`（Translation 列用 `[KEEP]` 表示保留英文）。**一条一译**：每条必须落单一译法或 `[KEEP]`，禁止"译法A/译法B"双选条目——双选等于把裁决债务推给翻译阶段各处各翻各的。拿不定的直接裁定一种并在 Context 注明理由。
 6. **结构化输出 keep-list**：把本篇须**原样保留英文**的元素（= `[KEEP]` 术语 + 专名/模型名 + 全大写缩写）写成独立 `keep-list-{title}.json`，供 Step 4.6 脚本校验消费。schema：
 
    ```json
@@ -85,7 +75,7 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 ### Step 4: 翻译（阶段A：翻译 + 内联打标）
 
-每个 chunk 启用独立 subagent 进行翻译。
+启用**一个独立 subagent** 对**整篇**文章翻译（全文单次），输出落 `translated-draft.md`（工作稿——后续审阅/修复都改这份，Step 10 才定稿为交付物）。
 
 **优先级序列（冲突时的取舍依据）**：准确 > 流畅地道 > 必要注释。三者冲突时，**流畅优先于注释**——宁可少一个括注，也不要读起来逐字打嗝的译文。这条序列在阶段A/阶段B 全程生效。
 
@@ -117,7 +107,7 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 ### Step 4.5: 阶段B（注释把关）
 
-输入 = **带 `«english»` 标记的阶段A 译文**（非独立清单）。对每个 chunk 启用独立 subagent（与阶段A 同 chunk 串行）。
+输入 = **带 `«english»` 标记的阶段A 译文全文**（`translated-draft.md`，非独立清单）。启用**一个独立 subagent** 整篇裁定（与阶段A 串行）。
 
 **裁定每个残留 `«english»`（#1 词级标准）**：保留→替换为`中文（English）`，删除→去掉`«»`标记。
 
@@ -130,13 +120,13 @@ bun run {skill-dir}/scripts/doc_segmenter/src/cli.ts "{title}/translation/origin
 
 ### Step 4.6: 机械校验关卡（脚本，质检前必过）
 
-对每个 chunk 译文强制运行（按 `manifest.md` 取原 chunk 文件名填入）：
+对整篇译文强制运行（原文 × 工作稿）：
 
 ```bash
-node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-{NN}-xxx.md" "{title}/translation/translated-chunks/translated-chunk-{NN}.md" --keep-list "{title}/translation/keep-list-{title}.json"
+node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/original-{title}.md" "{title}/translation/translated-draft.md" --keep-list "{title}/translation/keep-list-{title}.json"
 ```
 
-**脚本不过即打回重做，不得进入 Step 5+ 质检。** 硬判校验项（不过即打回）：代码块/行内代码原文⊆译文（抓遗漏与误改）、内联 SVG 字节一致、URL 原样、keep-list 条目未被改写、`«»` 残留 = 0。`（英文）` 括注密度超阈值仅 **WARN**——该计数无法区分金句原文/引用/专名括注与词级 spam，过注与否的硬判留给 Step 6 翻译腔语义检查（"括号英文堆砌"规则）。退出码 0 = 通过，1 = 打回。每次运行的结果自动追加落盘到 `verify-results.json`（translation 根目录），供 Step 12 终检交叉核验。详见 `scripts/verify-mechanical.js` 顶部说明。
+**脚本不过即打回重做，不得进入 Step 5+ 质检。** 硬判校验项（不过即打回）：代码块/行内代码原文⊆译文（抓遗漏与误改）、内联 SVG 字节一致、URL 原样、keep-list 条目未被改写、`«»` 残留 = 0。`（英文）` 括注密度超阈值仅 **WARN**——该计数无法区分金句原文/引用/专名括注与词级 spam，过注与否的硬判留给 Step 6 翻译腔语义检查（"括号英文堆砌"规则）。退出码 0 = 通过，1 = 打回。每次运行的结果自动追加落盘到 `verify-results.json`（translation 根目录——工作稿与原文同在根目录，落盘链路天然命中；供 Step 11 终检交叉核验）。**审阅修复改动译文后，重跑本关卡**（终检按最新落盘记录判闭环）。详见 `scripts/verify-mechanical.js` 顶部说明。
 
 ### 审校循环（Step 5–7：准确性 / 翻译腔 / AI 味）
 
@@ -145,19 +135,19 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-
 - **独立执行、不可压缩**：Step 5/6/7/9 各是一个独立 subagent、各自独立执行。**不得合并维度**——合并质检会稀释 rigor，深层问题（过注、翻译腔、AI 味）会被同一个盲区一起放过。即便为绕限流，也只能改**串行**（每次 1 个），**绝不能合并质检维度**。
 - **模型多样性**：审校 subagent 尽量**与翻译（Step 4 / 4.5）使用不同模型**——同模型自审共享盲区，会放过自己造成的深层问题。环境不可控时，补一个专门的**注释滥用对抗检查** pass：扫译文所有 `（...）` 括注，猎杀**非 #1（术语）/ #2-#3（金句/修辞）**的括注，并核对 `«»` 标记是否已被阶段B 全部裁定（残留应 = 0）。
 - **偏离须报备**：如需偏离下列任何流程（除下述资源约束降级外），**必须先告知用户并取得同意**，不得自作主张（如擅自把多个质检 subagent 合并成一个）。
-- **资源约束下的合法降级**：API 限流/资源不足导致某质检维度无法执行时，允许整维度跳过、无需事前报备，但必须：①pm-review 合规表用标准标记 `⏭️ SKIPPED(原因)` 披露；②最终交付回复中明示。**静默跳过或用通过性套话填充报告属伪造流程**——Step 12 终检脚本按文件系统事实判定，未披露的缺失直接 FAIL。
+- **资源约束下的合法降级**：API 限流/资源不足导致某质检维度无法执行时，允许整维度跳过、无需事前报备，但必须：①pm-review 合规表用标准标记 `⏭️ SKIPPED(原因)` 披露；②最终交付回复中明示。**静默跳过或用通过性套话填充报告属伪造流程**——Step 11 终检脚本按文件系统事实判定，未披露的缺失直接 FAIL。
 
-每个维度：**每 chunk 一个独立 subagent**；按报告修复对应译文文件。
+每个维度：**一个独立 subagent，全文单次**；按报告修复 `translated-draft.md`。
 
 | 维度 | 检查指令 | 输入 | 报告路径 |
 |---|---|---|---|
-| 准确性（Step 5） | `{skill-dir}/references/evaluate-translation-prompt.md` | 原文 + 译文 + terms.md 匹配项 + glossary + 特殊词句表 | `review-translation-chunk-{NN}.md` |
-| 翻译腔（Step 6） | `{skill-dir}/references/evaluate-translationese-prompt.md` | 原文 + 译文 | `review-translationese-chunk-{NN}.md` |
-| AI 味（Step 7） | `{skill-dir}/references/evaluate-ai-tone-prompt.md` | 原文 + 译文 | `review-ai-tone-chunk-{NN}.md` |
+| 准确性（Step 5） | `{skill-dir}/references/evaluate-translation-prompt.md` | 原文 + 译文全文 + terms.md 匹配项 + glossary + 特殊词句表 | `review-translation.md` |
+| 翻译腔（Step 6） | `{skill-dir}/references/evaluate-translationese-prompt.md` | 原文 + 译文全文 | `review-translationese.md` |
+| AI 味（Step 7） | `{skill-dir}/references/evaluate-ai-tone-prompt.md` | 原文 + 译文全文 | `review-ai-tone.md` |
 
 ### Step 8: 术语维护
 
-启用 subagent 维护 terms.md。**输入**：原文（按路径约定）、译文（按路径约定）、当前 terms.md 内容。
+启用 subagent 维护 terms.md。**输入**：原文（`original-{title}.md`）、译文（`translated-draft.md`）、当前 terms.md 内容。
 
 **Subagent 任务：**
 
@@ -170,52 +160,35 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/chunks/chunk-
 
 ### Step 9: 可读性检查
 
-审校纪律同上"审校循环"。**每 chunk 一个独立 subagent**；检查指令 `{skill-dir}/references/evaluate-readability-prompt.md`；输入：**单个 chunk 的中文译文**；报告 `review-readability-chunk-{NN}.md`；按报告修复对应译文文件。
+审校纪律同上"审校循环"。**一个独立 subagent，全文单次**；检查指令 `{skill-dir}/references/evaluate-readability-prompt.md`；输入：**整篇中文译文**（`translated-draft.md`）；报告 `review-readability.md`；按报告修复 `translated-draft.md`。
 
-### Step 10: 合并译文
+### Step 10: 定稿（元信息头 + 临时标记清理 + 字数统计）
 
-将 `translated-chunks/` 下所有文件按编号排序合并。
+从工作稿 `translated-draft.md` 产出交付物 `translated-{title}-zh.md`：
 
-1. 在译文前添加元信息：
+1. **清理临时标记**（重要）：移除翻译阶段使用的临时处理标记
+   - 移除所有 `**{golden quote}**` 标记，保留加粗格式
+   - 移除所有 `**{slang/idiom}**` 标记，保留加粗格式
+   - 最终交付的译文中不应包含任何花括号标记
+
+2. 在译文前添加元信息头（正文自带 H1，头不另插标题——与 xl-translator 同形态）：
 
 ```markdown
-# {翻译后的标题}
-
-> **原文**：{原始英文标题} 
-> **作者**：{author 或空} 
+> **原文**：{原始英文标题}
+> **作者**：{author 或空}
 > **来源**：{url 或空}
-> **翻译日期**：{日期} 
-> **风格**：{意译 或 直译} 
+> **翻译日期**：{日期}
+> **风格**：{意译 或 直译}
 > **字数**：{TBD}
 
 ---
 ```
 
-2. **清理临时标记**（重要）：移除翻译阶段使用的临时处理标记
-   - 移除所有 `**{golden quote}**` 标记，保留加粗格式
-   - 移除所有 `**{slang/idiom}**` 标记，保留加粗格式
-   - 最终交付的译文中不应包含任何花括号标记
+3. 写入 `translated-{title}-zh.md`（字数暂填 `TBD`），运行字数统计 `node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，将结果替换 `TBD`。工作稿 `translated-draft.md` 保留（Step 11 时序核验的比对对象）。
 
-3. 拼接所有 chunk 译文（chunk 之间用空行分隔），写入 `translated-{title}-zh.md`（字数暂填 `TBD`）。
+### Step 11: PM 验收（交付前强制关卡）
 
-4. 运行字数统计：`node {skill-dir}/scripts/word-counter.js {title}/translation/translated-{title}-zh.md`，将结果替换 `TBD`。
-
-### Step 11: 全局一致性
-
-分块并行翻译 → 跨 chunk 的术语 / 注释密度 / 格式可能不一致。**不采用"一个 subagent 读整篇"**（长文如 93KB 会上下文溢出），改为：
-
-1. 扫描清单：
-
-   ```bash
-   node {skill-dir}/scripts/consistency-checklist.js "{title}/translation/translated-{title}-zh.md" --glossary "{title}/translation/glossary-{title}.md" --chunks-dir "{title}/translation/translated-chunks/" --output "{title}/translation/consistency-{title}.md"
-   ```
-
-2. 启用一个决策 subagent，**只读 `consistency-{title}.md` 这份小清单**下结论（哪些术语须统一、哪些 chunk 过注、格式如何规整）。
-3. 按结论机械应用修复到 `translated-{title}-zh.md`。
-
-### Step 12: PM 验收（交付前强制关卡）
-
-PM（执行本 skill 的主 agent）亲自验收最终产物。这是修"PM 转发报告、自己没看"的根因——PM 必须亲自看，**样本通读不得外包给 subagent**（大文章可额外派冷读者 subagent 做更广覆盖，但 PM 的样本通读不可委托）。
+PM（执行本 skill 的主 agent）亲自验收最终产物。这是修"PM 转发报告、自己没看"的根因——PM 必须亲自看，**样本通读不得外包给 subagent**。
 
 **① 过程真实性终检（脚本，先于一切）**：
 
@@ -223,14 +196,15 @@ PM（执行本 skill 的主 agent）亲自验收最终产物。这是修"PM 转�
 node {skill-dir}/scripts/verify-pipeline.js "{title}/translation"
 ```
 
-脚本从文件系统事实核验过程真实性（完备性矩阵、模板占位符、同维度查重、尺寸下限、批量写入签名、机械校验落盘），产出 `verify-pipeline-report.md` + `verify-report.json`。**FAIL = 不得交付**——终检不过说明存在未披露的步骤缺失或伪造签名，先按报告定位问题打回对应步骤。另查 `consistency-{title}.md` 有无致命术语冲突；注释密度 WARN 的 chunk → 列为下方人工通读候选。
+脚本从文件系统事实核验过程真实性（单文件模式：完备性矩阵 / 模板占位符 / 尺寸下限 / 批量写入签名 / 时序 / 机械校验落盘；同维度查重仅旧多 chunk 结构回放时有对象——七类检查逐项去留见脚本顶部说明），产出 `verify-pipeline-report.md` + `verify-report.json`。**FAIL = 不得交付**——终检不过说明存在未披露的步骤缺失或伪造签名，先按报告定位问题打回对应步骤。机械校验的注释密度 WARN → 列为下方人工通读候选。
 
-**② 风险定向抽样通读**：PM 以读者视角读 N 个 chunk，N = `max(2, ⌈总 chunk 数 × 10%⌉)`。抽样须**包含所有红旗 chunk**（密度 WARN / 一致性离群 / 最大 chunk），不足则随机补足。判断范围：clutter 消除、流畅、跨 chunk 连贯、顺眼可见的明显错（错数字/明显误译）。**不系统重校每个数据点**——那是 Step 5 的活。
+**② 风险定向抽样通读**：PM 以读者视角**通读 ≥2 个章节（短文可全文）+ 密度 WARN 触发段**。判断范围：clutter 消除、流畅、顺眼可见的明显错（错数字/明显误译）。**不系统重校每个数据点**——那是 Step 5 的活。
 
 **③ 留痕 + 裁定**：把验收记录写到 `pm-review-{title}.md`，**必须包含步骤完成合规表**——每步一行：`步骤 | ✅ 完成 | 产物`，跳过的维度写 `⏭️ SKIPPED(原因)`（见审校纪律"资源约束下的合法降级"）。合规表是终检脚本判定"披露跳过（WARN）vs 静默缺失（FAIL）"的依据。附 verify-pipeline 终判结论。
 
 - **pass** → 交付 `translated-{title}-zh.md`，**交付即止**：不自动运行下游管线（如 refined-stock publish），仅在交付信息中提示其入口由用户自行执行。
-- **rework** → 把问题打回对应步骤（clutter→Step 6、准确性→Step 5、一致性→Step 11），修完重跑本步。
+- **双语对照（两种触发）**：① 发起翻译时用户说了要双语 → 交付后自动跑 `node {skill-dir}/scripts/derive-bilingual.js "{title}/translation"`；② 交付后随时补说"要双语对照" → 同命令幂等重生成。产物 `translated-{title}-bilingual.md` = （交付物 × 原文）机械交错的只读派生视图（非交付物、不经终检、中文在上英文在下、配不齐的节降级为节级对照并随文件尾披露覆盖率）。
+- **rework** → 把问题打回对应步骤（clutter→Step 6、准确性→Step 5），修完重跑本步。
 
 ---
 

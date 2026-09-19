@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.0.0 (2026-09-19)
+
+### 瘦身为小文章专用（≤40KB）+ 双语对照派生（破坏性变更）
+
+大文档需求已由 yiyue31-xl-translator 承接（分段流水线 + 终检交付门），本 skill 删除自带的整个多 chunk 分层，回归全文单文件流水线。设计讨论与三角色评审见 git 历史 `docs/yiyue31-translator-bilingual-*.md`。
+
+- **>40KB 规模门（Step 1 首条）**：超限回一行"本文约 XX KB，超过 40KB 上限，本 skill 不再处理大文档——请对同一输入改说『翻译大文档』（yiyue31-xl-translator）"并停止；检查先于建目录/落盘（超限即零落盘）。替代 v2.5.0 的"确认后走多 chunk"提示。
+- **删多 chunk 层（破坏性）**：Step 1.5 与 `scripts/doc_segmenter/` 整目录删除（含 node_modules 与自带 tests，`rm -rf` 兜住未跟踪残留）；bun 依赖随删除消失。路径约定单文件化：`original-{title}.md` → 工作稿 `translated-draft.md` → 交付物 `translated-{title}-zh.md`，审阅报告 `review-{type}.md`。Step 4/4.5/5/6/7/9 每维度一个 subagent 全文单次（"维度不合并"审校纪律保留）。
+- **Step 10 合并 → 定稿**：只剩元信息头 + 临时标记清理 + 字数统计（头不再另插 H1——正文自带）。
+- **删 Step 11 全局一致性（含 `scripts/consistency-checklist.js`）**：其存在理由就是分块（跨 chunk 术语/密度/格式不一致）；单文件流水线无此问题。README 设计决策档案同步删"全局一致性不读整篇"条目与"文章分段"节。
+- **verify-results.json 反伪造链保留（v2.5.0 防线不断裂）**：`verify-mechanical.js` 落盘目录门从"仅 translated-chunks/"放宽为"translation 根亦落盘"（原文与工作稿同在根目录；旧布局回放兼容保留）。单文件下曾会因目录门静默跳过落盘——旁路异常不报错正是最险形态。
+- **verify-pipeline.js 双模式适配**：无 `chunks/` → 单文件模式（四维报告 `review-{dimension}.md` + 共享产物完备性、模板签名、尺寸下限〔基准=原文整篇〕、批量写入签名〔四维同 60s 窗〕、时序〔比对工作稿 translated-draft.md——交付物被 Step 10 重写过不作对象〕、机械校验落盘〔按 original-{title}.md 键〕）；同维度查重在单文件下无跨单元对象、代码保留供旧目录回放。有 `chunks/` → 旧多 chunk 回放模式（harness-v2/abc-legal 复核能力不变）。
+- **双语对照派生（新 `scripts/derive-bilingual.js`，fork 自 xl derive-bilingual.mjs 算法）**：交付物 × 原文两文件机械交错，中文在上英文在下；节配对 = 标题顺序（fence 感知），块配对按序 + 双级指纹（代码块逐字 + isCode；URL 集合），配不齐降级为节级对照并随文件尾披露覆盖率（宁降级不误导）。只读、幂等；产物 `translated-{title}-bilingual.md`（非交付物、不经终检、命名不以 -zh.md 结尾）。两种触发：发起时说了要双语 → 交付后自动跑；交付后随时补说"要双语对照"。
+- **旧结构披露（不自动迁移）**：复用目录含 `chunks/` 多 chunk 结构时披露"此工程由旧版流程创建"，出口二选一（git 历史版本跑完 or 删目录重新发起）。
+- **依赖段**：删 `Python >= 3.10`（全 skill 已零 Python 消费）；根 `.gitignore` 清 `__pycache__/` 残留行。
+- **references**：`evaluate-readability-prompt.md` 输入描述"单个 chunk 中文译文"→"整篇中文译文"（与 hn-digest 版已分化为不同文档，不做同步——见 docs/shared-evaluation-prompt-sync.md）。
+
+### 版本号
+
+2.5.0 → 3.0.0（破坏性变更：>40KB 拒收、多 chunk 结构与 Step 11 移除）
+
 ## v2.5.0 (2026-08-25)
 
 ### 过程真实性防线 + 边界规则（harness-v2 事故复盘落地）
