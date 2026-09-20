@@ -7,7 +7,7 @@
 //      缺失 = 遗漏；相似但不一致 = 误改；译文独有 = 疑似误改（WARN）。
 //   2. 内联 SVG（<svg>...</svg>）：逐块字节比对，必须完全一致。
 //   3. URL：正则提取，原文每个 URL 必须在译文中原样出现。
-//   4. keep-list 存在性：原文 chunk 中出现的 keep-list 条目（[KEEP] 术语 / 专名 / 全大写缩写）必须在译文中原样保留，未被改写成中文。
+//   4. keep-list 存在性：原文中出现的 keep-list 条目（[KEEP] 术语 / 专名 / 全大写缩写）必须在译文中原样保留，未被改写成中文。
 //   5. «» 标记残留 = 0：阶段B 必须把所有 «english» 标记裁定完毕，残留即 FAIL。
 //   6. 注释密度（仅 WARN）：译文（英文）括注计数，超阈值仅告警（计数含金句原文/引用/专名括注，
 //      无法机械区分词级 spam；过注硬判留给语义层）。默认 --max-annotations 10，可调。
@@ -15,10 +15,10 @@
 // CLI: node verify-mechanical.js <original.md> <translated.md> [--keep-list <path>] [--max-annotations N] [--json]
 // Module: const verify = require('./verify-mechanical.js')
 //
-// 结果落盘：CLI 模式下当 <translated.md> 位于 translated-chunks/ 子目录（旧多 chunk 结构）或
-// 直接位于 translation 根目录（v3.0.0 单文件结构——译文即 translated-{title}-zh.md）时，每次
-// 运行把结果追加到对应 translation 根目录的 verify-results.json（供 verify-pipeline.js 终检
-// 交叉核验，防"声称已跑"式伪证）。目录门识别失败或写失败时静默跳过，不影响校验本身。
+// 结果落盘：CLI 模式下当 <translated.md> 直接位于 translation 根目录（旁有 original-*.md 佐证
+// ——译文即 translated-{title}-zh.md）时，每次运行把结果追加到该目录的 verify-results.json
+// （供 verify-pipeline.js 终检交叉核验，防"声称已跑"式伪证）。目录门识别失败或写失败时静默跳过，
+// 不影响校验本身。
 
 const fs = require("fs");
 const path = require("path");
@@ -228,16 +228,13 @@ function preview(s) {
 // ---------- 结果落盘 ----------
 
 // 追加一条运行记录到 translation 根目录的 verify-results.json。
-// 目录门（v3.0.0 放宽，防单文件结构下反伪造链静默断裂）：译文位于 */translated-chunks/ 下
-// → 根 = 上级目录；译文直接位于 translation 根（旁有 original-*.md 佐证）→ 根 = 所在目录本身。
+// 目录门：译文直接位于 translation 根（旁有 original-*.md 佐证）→ 根 = 所在目录本身。
 // 其余布局或任何异常静默跳过（落盘是旁路功能，不能拖垮校验）。
 function appendResultLog(translatedPath, record) {
   try {
     const dir = path.dirname(translatedPath);
     let root;
-    if (path.basename(dir) === "translated-chunks") {
-      root = path.resolve(dir, "..");
-    } else if (fs.readdirSync(dir).some((f) => /^original-.+\.md$/i.test(f))) {
+    if (fs.readdirSync(dir).some((f) => /^original-.+\.md$/i.test(f))) {
       root = dir;
     } else {
       return null;

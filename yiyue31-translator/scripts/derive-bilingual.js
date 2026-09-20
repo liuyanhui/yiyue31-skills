@@ -1,8 +1,7 @@
 "use strict";
 
 // derive-bilingual.js — 双语对照派生视图（v3.0.0；fork 自 yiyue31-xl-translator/scripts/
-// derive-bilingual.mjs 的 interleave 算法，一次性移植为单文件 CJS，绝不回写源（零共享纪律
-// ——同 xl segment.mjs fork 自本 skill doc_segmenter 的先例）。
+// derive-bilingual.mjs 的 interleave 算法，一次性移植为单文件 CJS，绝不回写源——零共享纪律）。
 //
 // 定位：交付后由（交付物 × 原文）机械派生的只读视图——非交付物、不经终检、不受手修保护、
 // 幂等可重生成、命名不以 -zh.md 结尾（refined-stock 根级 ^.+-zh\.md$ 发布模式只匹配根级裸 .md，

@@ -46,7 +46,7 @@
 | 脚本 | 作用 |
 |---|---|
 | `scripts/verify-mechanical.js` | **Step 4.6 机械校验关卡**：代码/URL/SVG/keep-list 原样、`«»` 残留=0（硬判）；注释密度（WARN）。不过打回。结果落盘 `verify-results.json`。 |
-| `scripts/verify-pipeline.js` | **Step 11 过程真实性终检**：完备性矩阵 / 模板占位符 / 尺寸下限 / 批量写入签名 / 时序 / 机械校验落盘核验（单文件模式；旧多 chunk 目录自动切回放模式）。FAIL 阻断交付。 |
+| `scripts/verify-pipeline.js` | **Step 11 过程真实性终检**：完备性矩阵 / 模板占位符 / 跨维度查重 / 尺寸下限 / 批量写入签名 / 时序 / 机械校验落盘与重跑。FAIL 阻断交付。 |
 | `scripts/derive-bilingual.js` | **双语对照派生视图**：交付物 × 原文机械交错，中文在上英文在下；配不齐的节降级为节级对照并披露覆盖率。只读、幂等。 |
 | `scripts/word-counter.js` | Step 10 字数统计。 |
 

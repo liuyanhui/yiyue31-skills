@@ -10,6 +10,14 @@
 - **terms.md 首现括注改"按受众裁量"（发现 2）**：PR/tokens/LLM/KPI 四条由"首现括注"改为受众裁量口径（技术受众免注、通用受众首现注）；SKILL Step 4 术语规范同步裁量规则——消除与阶段B"宁少勿滥"的规则张力（双审已背书技术读者免注）。
 - **人工锚点不升格（三样本拍板）**：双语降级率 146/166 节（87.9%），降级均归因真实内容分歧（源格式怪癖/译文块形态重组），无算法错配证据——xl derive 维持现状，升格留待未来算法性错配样本再议。
 
+### 旧多 chunk 兼容层整体移除（用户拍板：默认不考虑向后兼容，规则已入根 CLAUDE.md）
+
+- **SKILL Step 1 删"旧结构披露"条目**：复用目录含 `chunks/` 旧结构不再披露/给出口——旧结构需求由 git 历史版本承接。
+- **verify-pipeline.js 删旧多 chunk 回放模式**：loadChunks / 双模式判定 / 同维度查重 / translated-chunks 完备性等 chunk 分支全删，固定单文件模式；头注检查清单改列跨维度查重，顺带修 Step 编号 12→11①（v3.0.0 步骤重编号遗留）。
+- **verify-mechanical.js 目录门删 translated-chunks/ 分支**：译文在 translation 根（旁有 original-*.md）才落盘 verify-results.json。
+- **磁盘残留清除**：`scripts/doc_segmenter/node_modules/jschardet`（1.4MB）——v3.0.0 声称 rm -rf 兜底但漏删的未跟踪残留。
+- README 脚本表 / SKILL Step 11① / derive-bilingual 头注同步去旧结构字样。版本号不变（用户拍板）。
+
 ## v3.0.1 (2026-09-19)
 
 ### 实施后三角色评审收口（角色①冷启动执行者 / ②边界攻击者 / ③防线一致性审计，32 条发现逐条去伪后修复）

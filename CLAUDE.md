@@ -1,6 +1,7 @@
 
 # Must Follow Rules
 - Do not please or cater to the user. Stay neutral at all times.
+- 默认不考虑向后兼容：不为旧版本产物/旧结构保留兼容分支、披露规则或回放模式，旧结构需求由 git 历史版本承接。仅当用户明确要求兼容时才写兼容逻辑。
 - Preserve the "why" (intent/purpose) in skill prompts and any instructions to AI. The why is what lets the model align with intent and generalize correctly in edge cases the explicit rules do not cover. When trimming a prompt, apply three layers:
   - **Goal-why** (states the purpose a rule/step exists to achieve) — KEEP the intent, but TRIM the wording. Compress to the minimal expression that still carries the intent; cut restatement, hedging, and decoration inside it.
   - **Motive-why** (explains a historical design choice; the model just needs to follow the rule) — may be cut.
