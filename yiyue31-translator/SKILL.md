@@ -9,7 +9,7 @@ author: Yiyue31
 
 ## 功能描述
 
-你是专业的翻译项目经理，全权负责把英文译为中文的工作。你统筹分析、翻译、审阅和术语维护，确保每个环节交给合适的 subagent 执行，交付高质量的译文。本 skill 只处理 ≤40KB 的小文章（全文单文件流水线）；大文档归 yiyue31-xl-translator。
+你是翻译项目经理，统筹分析、翻译、审阅和术语维护，各环节派 subagent 执行。本 skill 只处理 ≤40KB 的小文章（全文单文件流水线）；大文档归 yiyue31-xl-translator。
 
 ---
 
@@ -38,13 +38,7 @@ author: Yiyue31
 5. **源含 YAML frontmatter（网页剪藏元数据）**：标题/来源/作者等元信息不进译文正文，改为在译文草稿顶部以引用块呈现（`> **来源**：…` 形态）——既供 Step 10 元信息头取材，也使 frontmatter 里的 URL 自然进入 URL 子集校验（否则机械校验必误报缺失）。
 6. 保存到 `{title}/translation/original-{title}.md`。
 
-**路径约定（全文单文件，相对路径基于 `{title}/translation/`）：**
-
-| | 原文输入 | 译文输出 | 审阅报告 |
-|---|---|---|---|
-| 全文 | `original-{title}.md` | `translated-draft.md`（工作稿）→ `translated-{title}-zh.md`（交付物，Step 10 定稿） | `review-{type}.md` |
-
-- 共享路径（均在 `{title}/translation/` 根）：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`、`keep-list-{title}.json`（Step 2 产、Step 4.6 消费）、`pm-review-{title}.md`（Step 11 产）
+**路径约定（全文单文件，相对路径基于 `{title}/translation/`）**：原文 `original-{title}.md`；译文 `translated-draft.md`（工作稿）→ `translated-{title}-zh.md`（交付物，Step 10 定稿）；审阅报告 `review-{type}.md`。共享产物（同根目录）：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`、`keep-list-{title}.json`（Step 2 产、Step 4.6 消费）、`pm-review-{title}.md`（Step 11 产）。
 
 ### Step 2: 文章分析 + 生成术语表
 
@@ -95,14 +89,12 @@ author: Yiyue31
 **通用翻译规则：**
 
 - **术语规范**：使用标准译法；术语表 `[KEEP]` 项原样保留英文，其余按术语表统一译法。terms.md 中"首现括注"类口径**按本文受众裁量**（Step 2 受众判定：技术受众免注、通用受众首现注）——阶段B 与准确性审校以同一口径复核。
-- **修辞处理**：隐喻、习语等修辞性表达，按实际意图翻译而非逐字直译。若源语言意在目标语言中内涵不同，替换为表意、情感效果一致的自然表达。
 - **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）。
-- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语使用临时标记：`**{golden quote}**` 和 `**{slang/idiom}**`。**重要**：这些是临时处理标记，必须在 Step 10 定稿时清理为纯加粗格式。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
+- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语使用临时标记：`**{golden quote}**` 和 `**{slang/idiom}**`。临时标记由 Step 10 定稿清理。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
 - **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` → `[译文](https://example.com)`。
 
-
 **翻译风格**（默认意译，用户指定时用直译）：
-- **意译**：重意不重形、情感保真、表达流畅。可自由重构句式，保留情感内涵。
+- **意译**：重意不重形，可自由重构句式；隐喻、习语按实际意图译而非逐字直译，内涵冲突时换表意效果一致的自然表达。
 - **直译**：逐字翻译，保留原文句式结构。
 
 **Subagent 输入**：原文、terms.md 匹配项、glossary、keep-list（见 Step 2）、特殊词句表、本文受众（见 Step 2）、翻译风格。
@@ -153,11 +145,9 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/original-{tit
 
 **Subagent 任务：**
 
-1. 对比原文和译文，找出 LLM **实际翻译错误**的英文术语（如 "agent" 被翻译为"代理"而非"智能体"）。添加到 terms.md。
-2. 审查现有条目。如果 LLM 无需纠正项就能正确翻译，标记为建议移除。
-3. 更新 terms.md：追加新条目，移除已标记的条目。
-4. **添加标准**：仅添加有可验证误译证据的术语。**移除标准**：仅移除全文均正确翻译的术语。
-5. 向用户展示发生变化的 terms.md 和变更报告（新增条目列表、移除条目列表、当前总条目数）。
+1. 对比原文和译文，找出 LLM **实际翻译错误**的英文术语（如 "agent" 被翻译为"代理"而非"智能体"），按下方 Corrections 收录标准添加到 terms.md。
+2. 审查现有条目：按 Corrections 移除标准标记可移除项，更新 terms.md（追加新条目、移除已标记条目）。
+3. 向用户展示发生变化的 terms.md 和变更报告（新增条目列表、移除条目列表、当前总条目数）。
 
 
 ### Step 9: 可读性检查
@@ -212,13 +202,15 @@ node {skill-dir}/scripts/verify-pipeline.js "{title}/translation"
 
 ## Corrections
 
-文件位置：`{skill-dir}/references/terms.md`（本地运行态文件，已 gitignore；随翻译自动维护）。
+文件位置：`{skill-dir}/references/terms.md`（本地运行态文件，已 gitignore；随翻译自动维护，Step 8 执行）。
 
 **收录标准（须全部满足）：**
 
 1. **可验证误译**：LLM 在没有此条目时会实际翻译错误或不一致（有证据，而非“可能”）。
 2. **跨篇复现**：能出现在多篇不同文章里。单篇文章特有的金句、整句、代码标识符、一次性隐喻 → 归入 per-article 的 `special-phrases-{title}.md`，不进本表。
 3. **非 LLM 已会**：LLM 本就能翻对的常见词不收。
+
+**移除标准**：仅移除本文全文均正确翻译的术语。
 
 ```markdown
 | English Term | Correct Translation | Why |
