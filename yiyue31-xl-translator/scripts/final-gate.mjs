@@ -240,6 +240,68 @@ export function probeCheck(dir, truth) {
   return fails;
 }
 
+// ---------- C4 抽核（S2②：grep 核对归 agent 自觉，脚本随机抽核 ≥3 份兜底） ----------
+// 抽样对象 = events.jsonl 中带 c4 detail 的 dispatch 事件（C4 块）；--seed N 可复现
+// （同 seed 必同抽样——mulberry32 确定性洗牌，池按事件序稳定）。核对 = 该单元当前报告的
+// sha 表与派发时记录的口径一致（报告 certify 的恰是派发出去的内容——防口径漂移/偷换）；
+// 已被更晚的同单元派发或 invalidate 取代 → 豁免（superseded）。
+
+function mulberry32(a) {
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function seededOrder(n, seed) {
+  const rnd = mulberry32(seed >>> 0);
+  const arr = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+export function c4SpotCheck(dir, events, seed = 0) {
+  const pool = [];
+  events.forEach((e, i) => {
+    if (e.ev !== "dispatch" || typeof e.detail !== "string") return;
+    try {
+      const c4 = JSON.parse(e.detail);
+      if (c4 && Array.isArray(c4.secs) && c4.secs.length) pool.push({ i, e, c4 });
+    } catch { /* 非 c4 detail（旧事件等）忽略 */ }
+  });
+  const k = Math.min(3, pool.length);
+  const picked = seededOrder(pool.length, seed).slice(0, k);
+  const fails = [];
+  const sampled = [];
+  for (const j of picked) {
+    const { i, e, c4 } = pool[j];
+    sampled.push(`${e.dim}#${e.nn}${e.sec ? `-${e.sec}` : ""}`);
+    const fname = `review-${e.dim}-chunk-${nn2(e.nn)}${e.sec ? `-${e.sec}` : ""}.md`;
+    const head = parseReportHead(safeRead(path.join(dir, "reviews", fname)) ?? "");
+    const superseded = events.some((e2, i2) => i2 > i && (
+      (e2.ev === "dispatch" && e2.dim === e.dim && e2.nn === e.nn && (e2.sec ?? null) === (e.sec ?? null))
+      || (e2.ev === "invalidate" && e2.nn === e.nn)
+    ));
+    const ok = e.sec != null || e.nn >= 901
+      ? head.sha === c4.secs[0].sha // delta 单节 / 探针：报告头 sha 即单元 sha
+      : head.sha === c4.sha && c4.secs.every((s) => head.secs[s.id] === s.sha) && head.secOrder.length === c4.secs.length; // 整 chunk：头三行 + 逐节表全等
+    if (!ok && !superseded) {
+      fails.push({
+        scope: e.nn >= 901 ? "global" : e.nn,
+        check: "c4",
+        message: `C4 抽核失配（样本 ${j + 1}/${pool.length}，seed ${seed}）：dispatch ${e.dim} chunk ${nn2(e.nn)}${e.sec ? ` 节 ${e.sec}` : ""} 的派发口径与报告 sha 表不一致——报告未 certify 所派发单元（口径漂移或偷换）`,
+      });
+    }
+  }
+  return { sampled, fails, poolSize: pool.length, seed };
+}
+
 // ---------- 主检 ----------
 
 export function runGate(dir, opts = {}) {
@@ -490,6 +552,10 @@ export function runGate(dir, opts = {}) {
     for (const f of probeCheck(dir, probeTruth)) push("global", "probe", f);
   }
 
+  // ---- 9.5 C4 抽核（S2②：随机抽 ≥3 份 dispatch 事件核对口径；--seed 可复现；结果落 events detail） ----
+  const c4spot = c4SpotCheck(dir, inv.events, opts.seed ?? 0);
+  for (const f of c4spot.fails) push(f.scope, f.check, f.message);
+
   // ---- 10. 新鲜度（WARN only；豁免 glob 精确到文件/目录） ----
   const mergedStat = fs.existsSync(path.join(dir, "merged-draft.md")) ? fs.statSync(path.join(dir, "merged-draft.md")).mtimeMs : null;
   if (mergedStat != null) {
@@ -547,6 +613,8 @@ export function runGate(dir, opts = {}) {
   const finalPassed = fails.length === 0;
   const eventsNote = { ev: "final-gate", passed: finalPassed, radius: finalPassed ? null : hasGlobal ? "global" : "scoped", failCount: fails.length };
   if (finalPassed) eventsNote.deliverableSha = fileSha(deliverablePath);
+  // S2②：C4 抽核结果落 events detail（seed/池/样本/结论——对账凭证，禁补记故随本次执行落）
+  eventsNote.detail = JSON.stringify({ c4spot: { seed: c4spot.seed, pool: c4spot.poolSize, sampled: c4spot.sampled, ok: c4spot.fails.length === 0 } });
   appendEvents(dir, eventsNote);
 
   // 连续 FAIL ≥3 → PENDING-USER（不无限空转）。计数 = 事件流末尾连续 fail 的 final-gate 段
@@ -566,7 +634,7 @@ export function runGate(dir, opts = {}) {
   }
 
   // ---- REPORT 定稿（PASS/FAIL 均落盘；终检报告自身在新鲜度豁免 glob 内） ----
-  const report = renderReport({ title, inv, total, fails, warns, finalPassed, delivered, deliverable, deliverablePath, briefTh, anchorSkipped, matrix, probeTruth, dir });
+  const report = renderReport({ title, inv, total, fails, warns, finalPassed, delivered, deliverable, deliverablePath, briefTh, anchorSkipped, matrix, probeTruth, dir, c4spot });
   fs.writeFileSync(path.join(dir, "REPORT.md"), report, "utf-8");
 
   const summary = finalPassed
@@ -589,7 +657,7 @@ export function runGate(dir, opts = {}) {
 
 // ---------- REPORT 渲染 ----------
 
-function renderReport({ title, inv, total, fails, warns, finalPassed, delivered, deliverable, deliverablePath, briefTh, anchorSkipped, matrix, probeTruth, dir }) {
+function renderReport({ title, inv, total, fails, warns, finalPassed, delivered, deliverable, deliverablePath, briefTh, anchorSkipped, matrix, probeTruth, dir, c4spot }) {
   const L = [];
   const scopedNn = [...new Set(fails.filter((f) => f.scope !== "global").map((f) => f.scope))].sort((a, b) => a - b);
   L.push(`# REPORT — ${title} 交付体检报告`);
@@ -622,6 +690,7 @@ function renderReport({ title, inv, total, fails, warns, finalPassed, delivered,
   } else {
     L.push("- 探针：**无 truth（FAIL 项）**");
   }
+  L.push(`- C4 抽核（S2②）：seed ${c4spot.seed}，样本 ${c4spot.sampled.length}/${c4spot.poolSize}${c4spot.sampled.length ? `（${c4spot.sampled.join("、")}）` : ""}——${c4spot.fails.length ? "**失配，见 FAIL 清单**" : "口径一致"}`);
   L.push("");
   const map = chapterMap(inv);
   if (map.length) {
@@ -663,6 +732,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--probe-truth") opts.probeTruth = argv[++i];
+    else if (a === "--seed") opts.seed = Number(argv[++i]);
     else if (a === "--json") opts.json = true;
     else if (a === "-h" || a === "--help") opts.help = true;
     else pos.push(a);
@@ -673,14 +743,15 @@ function parseArgs(argv) {
 const __help = `final-gate.mjs — xl-translator Step 10 终检与交付（交付门，M1c）
 
 用法:
-  node final-gate.mjs <workdir> [--probe-truth <truth.json>] [--json]
+  node final-gate.mjs <workdir> [--probe-truth <truth.json>] [--seed N] [--json]
 
 规则（重执行一切，不信任何落盘日志）:
   - 机械校验全项重跑（verify-mech 同源）+ 拼接 sha 复核 + merged 重导出 diff（merge 纯函数）
   - 完备性矩阵（裁定 + 4 维 × 逐节 fresh——节级锚，未变节豁免）；准确性维度缺失 = 无条件 FAIL
   - G3 括注对账双向相等（台账保留 ∪ R23 必兑现）；R23 精选表兑现硬判
   - 标题双语锚（fence 感知分母；brief 关闭时披露跳过）；G4 冷读覆盖矩阵 + pm-review 选样；
-    R15 pm-review merged-sha 锚不豁免；探针命中比对（每维度每 run ≥1）
+    R15 pm-review merged-sha 锚不豁免；探针命中比对（每维度每 run ≥1）；
+    C4 抽核：随机抽 ≥3 份 dispatch 事件核对派发口径 × 报告 sha 表（--seed N 可复现，结果落 events detail）
   - 新鲜度 mtime 仅 WARN（豁免 glob：status.md / verify-results.json / staging/ / pm-review /
     REPORT.md / events.jsonl / pending.md）
   - PASS → 原子改名 translated-<title>-zh.md + REPORT 定稿（交付物 sha 内容锚）；

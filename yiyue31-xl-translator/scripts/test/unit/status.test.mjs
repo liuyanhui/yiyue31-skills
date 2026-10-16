@@ -231,12 +231,71 @@ test("译文变更 → 仅变化节（s2）4 维 stale、未变节豁免不级�
     assert.deepEqual(c1.staleSections.s2.sort(), [...DIMS].sort(), "s2 节 4 维全 stale");
     assert.equal(c1.reviewDone, DIMS.length * 2, "未变节 s1/s3 各维仍 fresh（4 维 × 2 节）");
     assert.ok(r.state.handoffStale.includes(2), "N+1（chunk 2）handoff 失效标记");
-    // 队列（① 阶段契约）：4 维整 chunk 重审单元；② 起改为 s2 delta 单节（delta 专属用例另测）
+    // 队列（S2②）：4 维 × 变化节 s2 = delta 单节单元（变化节 × 4 维差集）
     assert.equal(r.queue.q.length, 4);
-    assert.ok(r.queue.q.every((u) => u.sec === null && u.dim && u.nn === 1));
+    assert.ok(r.queue.q.every((u) => u.sec === "s2" && u.kind === "real" && u.nn === 1), "delta 单元 = 变化节 s2");
     // 节 sha 可从 state 直接取（供派发指令随附）
     assert.equal(c1.sections.length, 3);
     for (const s of c1.sections) assert.match(s.sha, /^[0-9a-f]{12}$/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2② delta 全链路：队列=变化节×4 维；staging 物化节文本；dispatch 事件携 c4 detail；delta 报告落位 → fresh → done", () => {
+  const dir = makeWorkdir();
+  try {
+    pushThroughVerify(dir, 1);
+    pushThroughVerify(dir, 2);
+    writeReviews(dir, 1);
+    writeReviews(dir, 2);
+    // 改节 2 + 机械校验重过
+    const tp = path.join(dir, "translated-chunks", "translated-chunk-01.md");
+    const neu = fs.readFileSync(tp, "utf-8").replace("段二：数字 42", "段二：数字 42（修复表述）");
+    fs.writeFileSync(tp, neu, "utf-8");
+    const vr = JSON.parse(fs.readFileSync(path.join(dir, "verify-results.json"), "utf-8"));
+    vr.results.find((x) => x.nn === 1).translationSha = sha12Of(tp);
+    fs.writeFileSync(path.join(dir, "verify-results.json"), JSON.stringify(vr), "utf-8");
+
+    // 派发（C3 dispatch 动词）→ delta 单元物化
+    const r = run(dir, { verb: "dispatch" });
+    assert.equal(r.queue.q.length, 4, "变化节 s2 × 4 维");
+    const staging = fs.readdirSync(path.join(dir, "staging"));
+    assert.equal(staging.length, 4);
+    const secs = sectionSlices(neu);
+    const s2 = secs.find((s) => s.id === "s2");
+    const bodies = staging.map((f) => fs.readFileSync(path.join(dir, "staging", f), "utf-8"));
+    assert.ok(bodies.every((b) => b === s2.text), "staging 物化 = 节 s2 文本（被审单元恰为该节）");
+    // 派发清单 c4 行（机械可验三件 + grep 提示）
+    for (const d of r.queue.dispatch) {
+      assert.equal(d.c4.lines, s2.text.split("\n").length, "c4 行数自内容派生");
+      assert.equal(d.c4.secs.length, 1);
+      assert.equal(d.c4.secs[0].sha, s2.sha, "c4 节 sha = 当前节 sha");
+      assert.match(d.output, /reviews\/review-[\w-]+-chunk-01-s2\.md$/, "输出名 = delta 单节报告位");
+    }
+    const md = fs.readFileSync(path.join(dir, "status.md"), "utf-8");
+    assert.ok(md.includes("c4: 共") && md.includes('grep -n "^#"'), "status.md 派发清单渲染 c4 行");
+    // dispatch 事件携带 c4 detail（final-gate 抽核对象）
+    const dispatches = scanWorkdir(dir).events.filter((e) => e.ev === "dispatch");
+    assert.equal(dispatches.length, 4);
+    for (const e of dispatches) {
+      assert.equal(e.sec, "s2");
+      const c4 = JSON.parse(e.detail);
+      assert.equal(c4.sha, s2.sha, "事件 detail 与物化内容同源");
+      assert.deepEqual(c4.range, [s2.title, s2.title]);
+    }
+    // 审校者按 delta 契约回报告（头三行，sha=节 sha）→ 该节 fresh → chunk done
+    for (const dim of DIMS) {
+      fs.writeFileSync(
+        path.join(dir, "reviews", `review-${dim}-chunk-01-s2.md`),
+        `sha: ${s2.sha}\nmodel: test\ntime: 2026-10-16T00:00:00Z\n结论：${dim} delta 补审通过（01-s2-${dim} 专属观察行）。\n`,
+        "utf-8"
+      );
+    }
+    const r2 = run(dir, {});
+    assert.equal(r2.state.chunks[0].stage, "done", "delta 报告落位 → s2 fresh（whole 报告仍证 s1/s3）→ done");
+    assert.equal(r2.state.chunks[0].reviewDone, DIMS.length * secs.length);
+    assert.equal(r2.queue.q.length, 0, "无残余队列");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

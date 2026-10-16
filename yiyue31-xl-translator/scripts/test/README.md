@@ -146,6 +146,7 @@ SKILL.md Step 10 只保留指针与运行时纪律（半径分级/PENDING-USER/�
 | F10 | R15 pm-review 头部 merged-sha 锚不豁免 | 旧稿结论携入 | "R15" 用例 |
 | F11 | 探针命中（truth 比对源侧；每维度每 run ≥1；缺报告/未命中 = FAIL） | 审校有效性无证据 | "探针" 用例 |
 | F12 | 报告头三行机器解析（`sha:/model:/time:`(+`sec:` 表)——status.mjs `parseReportHead` 同源） | 头部契约漂移 | status 用例（S2② 头三行解析） |
+| F13 | C4 抽核（S2②）：dispatch 事件 `detail` 携带的 c4 口径 × 当前报告 sha 表一致（或被更晚同单元派发/invalidate 取代）；随机抽 ≥3、`--seed N` 同 seed 同抽样；结果落 events detail | 口径漂移/偷换单元/报告未 certify 所派发内容 | final-gate 用例（S2② C4 抽核） |
 
 ## 维护规约
 

@@ -129,6 +129,20 @@ export function sectionSlices(text) {
   });
 }
 
+// C4 派发口径（S2② 机械归属拆分）：行数/起止标题/节名枚举/sha 全部从物化单元内容派生——
+// status.mjs 自动生成进派发清单与 events detail（防造假红线：报告锚由脚本从内容派生，
+// 禁止人工拼接）；第四项 grep 节序核对留 agent 派发前自觉 + final-gate 随机抽核兜底。
+export function c4Facts(body, file = null) {
+  const secs = sectionSlices(body);
+  return {
+    file,
+    lines: String(body ?? "").split("\n").length,
+    range: secs.length ? [secs[0].title, secs[secs.length - 1].title] : [null, null],
+    secs: secs.map((s) => ({ id: s.id, sha: s.sha, title: s.title })),
+    sha: sha12(body),
+  };
+}
+
 // 报告头契约（S2① 冻结；status/final-gate 同源解析）：
 //   sha: <被审单元整体 sha1 前 12>（首审=整 chunk 译文；delta 单节=该节文本；探针=样本文本）
 //   model: <模型 id>
@@ -382,19 +396,20 @@ export function buildQueue(state, inv, opts = {}) {
     const step = c.stage === "translate" ? "translate" : c.stage === "adjudicate" ? "adjudicate" : "verify";
     return { q, action: { step, inputs: [`chunks/${c.name}`, "brief.md"], outputs: [step === "translate" ? `translated-chunks/translated-chunk-${String(c.nn).padStart(2, "0")}.md` : step === "adjudicate" ? `adjudications/adjudication-chunk-${String(c.nn).padStart(2, "0")}.md` : "verify-results.json"] } };
   }
-  // review / re-review（S2①：节级锚判定；S2② 起 stale 维度派 delta 单节单元）：
-  // 首审缺席（无 whole 报告）→ 整 chunk 单元；有 whole 报告但存在不 fresh 节 → 该维度重审。
+  // review / re-review（S2① 节级锚 + S2② delta 队列 = 变化节 × 4 维差集）：
+  // 首审缺席（该维无 whole 报告）→ 整 chunk 单元（首审全量四维、整 chunk 粒度——§8 选型）；
+  // 首审在但存在不 fresh 节 → 仅该维的变化节 delta 单节单元（未变节豁免）。
   for (const dim of DIMS) {
     const slot = inv.reviews[c.nn]?.[dim];
     if (!slot?.whole) {
       q.push({ dim, nn: c.nn, sec: null, kind: "real" });
       continue;
     }
-    const needs = c.sections.some((sec) => {
+    for (const sec of c.sections) {
       const secRep = slot.secs?.[sec.id] ?? null;
-      return slot.whole.secs?.[sec.id] !== sec.sha && secRep?.sha !== sec.sha;
-    });
-    if (needs) q.push({ dim, nn: c.nn, sec: null, kind: "real" });
+      if (slot.whole.secs?.[sec.id] === sec.sha || secRep?.sha === sec.sha) continue;
+      q.push({ dim, nn: c.nn, sec: sec.id, kind: "real" });
+    }
   }
   // 探针注入（源侧 truth 存在时）：混排在真单元之后，命名同构；text 随行携带（M1c 起
   // probe.mjs 生成的真实样本文本经 staging 物化派发，缺陷只存源侧 truth）
@@ -412,7 +427,8 @@ export function buildQueue(state, inv, opts = {}) {
   return { q, action: null };
 }
 
-// 统一物化：清空 staging/ 后把队列全部单元写成同构暂存件；返回派发清单（不区分真假）
+// 统一物化：清空 staging/ 后把队列全部单元写成同构暂存件；返回派发清单（不区分真假）。
+// 每单元附 c4 口径（S2②：行数/起止/节枚举由脚本从物化内容派生，随清单渲染、随事件落 detail）。
 export function materialize(dir, q) {
   const sdir = path.join(dir, "staging");
   fs.rmSync(sdir, { recursive: true, force: true });
@@ -421,13 +437,15 @@ export function materialize(dir, q) {
   q.forEach((u, i) => {
     const seq = String(i + 1).padStart(3, "0");
     const name = `review-${u.dim}-unit-${seq}.md`;
+    const rel = `staging/${name}`;
     const body = u.kind === "real"
       ? unitText(dir, u.nn, u.sec)
       : u.text ?? "__PROBE_BODY__"; // 探针样本文本来自源侧 truth（probe.mjs 生成）；缺 text 的旧 truth 退占位
     fs.writeFileSync(path.join(sdir, name), body ?? "", "utf-8");
     dispatch.push({
-      input: `staging/${name}`,
+      input: rel,
       output: `reviews/review-${u.dim}-chunk-${String(u.nn).padStart(2, "0")}${u.sec ? `-${u.sec}` : ""}.md`,
+      c4: c4Facts(body ?? "", rel),
     });
   });
   return dispatch;
@@ -507,6 +525,8 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
     for (const d of queue.dispatch) {
       L.push(`- in: ${d.input}`);
       L.push(`  out: ${d.output}`);
+      const secs = d.c4.secs.map((s) => `${s.id} ${s.title}(${s.sha})`).join("、");
+      L.push(`  c4: 共 ${d.c4.lines} 行｜起止：${d.c4.range[0]} → ${d.c4.range[1]}｜节：${secs}｜派发前核对：grep -n "^#" ${d.input} 节序与上列一致`);
     }
     L.push("```");
   } else {
@@ -626,7 +646,14 @@ export function run(dir, opts = {}) {
   const wantDispatch = opts.verb === "dispatch";
   if (wantDispatch && queue.q.length && !inv.pending && !overBudget) {
     queue.dispatch = materialize(dir, queue.q);
-    appendEvents(dir, queue.q.map((u) => ({ ev: "dispatch", nn: u.nn, dim: u.dim, sec: u.sec ?? null })));
+    // S2②：dispatch 事件携带 c4 detail（JSON——final-gate 抽核对象；events 禁补记，只在物化时落）
+    appendEvents(dir, queue.q.map((u, i) => ({
+      ev: "dispatch",
+      nn: u.nn,
+      dim: u.dim,
+      sec: u.sec ?? null,
+      detail: JSON.stringify(queue.dispatch[i].c4),
+    })));
   }
   const text = renderStatus(dir, inv, state, queue, opts);
   fs.writeFileSync(path.join(dir, STATUS), text, "utf-8");

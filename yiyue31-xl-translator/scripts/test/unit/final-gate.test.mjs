@@ -28,7 +28,7 @@ import { spawnSync } from "node:child_process";
 import { runMerge } from "../../merge.mjs";
 import { runDerive } from "../../derive-bilingual.mjs";
 import { generate } from "../../probe.mjs";
-import { sectionSlices } from "../../status.mjs";
+import { sectionSlices, appendEvents } from "../../status.mjs";
 import {
   runGate,
   parseLedger,
@@ -264,6 +264,23 @@ function greenDir() {
   );
 
   return { dir, truthFile, truth, mergedSha, trans, names };
+}
+
+// ---------- S2② C4 抽核辅助：合成带 c4 detail 的 dispatch 事件（与 status.mjs 派发同构） ----------
+
+function c4DetailOf(text) {
+  const secs = sectionSlices(text);
+  return JSON.stringify({
+    file: "staging/review-x-unit-001.md",
+    lines: text.split("\n").length,
+    range: [secs[0].title, secs[secs.length - 1].title],
+    secs: secs.map(({ id, sha, title }) => ({ id, sha, title })),
+    sha: sha12(text),
+  });
+}
+
+function gateEvents(dir) {
+  return fs.readFileSync(path.join(dir, "events.jsonl"), "utf-8").trim().split("\n").map((l) => JSON.parse(l));
 }
 
 // ---------- PASS 主路径 ----------
@@ -733,6 +750,83 @@ test("探针：缺 truth 文件 / 缺报告 / 报告未命中 → global FAIL", 
   } finally {
     fs.rmSync(c.truthFile, { force: true });
     fs.rmSync(c.dir, { recursive: true, force: true });
+  }
+});
+
+// ---------- S2② C4 抽核 ----------
+
+test("S2② C4 抽核：--seed 同 seed 同抽样（硬验收）；结果落 events detail；口径全一致不产 FAIL", () => {
+  const { dir, truthFile, trans } = greenDir();
+  try {
+    // 12 条 dispatch 事件（3 chunk × 4 维，c4 detail 与报告一致）
+    for (const n of [1, 2, 3]) for (const dim of DIMS) appendEvents(dir, { ev: "dispatch", nn: n, dim, sec: null, detail: c4DetailOf(trans[n]) });
+    let r = runGate(dir, { probeTruth: truthFile, seed: 7 });
+    assert.equal(r.exitCode, 0, JSON.stringify(r.fails.map((f) => f.message)));
+    r = runGate(dir, { probeTruth: truthFile, seed: 7 }); // 幂等重入亦 PASS
+    assert.equal(r.exitCode, 0, JSON.stringify(r.fails.map((f) => f.message)));
+    const fg = gateEvents(dir).filter((e) => e.ev === "final-gate");
+    assert.equal(fg.length, 2, "两次执行两事件");
+    const d1 = JSON.parse(fg[0].detail).c4spot;
+    const d2 = JSON.parse(fg[1].detail).c4spot;
+    assert.deepEqual(d1.sampled, d2.sampled, "同 seed 必同抽样");
+    assert.equal(d1.seed, 7);
+    assert.equal(d1.pool, 12);
+    assert.equal(d1.sampled.length, 3, "随机抽 ≥3");
+    assert.equal(d1.ok, true, "口径一致无 FAIL");
+    assert.ok(d1.sampled.every((s) => /^[\w-]+#\d+(-s\d+)?$/.test(s)), "样本标签可读（dim#nn[-sK]）");
+    // 不同 seed → 抽样改变（确定性洗牌下两 seed 前 3 序列不同）
+    runGate(dir, { probeTruth: truthFile, seed: 8 });
+    const d3 = JSON.parse(gateEvents(dir).filter((e) => e.ev === "final-gate").at(-1).detail).c4spot;
+    assert.equal(d3.seed, 8);
+    assert.notDeepEqual(d3.sampled, d1.sampled, "不同 seed 应得不同抽样");
+    // REPORT 披露抽核行
+    const report = fs.readFileSync(path.join(dir, "REPORT.md"), "utf-8");
+    assert.ok(report.includes("C4 抽核") && report.includes("口径一致"), "REPORT 含抽核结论");
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2② C4 抽核：报告 sha 表与派发口径失配 → c4 FAIL（scoped，exit 3）", () => {
+  const { dir, truthFile, trans } = greenDir();
+  try {
+    // 池恰 3 条（全抽必中）：readability chunk03 的报告 sec 表事后被改 → 与派发口径失配
+    appendEvents(dir, { ev: "dispatch", nn: 1, dim: "accuracy", sec: null, detail: c4DetailOf(trans[1]) });
+    appendEvents(dir, { ev: "dispatch", nn: 2, dim: "translationese", sec: null, detail: c4DetailOf(trans[2]) });
+    appendEvents(dir, { ev: "dispatch", nn: 3, dim: "readability", sec: null, detail: c4DetailOf(trans[3]) });
+    const p = path.join(dir, "reviews", "review-readability-chunk-03.md");
+    fs.writeFileSync(p, fs.readFileSync(p, "utf-8").replace(/^sec: s1 [0-9a-f]{12}/m, "sec: s1 000000000000"), "utf-8");
+    const r = runGate(dir, { probeTruth: truthFile });
+    assert.equal(r.exitCode, 3);
+    const c4 = r.fails.find((f) => f.check === "c4");
+    assert.ok(c4, "须有 c4 FAIL：" + JSON.stringify(r.fails.map((f) => f.check)));
+    assert.equal(c4.scope, 3, "半径归属该 chunk");
+    assert.ok(c4.message.includes("readability"), "指认单元");
+    assert.ok(JSON.parse(gateEvents(dir).filter((e) => e.ev === "final-gate").at(-1).detail).c4spot.ok === false, "events detail 记失配");
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2② C4 抽核：旧派发已被更晚 invalidate 取代（superseded）→ 豁免不 FAIL", () => {
+  const { dir, truthFile, trans } = greenDir();
+  try {
+    // 池 3 条（全抽）：accuracy chunk01 为旧口径（伪旧表）；随后 invalidate chunk01 → superseded
+    const stale = JSON.stringify({ file: "staging/review-accuracy-unit-001.md", lines: 9, range: ["旧标题", "旧标题"], secs: [{ id: "s1", sha: "000000000000", title: "旧标题" }], sha: "000000000000" });
+    appendEvents(dir, { ev: "dispatch", nn: 1, dim: "accuracy", sec: null, detail: stale });
+    appendEvents(dir, { ev: "dispatch", nn: 1, dim: "translationese", sec: null, detail: c4DetailOf(trans[1]) });
+    appendEvents(dir, { ev: "dispatch", nn: 1, dim: "readability", sec: null, detail: c4DetailOf(trans[1]) });
+    appendEvents(dir, { ev: "invalidate", nn: 1, detail: "重翻（测试）" });
+    const r = runGate(dir, { probeTruth: truthFile });
+    assert.equal(r.exitCode, 0, JSON.stringify(r.fails.map((f) => [f.check, f.message])));
+    assert.ok(!r.fails.some((f) => f.check === "c4"), "superseded 旧口径豁免");
+    const d = JSON.parse(gateEvents(dir).filter((e) => e.ev === "final-gate").at(-1).detail).c4spot;
+    assert.ok(d.sampled.includes("accuracy#1"), "旧口径单元确被抽中（豁免非漏抽）");
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

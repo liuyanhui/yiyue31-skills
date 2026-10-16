@@ -70,11 +70,7 @@ author: Yiyue31
 ### Step 6 审校 `[subagent]` 串行
 - **四维独立、全覆盖、不合并、不抽样**：准确性 / 翻译腔 / AI 味 / 可读性——prompt 分别为 `{skill-dir}/references/evaluate-accuracy.md`、`evaluate-translationese.md`、`evaluate-ai-tone.md`、`evaluate-readability.md`；可读性维度**每 4 chunk 加文风对漂抽查**（派发消息注明触发）。
 - **送审单元（节级锚）**：首审 = **整 chunk × 4 维**一次送审（§8 选型）；修复后仅 **sha 变化节 × 4 维 delta 补审**（只审变化节 + 邻节只读语境）；单元经 `staging/` 统一物化同构派发；**派发附该 chunk 原文全文作只读对照**（逐项核对依据；探针单元无原文，正常）；分节报告 + 每节独立结论。
-- **C4 派发口径模板**：审校派发提示词**必须**包含以下四项，缺一即口径事故风险：
-  1. **staging 总行数**（如"该 staging 文件全部 91 行"）
-  2. **起止标题**（首行标题名 + 终点标题名或"至块末"）
-  3. **所含节名枚举**（逐节列出，如"含 CI/CD 节全部/维护章/闭环引言与如何起步"）
-  4. **派发前核对**：grep staging 文件标题树（`grep -n "^#" staging/<file>`），确认口径描述与实际标题序列一致后才派发
+- **C4 派发口径**（机械归属拆分，S2②）：staging 总行数/起止标题/节名枚举由 `status.mjs` 派发清单自动派生（`c4:` 行，随派发指令附给审校者——报告 sha 表逐字照抄）；agent 派发前自觉 `grep -n "^#" staging/<file>` 核对节序一致；终检随机抽核 ≥3 份兜底（`--seed N` 可复现，结果落 events）。
 - 输入含 **per-chunk glossary 投影** + brief + **文风基准卡全文 + anchor 节选**（判卷口径 = 对照文风卡判偏离，四维均附）+ 翻译腔维度另附**已裁定保留术语聚合视图**（括注 (a) 类首现口径）；**报告头三行 `sha:/model:/time:`，整 chunk 首审另附逐节 sha 表（`sec:` 行）**——由 `status.mjs` 自译文内容派生（`state.chunks[].sections`），随派发指令附给审校者**逐字照抄、禁手算**（机器解析契约）；undersize/模板签名阈值随单元大小缩放；异模型尽量，环境不可控时 REPORT 披露。
 - 关卡：四维报告齐备且非 stale。
 
