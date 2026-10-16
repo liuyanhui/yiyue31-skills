@@ -11,6 +11,7 @@ scripts/test/
 ├── unit/                           # 单元层：程序化合成夹具（确定性，不落盘），钉死算法行为
 │   ├── segment.test.mjs            #   分段算法：fence 感知/拼接 sha/落带/R11-B/产物/CLI
 │   ├── status.test.mjs             #   状态机（M1b+S2③④⑤）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账
+│   ├── import-draft.test.mjs       #   draft 导入（S2⑥）：版本戳拒旧格式/§7 边界执行/events 归档新建禁补记/幂等/探针小文档全流程
 │   ├── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
 │   ├── merge.test.mjs              #   合并（M1c）：M1-M7 纯函数与病态输入、CLI 冒烟
 │   ├── derive-bilingual.test.mjs   #   双语派生（Phase 1）：B1-B8 纯函数与病态输入、CLI 冒烟
@@ -170,6 +171,18 @@ SKILL.md Step 10 只保留指针与运行时纪律（半径分级/PENDING-USER/�
 | E5 | §9 mtime 对账兜底：脚本同进程成对产物（merged-draft / verify-results / staging / 交付物 / 双语版）mtime > events 末事件时间戳 → WARN（人话 + `--json` state.warnings 同源）；只 WARN 不阻塞；对齐后不 WARN | 有活动未落流的断档（①7；§9 REPORT 声明基准兜底） | "§9 mtime 对账…" |
 
 E5 审计集口径：agent 步调产物（reviews/adjudications/translated-chunks/chunks/manifest——事件配对跨步延迟，中间态晚于末事件属正常）与按设计晚于事件的视图/旗标件（status.md/pending.md/REPORT.md）不入集，防常态误报；末事件时间戳取实读文件尾（本次 run 已追加事件计入，防自误报），1s 容差吸收文件系统时间戳粒度。
+
+## draft-import 判据（S2⑥ 最小实现）
+
+**判据权威登记于此**——改判据 = 改 `import-draft.mjs` + 本表 + 对应用例，三处同步。边界清单权威 = 提案 §7（受/拒/隔离/重建逐产物；缺省 = 未列产物默认隔离 WARN 不导入）；真实目录迁移（P1 实跑）不属 S2⑥——本批只交付机制+用例。防造假红线：events **禁补记**——旧流整体归档不迁移，新流自零新建（首事件 = `import`）。
+
+| # | 判据 | 防什么 | 钉死用例（unit/import-draft.test.mjs） |
+|---|------|--------|----------------------------------|
+| D1 | 版本戳：status.md 头 `schema:` 行（`SCHEMA_VERSION` 与 renderStatus/parseStatusSchema 同源）；导入源 status.md 无戳（旧格式）或版本不识 → **非零拒收且零副作用** | 旧状态混入（"delivered" 系误报——§7 status.md 行；跨版本迁移属 S4①） | "D1 旧格式 status.md…"、"D1 version 在场…" |
+| D2 | §7 边界数据驱动执行（`classifyEntry` 首匹配）：受类原样保留；拒类 sibling 归档 `-r1`（reviews→reviews-r1/、events.jsonl→events-r1.jsonl、verify-results→-r1.json）；隔离类 + 未列缺省入 `quarantine/`（缺省附 WARN）；staging 清空 | 半块锚/混存证据伪装可迁移（§7 拒类理由）；来历不明件静默混入 | "D2-D4 边界执行…" |
+| D3 | events 禁补记：旧流归档逐字节保留不迁移；新流自零新建（首事件 = import，携对账明细）；幂等重入（首事件=import → 跳过移动不追加） | 凭空续写历史事件（防造假红线）；重复导入重复归档 | "D2-D4…"、"D3 幂等…" |
+| D4 | verify-results 强制重跑：归档 ⇒ 全部 chunk 推回 verify 阶段（status 派发口径强制重跑） | 混存 verify 结果被继承（§7：混存不可信，重跑 S4④ 分档前口径） | "D2-D4 边界执行…"（stage=verify 断言） |
+| D5 | 探针小文档全流程：导入 → status 可派发 → verify 重跑 → dispatch（真+探针同构物化）→ 伪审校报告落位 → truth 命中（正反）→ 状态机推进至 **ready-merge**（覆盖深度止于此；merge 后归既有 merge/final-gate 用例域） | 机制各自为绿、链路断点 | "D5 探针小文档全流程…" |
 
 ## 维护规约
 

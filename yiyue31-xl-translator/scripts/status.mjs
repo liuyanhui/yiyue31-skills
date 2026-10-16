@@ -46,6 +46,9 @@ const FIX_ROUND_MAX = 3; // S2③ 修复环轮上限（Step 7 每 chunk；超限
 // 窗内 pm-review 类发现只登记不修（SKILL.md Step 8）；用户点名修复的 delta 补审在本窗内派发计数。
 const FREEZE_STAGES = ["cold-read", "pm-review", "final-gate"];
 const FREEZE_ROUND_MAX = 2; // 冻结窗补审轮项目级硬门（超限 → dispatch 非零退出 + pending.md 上报）
+// S2⑥ state schema 版本戳：status.md 头部 `schema:` 行（物化视图自述版本）——import-draft
+// 拒收无戳旧格式（旧状态不可信，"delivered" 系误报；跨版本迁移语义属 S4①）。
+export const SCHEMA_VERSION = 1;
 
 // ---------- 基础工具 ----------
 
@@ -241,6 +244,13 @@ export function parseReportHead(text) {
   if (head.model == null) head.malformed.push("缺 model: 行");
   if (head.time == null) head.malformed.push("缺 time: 行");
   return head;
+}
+
+// S2⑥ status.md 头版本戳解析：`> schema: <n>` 行 → n；无戳/不可解析 → null（旧格式）。
+// import-draft 以此拒收旧格式（非零退出）；renderStatus 渲染恒带当前版本。
+export function parseStatusSchema(text) {
+  const m = String(text ?? "").match(/^>\s*schema:\s*(\d+)\b/m);
+  return m ? Number(m[1]) : null;
 }
 
 // ---------- 工作目录扫描 ----------
@@ -689,6 +699,7 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
   const L = [];
   L.push(`# status — ${state.title}（唯一续跑文档）`);
   L.push("");
+  L.push(`> schema: ${SCHEMA_VERSION}（state 版本戳——import-draft 据此拒收无戳旧格式，S2⑥）`);
   L.push(`> 推导锚：原文 sha1 ${state.originalSha}｜产物指纹 ${fp}｜推导时间 ${nowIso()}｜本文件为物化视图，可随时删除重建`);
   if (inv.verifyThresholds) L.push(`> 阈值披露（R22）：${JSON.stringify(inv.verifyThresholds)}`);
   L.push("");
@@ -931,7 +942,8 @@ const __help = `status.mjs — xl-translator 状态机与续跑（M1b）
   fix（S2④：--nn N [--dims accuracy,translationese,ai-tone,readability]——物化 fixer 包
        staging/fixer-chunk-NN.md + fix 事件；修复环轮每 chunk ≤${FIX_ROUND_MAX}，超限停该 chunk 登 residue）
 
-产物: status.md（唯一续跑文档，整体重写）+ staging/（统一物化，每轮先清后写）+ events.jsonl（追加）
+产物: status.md（唯一续跑文档，整体重写；头带 schema: 版本戳——S2⑥，import-draft 拒收无戳旧格式）
+       + staging/（统一物化，每轮先清后写）+ events.jsonl（追加）
 
 退出码: 0 正常 / 1 用法或动词错 / 2 工作目录异常 / 3 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 / S2④ 修复环轮 >3）`;
 
