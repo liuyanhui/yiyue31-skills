@@ -18,7 +18,7 @@ author: Yiyue31
 ## Directory
 
 - `{skill-dir}` = 本 SKILL.md 所在目录；`{translator-skill-dir}` = 兄弟 skill 目录 `../yiyue31-translator`（Step 0 自动交接用，读不到时按既定退化路径处理）。引用文件封闭集（引用格式 `{skill-dir}/references/<file>`、`{skill-dir}/scripts/<file>`）：
-  - **references/（9）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md。（terms.md 系运行时用户态：首次从 translator 一次性拷贝种子至工作目录，非本目录资产。）
+  - **references/（10）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md、unify.md。（terms.md 系运行时用户态：首次从 translator 一次性拷贝种子至工作目录，非本目录资产。）
   - **scripts/（10，运行时封闭集）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、derive-bilingual.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs。另有 `test/`（开发期测试资产，判据契约登记于其 README——SKILL 正文所指"判据契约见 scripts/test/README.md"即此，不计入运行时封闭集）。
 - 工作目录 `xl-translator/<title>/`（refined-stock 仓库根下）；文件命名遵循下方命名三条红线，status/final-gate 按脚本内建 glob 工作。
 - 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生——PASS 前全目录不得命中任何发布模式；`translated-<title>-bilingual.md` 为 PASS 后机械派生的**只读视图**（非交付物、不经终检、sha 不锚、不受手修保护、幂等可重生成，命名永不以 `-zh.md` 结尾）。
@@ -81,9 +81,9 @@ author: Yiyue31
 - **升级计数器三条款**：升级后该 chunk 重试计数器清零；每轮修复循环中升级至多一次；**累计升级 ≥2 次（跨轮，不随清零重置）→ 直接转 PENDING-USER**。
 
 ### Step 8 合并与统稿 `[脚本+subagent×1]`
-- merge **只由 `merge.mjs` 执行**（判据契约见 `scripts/test/README.md`）→ 临时名 `merged-draft.md` 落盘；final-gate 重导出复用其纯函数。
-- 统稿三段式：`consistency.mjs` 清单全量扫描（术语/密度离群/标题译法/间距/接缝/文风遵从）→ 决策 subagent 只读清单下结论 → 机械应用 → 受影响 chunk 重跑 Step 5。
-- 变更分类 stale 规则：**修复类**=相关维度报告 stale 重审；**统稿替换类**=逐条 diff 清单落盘 + consistency 重扫代替四维重审（REPORT 披露）；句式级改写仍走四维重审。统稿轮 ≤2，超限转 PENDING-USER。
+- merge **只由 `merge.mjs` 执行**（判据契约见 `scripts/test/README.md`）→ 临时名 `merged-draft.md` 落盘；final-gate 重导出复用其纯函数。**统稿先于终轮**（次序冻结：终轮冷读/PM 通读读到的是统稿后的稳定稿）。
+- 统稿三段式与变更 stale 分类（修复类/统稿替换类/句式级改写）细则见 `{skill-dir}/references/unify.md`；统稿轮 ≤2（冷读定点修计入，单套），超限转 PENDING-USER。
+- **内容冻结窗（S2③）**：统稿完成后（冷读/PM 通读/终检阶段）内容冻结——pm-review 类发现**只登记不修**（落 analysis-notes / residue），**用户点名才修**；点名修复走 Step 7 fixer 闭环，其 delta 补审由 `status.mjs` 派发计数，**冻结窗补审轮项目级 ≤2 硬门：超限 dispatch 非零退出 + 写 pending.md 上报**（双计数器：与修复环轮分开计数，不挤占）。
 
 ### Step 9 全稿通读与验收准备 `[subagent×1-2 + 主]`（终检之前）
 - 终稿**冷读者** subagent ×1-2：prompt = `{skill-dir}/references/cold-reader.md`——全稿通读，以读者身份对照**文风基准卡**找文风断裂、明显错误、跨章不一致；>30KB 分段接力（段间重叠 ~2KB + 递进式发现台账 + 收尾专读全部接缝与各 chunk 首末段；**派发附 chunk 定位表**——各 chunk 起始标题，接缝定位用；接力段只回传分段发现，主 agent 合并后整体落盘台账）；**>100KB 强制 ≥2 名独立通读、发现取并集（分歧逐条标注来源，不加第三读者）**。台账覆盖行格式冻结：`- chunk <NN>: sha <12hex>`（终检逐 chunk 对账）。
@@ -102,6 +102,7 @@ author: Yiyue31
 
 - **状态命令 = resume oracle**（`status.mjs`）：冷启动入口；同文件再触发自动检测进行中并续跑；**输出双段契约**——人话一行 + 动作指令。**C3 view/dispatch 拆分**：无动词或动词=`progress` 默认**只读渲染**（零副作用——不物化 staging、不追加事件）；动词=`dispatch` 时才物化 + 追加事件——"运行一次 = 派发一轮承诺"不再是默认行为。状态纯推导自文件系统，**唯一续跑文档 `status.md`**。
 - **节级锚与 delta 队列生于脚本**：审校锚 = 逐节 sha 表（`sectionSlices`——与分段同款 fence 感知节边界；status/final-gate/verify-mech 三脚本同源派生）；修复后重审队列 = 变化节 × 4 维差集。报告锚一律脚本从内容派生，**禁止人工拼接**；夹具钉死（`scripts/test/README.md` 判据契约）。
+- **决策落盘纪律（S2③）**：审校建议/统稿清单/历史参考的**采纳或不采纳当场落 analysis-notes**（逐条一句理由）——禁口头决策、禁事后补记。
 - **D1 环境处置模板**：API 限流/流停滞的编排侧处置：
   - 429 `[1302]`（突发限流）→ 等在途单元回传一个后原样补派（并发已降即自愈）
   - 429 `[1308]`（五小时配额上限）→ **定时等窗续跑**（cron 定在重置时刻后 ~5min；不空转重试）

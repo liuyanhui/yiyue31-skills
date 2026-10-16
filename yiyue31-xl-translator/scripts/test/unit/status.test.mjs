@@ -534,3 +534,103 @@ test("S2① 验收：3 节文档改节 2 → status.mjs --json 仅节 s2 stale�
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------- S2③ 内容冻结窗 + 双计数器 ----------
+
+// 冻结窗夹具：全 chunk done + 统稿完成（consistency 落盘）+ 冷读产物在 → global=cold-read（窗开启）
+function pushToFreeze(dir) {
+  for (const c of scanWorkdir(dir).chunks) {
+    pushThroughVerify(dir, c.nn);
+    writeReviews(dir, c.nn);
+  }
+  fs.writeFileSync(path.join(dir, "merged-draft.md"), "# merged\n", "utf-8");
+  fs.writeFileSync(path.join(dir, "consistency-testdoc.md"), "# 统稿清单\n", "utf-8");
+  fs.writeFileSync(path.join(dir, "cold-read-testdoc.md"), "# 冷读台账\n", "utf-8");
+}
+
+// 冻结窗内"用户点名修复"：改节 2 + 机械校验按新 sha 重过（同 stale 夹具手法）
+function freezeFix(dir) {
+  const tp = path.join(dir, "translated-chunks", "translated-chunk-01.md");
+  fs.writeFileSync(tp, fs.readFileSync(tp, "utf-8").replace("段二：数字 42", "段二：数字 42（点名修复）"), "utf-8");
+  const vr = JSON.parse(fs.readFileSync(path.join(dir, "verify-results.json"), "utf-8"));
+  vr.results.find((x) => x.nn === 1).translationSha = sha12Of(tp);
+  fs.writeFileSync(path.join(dir, "verify-results.json"), JSON.stringify(vr), "utf-8");
+}
+
+test("S2③ 冻结窗复欠队列：窗内修复 → 变化节 × 4 维补审优先于全局动作；派发批记 freeze-round 轮", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushToFreeze(dir);
+    freezeFix(dir);
+    let r = run(dir, {});
+    assert.equal(r.state.global, "cold-read", "前置：统稿完成进入冻结窗（冷读阶段）");
+    assert.ok(r.statusText.includes("内容冻结窗"), "人话段披露冻结窗与轮次");
+    // 补审派发（第 1 轮，硬门内）→ 队列 = 变化节 s2 × 4 维，action 空（优先于 pm-review 动作）
+    r = run(dir, { verb: "dispatch" });
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.queue.q.length, 4, "s2 × 4 维补审单元");
+    assert.ok(r.queue.q.every((u) => u.sec === "s2" && u.nn === 1));
+    const evs = scanWorkdir(dir).events;
+    assert.equal(evs.filter((e) => e.ev === "freeze-round").length, 1, "派发批落 freeze-round 事件（计数器事实源）");
+    assert.equal(evs.filter((e) => e.ev === "dispatch").length, 4);
+    // delta 报告落位 → 复欠清零 → 队列回到全局动作（pm-review）
+    const s2 = sectionSlices(fs.readFileSync(path.join(dir, "translated-chunks", "translated-chunk-01.md"), "utf-8")).find((s) => s.id === "s2");
+    for (const dim of DIMS) {
+      fs.writeFileSync(path.join(dir, "reviews", `review-${dim}-chunk-01-s2.md`), `sha: ${s2.sha}\nmodel: test\ntime: 2026-10-16T00:00:00Z\n结论：${dim} 冻结窗补审通过。\n`, "utf-8");
+    }
+    r = run(dir, {});
+    assert.equal(r.queue.q.length, 0, "复欠清零");
+    assert.equal(r.queue.action.step, "pm-review", "回到全局阶段动作");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2③ 冻结窗补审轮 >2 硬门：第 3 轮 dispatch → 非零退出 + pending.md 上报 + 不物化", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushToFreeze(dir);
+    freezeFix(dir);
+    appendEvents(dir, [{ ev: "freeze-round", units: 4 }, { ev: "freeze-round", units: 4 }]); // 已耗 2 轮（事件流事实）
+    const r = run(dir, { verb: "dispatch" });
+    assert.equal(r.exitCode, 3, "冻结窗补审轮超限须非零退出（S2③ 硬门）");
+    const pend = fs.readFileSync(path.join(dir, "pending.md"), "utf-8");
+    assert.ok(pend.includes("pending-user") && pend.includes("冻结窗"), "pending.md 上报在场");
+    assert.ok(!fs.existsSync(path.join(dir, "staging")) || fs.readdirSync(path.join(dir, "staging")).length === 0, "超限不得物化");
+    assert.ok(!scanWorkdir(dir).events.some((e) => e.ev === "dispatch"), "不得追加派发事件");
+    assert.ok(scanWorkdir(dir).events.some((e) => e.ev === "suspend" && String(e.detail).includes("freeze")), "suspend 事件落流");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2③ 双计数器不挤占：冻结窗轮已耗 2 不影响 per-chunk 阶段派发；fix/freeze-round 分开派生", () => {
+  const c = deriveCounters([
+    { ev: "freeze-round", units: 4 }, { ev: "freeze-round", units: 4 },
+    { ev: "fix", nn: 3 }, { ev: "fix", nn: 3 },
+  ]);
+  assert.equal(c.freezeRounds, 2, "项目级冻结窗轮");
+  assert.equal(c.reviewRounds[3], 2, "每 chunk 修复环轮——互不挤占");
+  const dir = makeWorkdir(2);
+  try {
+    pushThroughVerify(dir, 1);
+    appendEvents(dir, [{ ev: "freeze-round", units: 4 }, { ev: "freeze-round", units: 4 }]);
+    const r = run(dir, { verb: "dispatch" }); // per-chunk 首审派发——不受冻结窗轮牵连
+    assert.equal(r.exitCode, 0, "per-chunk 阶段派发不受冻结窗硬门影响");
+    assert.equal(r.queue.q.length, 4, "整 chunk 首审 4 单元照常物化");
+    assert.equal(scanWorkdir(dir).events.filter((e) => e.ev === "freeze-round").length, 2, "per-chunk 派发不记冻结窗轮");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2③ grep 验收：SKILL.md Step 8 节含冻结语义、≤2 硬门与统稿先于终轮", () => {
+  const md = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "SKILL.md"), "utf-8");
+  const sec = md.slice(md.indexOf("### Step 8"), md.indexOf("### Step 9"));
+  assert.ok(sec.length > 0, "Step 8 节在场");
+  assert.ok(sec.includes("冻结"), "冻结语义命中 Step 8");
+  assert.ok(sec.includes("只登记不修") && sec.includes("用户点名才修"), "pm-review 类发现只登记不修");
+  assert.ok(sec.includes("≤2"), "冻结窗补审轮 ≤2 硬门");
+  assert.ok(sec.includes("统稿先于终轮"), "统稿先于终轮次序（源①④4）");
+  assert.ok(sec.includes("unify.md"), "统稿细则迁出引用");
+});

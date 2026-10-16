@@ -14,14 +14,18 @@
 //    报告 stale（未变节不级联——新鲜度豁免降至节级）；N+1 邻 chunk handoff 失效重生成（R1）。
 // 5. 计数器全部由 events.jsonl 追加流水推导：机械打回 ≤2（R4）、重审 ≤3 轮、
 //    每轮修复循环升级至多一次、升级后清零、累计升级 ≥2 转挂起（G6，跨轮不重置）。
+//    S2③ 双计数器（分开计数、P1 并行不挤占）：冻结窗补审轮（项目级 ≤2——统稿完成后的
+//    冷读/PM 通读/终检阶段，一轮 = 冻结窗内一次补审派发批；超限 dispatch 非零退出 +
+//    pending.md 上报）vs 修复环轮（Step 7 每 chunk ≤3——超限停该 chunk 登 residue，项目不停）。
 // 6. 挂起旗标 pending.md（type: pending-user | rate-limit | sealed）；R18-③ 封存后
 //    "继续翻译" = 解封续跑；新起走显式动词"重新翻译"。
 // 7. 会话预算（R14）：unit = 一次 subagent 调用；自上次 session-end 事件起计数，
 //    达预算即干净退出点（status.md 首屏提示下次口令）。基线 ~11 单元/chunk（§4：88/8，M3 校准）。
 //
-// CLI: node status.mjs <workdir> [--verb progress|continue|stop|retranslate|sample|restart]
-//                     [--chapter N] [--budget N] [--probe-truth <file>] [--json]
-// 退出码: 0 = 正常（含挂起/预算退出点）；1 = 用法错；2 = 工作目录异常（无 original/manifest）
+// CLI: node status.mjs <workdir> [--verb progress|continue|stop|retranslate|sample|restart|fix|dispatch]
+//                     [--chapter N] [--budget N] [--nn N] [--dims a,b] [--probe-truth <file>] [--json]
+// 退出码: 0 = 正常（含挂起/预算退出点）；1 = 用法错；2 = 工作目录异常（无 original/manifest）；
+//         3 = 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 / S2④ 修复环轮 >3）
 
 import fs from "node:fs";
 import path from "node:path";
@@ -37,6 +41,10 @@ const VIRTUAL_NN_MIN = 901; // 探针虚拟 NN 段（真实上界 640 = 5MB/8KB�
 const EVENTS = "events.jsonl";
 const PENDING = "pending.md";
 const STATUS = "status.md";
+// S2③ 内容冻结窗：统稿（consistency 三段式）完成后开启——冷读/PM 通读/终检阶段。
+// 窗内 pm-review 类发现只登记不修（SKILL.md Step 8）；用户点名修复的 delta 补审在本窗内派发计数。
+const FREEZE_STAGES = ["cold-read", "pm-review", "final-gate"];
+const FREEZE_ROUND_MAX = 2; // 冻结窗补审轮项目级硬门（超限 → dispatch 非零退出 + pending.md 上报）
 
 // ---------- 基础工具 ----------
 
@@ -82,11 +90,13 @@ export function readEvents(dir) {
 
 // 计数器推导（G6/R4）：按 chunk 聚合
 // - mechanicalRejects: 自最近一次 verify-pass 后的 reject 数（pass 即用途重置点）
-// - reviewRounds:      自最近一次全维度齐后的 re-review 轮数（按 re-review 事件）
+// - reviewRounds:      修复环轮（S2④：fix 事件派生——每 chunk ≤3，超限停该 chunk 登 residue）
+// - freezeRounds:      冻结窗补审轮（S2③：freeze-round 事件派生——项目级 ≤2 硬门；一轮 =
+//                      冻结窗内一次补审派发批；与 reviewRounds 分开计数，P1 并行不挤占）
 // - escalations:       累计升级次数（跨轮不重置——G6 条款 3）
 // - sinceSessionEnd:   预算计数窗口
 export function deriveCounters(events) {
-  const c = { mechanicalRejects: {}, reviewRounds: {}, escalations: {}, dispatchedSinceSessionEnd: 0 };
+  const c = { mechanicalRejects: {}, reviewRounds: {}, escalations: {}, freezeRounds: 0, dispatchedSinceSessionEnd: 0 };
   for (const e of events) {
     const nn = e.nn ?? null;
     switch (e.ev) {
@@ -102,8 +112,11 @@ export function deriveCounters(events) {
       case "verify-pass":
         if (nn != null) c.mechanicalRejects[nn] = 0;
         break;
-      case "re-review":
+      case "fix":
         if (nn != null) c.reviewRounds[nn] = (c.reviewRounds[nn] ?? 0) + 1;
+        break;
+      case "freeze-round":
+        c.freezeRounds++;
         break;
       case "escalate":
         if (nn != null) c.escalations[nn] = (c.escalations[nn] ?? 0) + 1;
@@ -378,6 +391,24 @@ export function buildQueue(state, inv, opts = {}) {
   if (state.needsResegment) return { q, action: { step: "resegment", inputs: ["original-" + state.title + ".md"], outputs: ["manifest.md"] } };
   if (inv.pending) return { q, action: null };
   if (state.global !== "per-chunk") {
+    // S2③ 冻结窗补审队列：统稿完成后（冷读/PM 通读/终检）存在节 stale（用户点名修复的复欠）
+    // → 变化节 × 4 维 delta 补审单元优先于全局阶段动作；residue 停修 chunk 不回队。
+    if (FREEZE_STAGES.includes(state.global)) {
+      const fq = [];
+      for (const c of state.chunks) {
+        if (c.stage === "residue") continue;
+        for (const dim of DIMS) {
+          const slot = inv.reviews[c.nn]?.[dim];
+          if (!slot?.whole) continue; // 首审缺席非冻结窗场景（进窗前已全 done）
+          for (const sec of c.sections ?? []) {
+            const secRep = slot.secs?.[sec.id] ?? null;
+            if (slot.whole.secs?.[sec.id] === sec.sha || secRep?.sha === sec.sha) continue;
+            fq.push({ dim, nn: c.nn, sec: sec.id, kind: "real" });
+          }
+        }
+      }
+      if (fq.length) return { q: fq, action: null };
+    }
     const stepMap = {
       "ready-merge": ["merge", ["manifest.md"], ["merged-draft.md"]],
       merged: ["consistency", ["merged-draft.md"], ["consistency-" + state.title + ".md"]],
@@ -504,6 +535,7 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
     }
   } else if (state.global !== "per-chunk") {
     L.push(`全部 ${total} chunk 过审，当前全局阶段：${state.global}，已耗时 ${elapsedH}h。下次对我说：继续翻译 ${state.title}。`);
+    if (FREEZE_STAGES.includes(state.global)) L.push(`内容冻结窗已开启（统稿完成后）：pm-review 类发现只登记不修（用户点名才修）；补审轮 ${state.counters.freezeRounds}/${FREEZE_ROUND_MAX}（项目级硬门）。`);
   } else if (cur) {
     L.push(`第 ${cur.nn}/${total} chunk（${stageCn(cur.stage)}），已完成 ${done}/${total}，已耗时 ${elapsedH}h，预计剩余 ~${remainUnits} 单元（M3 前基线 ${UNITS_PER_CHUNK} 单元/chunk）。下次对我说：继续翻译 ${state.title}。`);
   }
@@ -645,6 +677,18 @@ export function run(dir, opts = {}) {
   // （M3 实证：三连跑产生 36 条幻影 dispatch 事件）
   const wantDispatch = opts.verb === "dispatch";
   if (wantDispatch && queue.q.length && !inv.pending && !overBudget) {
+    // S2③ 冻结窗补审轮硬门（项目级 ≤2）：超限拒绝本轮补审派发——非零退出 + pending.md 上报
+    // （统稿完成后内容冻结，补审轮已尽须用户裁决；residue/冻结窗发现只登记的口径见 SKILL.md Step 8）
+    const inFreeze = FREEZE_STAGES.includes(state.global);
+    if (inFreeze && state.counters.freezeRounds >= FREEZE_ROUND_MAX) {
+      fs.writeFileSync(
+        path.join(dir, PENDING),
+        `type: pending-user\n原因：冻结窗补审轮超限（已 ${state.counters.freezeRounds} 轮，硬门 ≤${FREEZE_ROUND_MAX}，S2③）——统稿完成后内容冻结，pm-review 类发现只登记不修；用户点名修复的补审轮已尽，须用户裁决（菜单：①继续（换模型/调参）②手修后说"继续翻译"③说"停止翻译"封存）\n`,
+        "utf-8"
+      );
+      appendEvents(dir, { ev: "suspend", detail: `freeze-rounds:${state.counters.freezeRounds}` });
+      return { exitCode: 3, errors: [`冻结窗补审轮 ${state.counters.freezeRounds}/${FREEZE_ROUND_MAX} 已达硬门——拒绝补审派发，已写 pending.md 上报（S2③）`] };
+    }
     queue.dispatch = materialize(dir, queue.q);
     // S2②：dispatch 事件携带 c4 detail（JSON——final-gate 抽核对象；events 禁补记，只在物化时落）
     appendEvents(dir, queue.q.map((u, i) => ({
@@ -654,6 +698,8 @@ export function run(dir, opts = {}) {
       sec: u.sec ?? null,
       detail: JSON.stringify(queue.dispatch[i].c4),
     })));
+    // S2③：冻结窗内补审派发批记一轮（freeze-round 事件——计数器事实源，脚本落流禁人工补记）
+    if (inFreeze) appendEvents(dir, { ev: "freeze-round", units: queue.q.length });
   }
   const text = renderStatus(dir, inv, state, queue, opts);
   fs.writeFileSync(path.join(dir, STATUS), text, "utf-8");
@@ -690,7 +736,7 @@ const __help = `status.mjs — xl-translator 状态机与续跑（M1b）
 
 产物: status.md（唯一续跑文档，整体重写）+ staging/（统一物化，每轮先清后写）+ events.jsonl（追加）
 
-退出码: 0 正常 / 1 用法或动词错 / 2 工作目录异常`;
+退出码: 0 正常 / 1 用法或动词错 / 2 工作目录异常 / 3 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 等超限）`;
 
 // CLI 守卫用 fileURLToPath：new URL().pathname 在 Windows 是 /D:/... 形态，path.resolve
 // 拼出 D:\D:\... 与 argv[1] 恒不等——M1c 实测抓到的 M1b 潜伏 bug（CLI 静默空转、退出码 0）
