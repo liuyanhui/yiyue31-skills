@@ -9,8 +9,9 @@
 //      R8-c 投影同参——投影从 glossary × chunk 原文**重推导**（handoff.mjs 纯函数），不信任
 //      落盘 projection-chunk 文件：防"删投影灭判"；落盘件与重推导不一致仅 WARN，以重推导为准）
 //   3. merged 重导出 diff（global）：assemble(全部译文)（merge.mjs 纯函数）vs merged-draft.md 字节比较
-//   4. 完备性矩阵（分母 = 原文钉死；scoped/chunk）：裁定台账 + 4 维 × 2 半块报告全存在且
-//      头部 sha fresh；**准确性维度缺失 = 无条件 FAIL（不可降级）**
+//   4. 完备性矩阵（分母 = 原文钉死；scoped/chunk；S2① 节级锚）：裁定台账 + 4 维 × 逐节
+//      报告全存在且 fresh（首审报告逐节 sha 表命中，或 delta 单节报告头 sha 命中——
+//      未变节豁免不级联）；**准确性维度缺失 = 无条件 FAIL（不可降级）**
 //   5. 报告签名扫描：undersize（阈值缩放公式 M1c 具体化：base 240B × unitKB/4，绝对下限 120B）
 //      + 跨报告同内容模板签名
 //   6. G3 括注对账（scoped/chunk）：译文括注集合 === 台账"保留" ∪ R23 必兑现集（双向相等，
@@ -44,7 +45,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { scanWorkdir, halfSlices, appendEvents, chapterMap } from "./status.mjs";
+import { scanWorkdir, sectionSlices, parseReportHead, appendEvents, chapterMap } from "./status.mjs";
 import { fenceAwareHeadings } from "./segment/segment.mjs";
 import { verify, loadKeepList, loadBrief, fenceAwareAnnotationMatches } from "./verify-mech.mjs";
 import { assemble } from "./merge.mjs";
@@ -227,7 +228,7 @@ export function probeCheck(dir, truth) {
     if (!dimsCovered.has(dim)) fails.push(`维度 ${dim} 无探针（每维度每 run ≥1——R20）`);
   }
   for (const t of truth) {
-    const report = safeRead(path.join(dir, "reviews", `review-${t.dim}-chunk-${nn2(t.virtualNn)}${t.half}.md`));
+    const report = safeRead(path.join(dir, "reviews", `review-${t.dim}-chunk-${nn2(t.virtualNn)}.md`));
     if (!report) {
       fails.push(`探针单元缺报告（${t.dim} #${t.virtualNn}）= 终检直接 FAIL`);
       continue;
@@ -338,49 +339,58 @@ export function runGate(dir, opts = {}) {
     }
   }
 
-  // ---- 4. 完备性矩阵（scoped/chunk；准确性缺失无条件 FAIL） ----
-  const matrix = inv.chunks.map((c) => ({ nn: c.nn, adjudication: false, reviews: 0, fresh: 0, missingDims: new Set() }));
+  // ---- 4. 完备性矩阵（scoped/chunk；S2① 节级锚：逐节 fresh，未变节豁免；准确性缺失无条件 FAIL） ----
+  const matrix = inv.chunks.map((c) => ({ nn: c.nn, adjudication: false, reviews: 0, fresh: 0, expect: 0, missingDims: new Set() }));
   for (const row of matrix) {
     const c = inv.chunks.find((x) => x.nn === row.nn);
     row.adjudication = inv.adjudicated.has(c.nn);
     if (!row.adjudication) push(c.nn, "completeness", `chunk ${nn2(c.nn)} 缺裁定台账（adjudications/）`);
     const t = inv.translated[c.nn];
     if (!t) continue;
-    const halves = halfSlices(t.text);
+    const secs = sectionSlices(t.text);
+    row.expect = DIMS.length * secs.length;
     for (const dim of DIMS) {
-      for (const h of ["a", "b"]) {
-        const rep = inv.reviews[c.nn]?.[dim]?.[h] ?? null;
-        if (rep == null) {
+      const slot = inv.reviews[c.nn]?.[dim];
+      const whole = slot?.whole ?? null;
+      for (const sec of secs) {
+        const secRep = slot?.secs?.[sec.id] ?? null;
+        row.reviews++;
+        const fresh = (whole?.secs?.[sec.id] === sec.sha) || (secRep?.sha === sec.sha);
+        if (whole == null && secRep == null) {
           row.missingDims.add(dim);
-          push(c.nn, "completeness", `chunk ${nn2(c.nn)} 缺 ${dim} 半块 ${h} 报告${dim === "accuracy" ? "（准确性维度缺失 = 无条件 FAIL，不可降级）" : ""}`);
-        } else if (rep !== halves[h].sha) {
+          push(c.nn, "completeness", `chunk ${nn2(c.nn)} 缺 ${dim} 节 ${sec.id}（${sec.title}）报告${dim === "accuracy" ? "（准确性维度缺失 = 无条件 FAIL，不可降级）" : ""}`);
+        } else if (!fresh) {
           row.missingDims.add(dim);
-          push(c.nn, "completeness", `chunk ${nn2(c.nn)} ${dim} 半块 ${h} 报告 sha 失配（stale——重审）`);
+          push(c.nn, "completeness", `chunk ${nn2(c.nn)} ${dim} 节 ${sec.id}（${sec.title}）报告 sha 失配（stale——重审）`);
         } else {
           row.fresh++;
         }
-        row.reviews++;
       }
     }
   }
 
   // ---- 5. 报告签名扫描（undersize 阈值随送审单元缩放 + 模板签名） ----
-  const unitBytes = (nn, h) => {
+  // 单元字节（S2① 节级锚）：整 chunk 首审 = 全文；delta 单节 = 该节文本；探针 = 样本文本
+  const unitBytes = (nn, secId) => {
+    if (nn >= 901) {
+      const probeTruthEarly = opts.probeTruth ? JSON.parse(safeRead(opts.probeTruth) ?? "[]") : [];
+      return Buffer.byteLength((probeTruthEarly.find((t) => t.virtualNn === nn)?.text) ?? "", "utf-8");
+    }
     const t = inv.translated[nn];
-    return t ? Buffer.byteLength(halfSlices(t.text)[h].text, "utf-8") : 0;
+    if (!t) return 0;
+    if (secId == null) return Buffer.byteLength(t.text, "utf-8");
+    return Buffer.byteLength(sectionSlices(t.text).find((x) => x.id === secId)?.text ?? "", "utf-8");
   };
   const rdir = path.join(dir, "reviews");
-  const reviewFiles = fs.existsSync(rdir) ? fs.readdirSync(rdir).filter((f) => /^review-[\w-]+-chunk-\d+[ab]\.md$/.test(f)) : [];
+  const reviewFiles = fs.existsSync(rdir) ? fs.readdirSync(rdir).filter((f) => /^review-[\w-]+-chunk-\d+(?:-s\d+)?\.md$/.test(f)) : [];
   const byContent = new Map();
   const probeTruth = opts.probeTruth ? JSON.parse(safeRead(opts.probeTruth) ?? "[]") : null;
   for (const f of reviewFiles) {
-    const m = f.match(/^review-([\w-]+)-chunk-(\d+)([ab])\.md$/);
-    const [, dim, nnS, h] = m;
+    const m = f.match(/^review-([\w-]+)-chunk-(\d+)(?:-s(\d+))?\.md$/);
+    const [, dim, nnS, sK] = m;
     const nn = Number(nnS);
     const content = safeRead(path.join(rdir, f)) ?? "";
-    const bytes = nn >= 901
-      ? Buffer.byteLength((probeTruth?.find((t) => t.virtualNn === nn)?.text) ?? "", "utf-8") // 探针单元
-      : unitBytes(nn, h);
+    const bytes = unitBytes(nn, sK == null ? null : `s${sK}`);
     const minBytes = Math.max(SIGNATURE_FLOOR, Math.round((SIGNATURE_BASE * (bytes / 1024)) / 4));
     if (Buffer.byteLength(content, "utf-8") < minBytes) {
       push(nn >= 901 ? "global" : nn, "signature", `${f} 疑似 undersize（${Buffer.byteLength(content, "utf-8")}B < 缩放阈值 ${minBytes}B）——签名不足`);
@@ -600,14 +610,14 @@ function renderReport({ title, inv, total, fails, warns, finalPassed, delivered,
   L.push("|-------|------|------------------|------|");
   for (const row of matrix) {
     const bad = fails.some((f) => f.scope === row.nn);
-    L.push(`| ${String(row.nn).padStart(2, "0")} | ${row.adjudication ? "✅" : "❌"} | ${row.fresh}/${DIMS.length * 2} | ${bad ? "❌ 见 FAIL 清单" : "✅"} |`);
+    L.push(`| ${String(row.nn).padStart(2, "0")} | ${row.adjudication ? "✅" : "❌"} | ${row.fresh}/${row.expect} | ${bad ? "❌ 见 FAIL 清单" : "✅"} |`);
   }
   L.push("");
   const dimFresh = DIMS.map((d) => `${d} ${matrix.filter((r) => !r.missingDims.has(d)).length}/${total}`).join("；");
   L.push(`- 四维各一句：${dimFresh}${DIMS.includes("accuracy") && matrix.some((r) => r.missingDims.has("accuracy")) ? "——**准确性维度缺失 = 无条件 FAIL**" : ""}`);
   L.push("");
   if (probeTruth) {
-    const hit = probeTruth.filter((t) => (safeRead(path.join(dir, "reviews", `review-${t.dim}-chunk-${String(t.virtualNn).padStart(2, "0")}${t.half}.md`)) ?? "").includes(t.expectedHit)).length;
+    const hit = probeTruth.filter((t) => (safeRead(path.join(dir, "reviews", `review-${t.dim}-chunk-${String(t.virtualNn).padStart(2, "0")}.md`)) ?? "").includes(t.expectedHit)).length;
     L.push(`- 探针：${probeTruth.length} 发命中 ${hit}/${probeTruth.length}（探针 = 故意埋错看审校能否全抓到——R20 人话括注）`);
   } else {
     L.push("- 探针：**无 truth（FAIL 项）**");
@@ -667,7 +677,7 @@ const __help = `final-gate.mjs — xl-translator Step 10 终检与交付（交�
 
 规则（重执行一切，不信任何落盘日志）:
   - 机械校验全项重跑（verify-mech 同源）+ 拼接 sha 复核 + merged 重导出 diff（merge 纯函数）
-  - 完备性矩阵（裁定 + 4 维 × 2 半块 fresh）；准确性维度缺失 = 无条件 FAIL
+  - 完备性矩阵（裁定 + 4 维 × 逐节 fresh——节级锚，未变节豁免）；准确性维度缺失 = 无条件 FAIL
   - G3 括注对账双向相等（台账保留 ∪ R23 必兑现）；R23 精选表兑现硬判
   - 标题双语锚（fence 感知分母；brief 关闭时披露跳过）；G4 冷读覆盖矩阵 + pm-review 选样；
     R15 pm-review merged-sha 锚不豁免；探针命中比对（每维度每 run ≥1）

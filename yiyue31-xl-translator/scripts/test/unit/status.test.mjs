@@ -29,7 +29,8 @@ import {
   scanWorkdir,
   deriveState,
   buildQueue,
-  halfSlices,
+  sectionSlices,
+  parseReportHead,
   nnKey,
   chapterMap,
   deriveCounters,
@@ -60,11 +61,11 @@ function makeWorkdir(nChunks = 3) {
 
 const nn2 = (n) => String(n).padStart(2, "0");
 
-// 把 chunk nn 推进到审校前（译文 + 裁定 + 机械校验通过）
+// 把 chunk nn 推进到审校前（译文 + 裁定 + 机械校验通过）。译文带 3 个 H2 节（S2① 节级夹具）
 function pushThroughVerify(dir, n, textOverride) {
   const tdir = path.join(dir, "translated-chunks");
   fs.mkdirSync(tdir, { recursive: true });
-  const text = textOverride ?? `第 ${n} 块译文。段一：术语 alpha 保留。\n\n段二：数字 42 与单位 3km 保持。\n\n段三：结尾。`;
+  const text = textOverride ?? `## 一\n\n第 ${n} 块段一：术语 alpha 保留。\n\n## 二\n\n段二：数字 42 与单位 3km 保持。\n\n## 三\n\n段三：结尾。`;
   const tp = path.join(tdir, `translated-chunk-${nn2(n)}.md`);
   fs.writeFileSync(tp, text, "utf-8");
   fs.mkdirSync(path.join(dir, "adjudications"), { recursive: true });
@@ -85,29 +86,49 @@ function sha12Of(p) {
   return crypto.createHash("sha1").update(fs.readFileSync(p, "utf-8"), "utf-8").digest("hex").slice(0, 12);
 }
 
-// 为 chunk nn 写齐 4 维 × 2 半块报告（头部 sha: 取当前半块——fresh）或指定失配
-function writeReviews(dir, n, breakHalves = []) {
+// 为 chunk nn 写齐 4 维整 chunk 首审报告（头三行 + 逐节 sha 表，fresh）或指定失配节
+function writeReviews(dir, n, breakSections = []) {
   const rdir = path.join(dir, "reviews");
   fs.mkdirSync(rdir, { recursive: true });
-  const halves = halfSlices(fs.readFileSync(path.join(dir, "translated-chunks", `translated-chunk-${nn2(n)}.md`), "utf-8"));
+  const secs = sectionSlices(fs.readFileSync(path.join(dir, "translated-chunks", `translated-chunk-${nn2(n)}.md`), "utf-8"));
   for (const dim of DIMS) {
-    for (const h of ["a", "b"]) {
-      const sha = breakHalves.includes(h) ? "000000000000" : halves[h].sha;
-      fs.writeFileSync(path.join(rdir, `review-${dim}-chunk-${nn2(n)}${h}.md`), `sha: ${sha}\nmodel: test\n结论：通过。\n`, "utf-8");
-    }
+    const L = [`sha: ${sha12Of(path.join(dir, "translated-chunks", `translated-chunk-${nn2(n)}.md`))}`, "model: test", "time: 2026-10-16T00:00:00Z"];
+    for (const s of secs) L.push(`sec: ${s.id} ${breakSections.includes(s.id) ? "000000000000" : s.sha} ${s.title}`);
+    L.push(`结论：${dim} 审校通过。观察 ${n}-${dim}。`);
+    fs.writeFileSync(path.join(rdir, `review-${dim}-chunk-${nn2(n)}.md`), L.join("\n") + "\n", "utf-8");
   }
 }
 
 // ---------- 基础 ----------
 
-test("halfSlices：a+b 拼接 === 原文；中点向段落边界取整", () => {
-  const text = "一\n\n二\n\n三\n\n四\n\n五";
-  const s = halfSlices(text);
-  assert.equal(s.a.text + "\n\n" + s.b.text, text);
-  const half = Buffer.byteLength(text, "utf-8") / 2;
-  const da = Math.abs(Buffer.byteLength(s.a.text, "utf-8") - half);
-  const db = Math.abs(Buffer.byteLength(s.b.text, "utf-8") - half);
-  assert.ok(da <= half && db <= half);
+test("sectionSlices（S2①）：切片拼接恒等原文；preamble/无标题单节；fence 内标题不切节", () => {
+  const text = "# 标题一\n\n正文一。\n\n## 标题二\n\n正文二。\n\n### 标题三\n\n正文三。\n";
+  const secs = sectionSlices(text);
+  assert.equal(secs.map((s) => s.text).join(""), text, "切片拼接恒等原文");
+  assert.deepEqual(secs.map((s) => s.title), ["标题一", "标题二", "标题三"]);
+  assert.deepEqual(secs.map((s, i) => s.id).slice(-1), [`s${secs.length}`]);
+  // preamble：首标题前内容自成一级
+  const pre = sectionSlices("前言段。\n\n## 甲\n\n正文。\n");
+  assert.equal(pre[0].title, "preamble");
+  assert.equal(pre.length, 2);
+  // 无标题全文 = 单节（root）
+  assert.equal(sectionSlices("只有一段。\n\n再一段。\n").length, 1);
+  // fence 感知：围栏内 # 行不是标题（segment 同款状态机）
+  const fenced = sectionSlices("## 甲\n\n```text\n## 围栏内假标题\n```\n\n正文。\n");
+  assert.equal(fenced.length, 1, "围栏内标题不得切节");
+});
+
+test("parseReportHead（S2② 头三行机械校验）：sha/model/time + sec 表解析与缺行检出", () => {
+  const ok = parseReportHead("sha: abc123def456\nmodel: test-model\ntime: 2026-10-16T01:02:03Z\nsec: s1 aaaaaaaaaaaa 引言\nsec: s2 bbbbbbbbbbbb 安装\n结论……\n");
+  assert.equal(ok.sha, "abc123def456");
+  assert.equal(ok.model, "test-model");
+  assert.equal(ok.time, "2026-10-16T01:02:03Z");
+  assert.deepEqual(ok.secs, { s1: "aaaaaaaaaaaa", s2: "bbbbbbbbbbbb" });
+  assert.deepEqual(ok.malformed, []);
+  // delta 单节报告：只写头三行（sha 即该节 sha）
+  const delta = parseReportHead("sha: cccccc\ntime: x\n");
+  assert.equal(delta.sha, null, "sha 须 12 位 hex");
+  assert.deepEqual(delta.malformed.sort(), ["缺 model: 行", "缺 sha: 行"], "缺行逐项检出");
 });
 
 test("nnKey：数值排序禁字典序（R29）", () => {
@@ -137,13 +158,13 @@ test("删掉 status.md 仍推导重建全部状态（物化视图证明）", () 
   try {
     run(dir, {});
     pushThroughVerify(dir, 1);
-    writeReviews(dir, 1, ["b"]); // b 半块报告失配 → 未完成
+    writeReviews(dir, 1, ["s2"]); // 节 s2 报告表失配 → 未完成
     fs.rmSync(path.join(dir, "status.md"), { force: true });
     const r = run(dir, {});
     assert.equal(r.exitCode, 0);
     const md = fs.readFileSync(path.join(dir, "status.md"), "utf-8");
     assert.ok(/重审中|审校中/.test(md), "状态应重建为审校/重审阶段");
-    assert.equal(r.state.chunks[0].reviewDone, 4, "4 份 fresh 报告（b 失配）");
+    assert.equal(r.state.chunks[0].reviewDone, DIMS.length * 2, "4 维 × 未变 2 节 fresh（s2 失配）");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -157,14 +178,14 @@ test("审校队列统一物化：探针与真单元同构混排，工作区无�
   try {
     pushThroughVerify(dir, 1);
     fs.writeFileSync(truthFile, JSON.stringify([
-      { dim: "accuracy", half: "a", text: "探针样本内容（含植入缺陷）" },
-      { dim: "readability", half: "b", text: "探针样本内容二" },
+      { dim: "accuracy", text: "探针样本内容（含植入缺陷）" },
+      { dim: "readability", text: "探针样本内容二" },
     ]), "utf-8");
     const r = run(dir, { probeTruth: truthFile, verb: "dispatch" }); // C3：物化需 dispatch 动词
-    // 真单元 4（b 失配 4 维中——fresh a 4 份已写? 未写 reviews 时=8 真单元）+ 探针 2
-    assert.equal(r.queue.q.length, 8 + 2, "8 真半块单元 + 2 探针");
+    // 真单元 4（整 chunk × 4 维首审，S2①）+ 探针 2
+    assert.equal(r.queue.q.length, 4 + 2, "4 整 chunk 首审单元 + 2 探针");
     const staging = fs.readdirSync(path.join(dir, "staging"));
-    assert.equal(staging.length, 10, "staging 全量物化");
+    assert.equal(staging.length, 6, "staging 全量物化");
     for (const f of staging) assert.match(f, /^review-[\w-]+-unit-\d{3}\.md$/, "同构命名");
     // M1c 延伸：探针真实样本文本须落 staging（占位符退场——审校者读到的是真缺陷样本）
     const stagedAll = staging.map((f) => fs.readFileSync(path.join(dir, "staging", f), "utf-8"));
@@ -175,6 +196,8 @@ test("审校队列统一物化：探针与真单元同构混排，工作区无�
     assert.ok(!/probe/.test(md), "status.md 不得出现 probe 字样（不可分辨）");
     assert.ok(!fs.existsSync(path.join(dir, "probes")), "工作区无 probes/ 目录");
     assert.ok(!staging.some((f) => f.includes("probe")), "暂存名不含 probe 标记");
+    // 派发清单输出名 = 新命名（整 chunk 无半块后缀）
+    assert.ok(r.queue.dispatch.every((d) => /reviews\/review-[\w-]+-chunk-\d+(-s\d+)?\.md$/.test(d.output)));
   } finally {
     fs.rmSync(truthFile, { force: true });
     fs.rmSync(dir, { recursive: true, force: true });
@@ -183,36 +206,37 @@ test("审校队列统一物化：探针与真单元同构混排，工作区无�
 
 // ---------- stale 半块级分类（R1） ----------
 
-test("译文变更 → 半块全维 stale、a 不级联 b、N+1 handoff 失效", () => {
+test("译文变更 → 仅变化节（s2）4 维 stale、未变节豁免不级联、N+1 handoff 失效（S2①）", () => {
   const dir = makeWorkdir();
   try {
     pushThroughVerify(dir, 1);
     pushThroughVerify(dir, 2);
     writeReviews(dir, 1);
     writeReviews(dir, 2);
-    // 只改 a 半块内容（前段追加文字），随后机械校验已按新 sha 重过（模拟修复后重验）
-    const old = fs.readFileSync(path.join(dir, "translated-chunks", "translated-chunk-01.md"), "utf-8");
-    const paras = old.split("\n\n");
-    paras[0] += " 修复补充。";
-    const neu = paras.join("\n\n");
-    fs.writeFileSync(path.join(dir, "translated-chunks", "translated-chunk-01.md"), neu, "utf-8");
+    // 只改第 2 节内容（节内段落追加），随后机械校验已按新 sha 重过（模拟修复后重验）
+    const tp = path.join(dir, "translated-chunks", "translated-chunk-01.md");
+    const old = fs.readFileSync(tp, "utf-8");
+    const neu = old.replace("段二：数字 42", "段二：数字 42（修复补充说明）");
+    assert.notEqual(neu, old, "夹具应实际改动节 2");
+    fs.writeFileSync(tp, neu, "utf-8");
     const vr = JSON.parse(fs.readFileSync(path.join(dir, "verify-results.json"), "utf-8"));
-    vr.results.find((x) => x.nn === 1).translationSha = sha12Of(path.join(dir, "translated-chunks", "translated-chunk-01.md"));
+    vr.results.find((x) => x.nn === 1).translationSha = sha12Of(tp);
     fs.writeFileSync(path.join(dir, "verify-results.json"), JSON.stringify(vr), "utf-8");
 
     const r = run(dir, {});
     const c1 = r.state.chunks[0];
     assert.equal(c1.stage, "re-review", "译文 sha 变化应进重审");
-    // 旧报告 a 半全部失配、b 半仍匹配（不级联）
-    const halves = halfSlices(neu);
-    const staleDims = c1.staleHalves.a ?? [];
-    assert.equal(staleDims.length, 4, "a 半块 4 维全 stale");
-    assert.ok(!(c1.staleHalves.b ?? []).length, "b 半块不得级联");
+    // S2①：stale 精确到节——s2 四维全 stale；s1/s3 未变不级联
+    assert.deepEqual(Object.keys(c1.staleSections), ["s2"], "仅节 s2 stale");
+    assert.deepEqual(c1.staleSections.s2.sort(), [...DIMS].sort(), "s2 节 4 维全 stale");
+    assert.equal(c1.reviewDone, DIMS.length * 2, "未变节 s1/s3 各维仍 fresh（4 维 × 2 节）");
     assert.ok(r.state.handoffStale.includes(2), "N+1（chunk 2）handoff 失效标记");
-    // 队列只派 a 半 4 维
-    assert.equal(r.queue.q.filter((u) => u.half === "a").length, 4);
-    assert.equal(r.queue.q.filter((u) => u.half === "b").length, 0);
-    assert.equal(halves.a.sha.length, 12);
+    // 队列（① 阶段契约）：4 维整 chunk 重审单元；② 起改为 s2 delta 单节（delta 专属用例另测）
+    assert.equal(r.queue.q.length, 4);
+    assert.ok(r.queue.q.every((u) => u.sec === null && u.dim && u.nn === 1));
+    // 节 sha 可从 state 直接取（供派发指令随附）
+    assert.equal(c1.sections.length, 3);
+    for (const s of c1.sections) assert.match(s.sha, /^[0-9a-f]{12}$/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -414,6 +438,39 @@ test("CLI：真实执行（status.md 落盘 + stdout 输出），非静默空转
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.ok(r.stdout.includes("status —"), "CLI 应输出 status.md 内容");
     assert.ok(fs.existsSync(path.join(dir, "status.md")), "status.md 由 CLI 落盘");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------- S2① 机械验收：3 节文档改节 2 → --json 仅节 2 stale ----------
+
+test("S2① 验收：3 节文档改节 2 → status.mjs --json 仅节 s2 stale（未变节豁免）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushThroughVerify(dir, 1); // 默认译文 = 3 个 H2 节
+    writeReviews(dir, 1); // 4 维首审报告全 fresh
+    let r = run(dir, {});
+    assert.equal(r.state.chunks[0].stage, "done", "前置：全 fresh 应 done");
+    // 改节 2（节内追加），机械校验按新 sha 重过（模拟修复后重验）
+    const tp = path.join(dir, "translated-chunks", "translated-chunk-01.md");
+    const neu = fs.readFileSync(tp, "utf-8").replace("段二：数字 42", "段二：数字 42 修复后表述");
+    fs.writeFileSync(tp, neu, "utf-8");
+    const vr = JSON.parse(fs.readFileSync(path.join(dir, "verify-results.json"), "utf-8"));
+    vr.results.find((x) => x.nn === 1).translationSha = sha12Of(tp);
+    fs.writeFileSync(path.join(dir, "verify-results.json"), JSON.stringify(vr), "utf-8");
+    // 验收口径：CLI --json 原始输出（非进程内调用）
+    const cli = spawnSync(process.execPath, [SCRIPT, dir, "--json"], { encoding: "utf-8" });
+    assert.equal(cli.status, 0, cli.stdout + cli.stderr);
+    const j = JSON.parse(cli.stdout);
+    const c = j.state.chunks[0];
+    assert.equal(c.stage, "re-review");
+    assert.deepEqual(Object.keys(c.staleSections), ["s2"], "仅节 s2 stale");
+    assert.deepEqual(c.staleSections.s2.sort(), [...DIMS].sort(), "s2 × 4 维");
+    assert.equal(j.queue, 4, "重审派发 4 维（① 整 chunk 单元）");
+    // 未变节 sha 不变（豁免的机械基础：节表与报告 sec 表仍逐节相等）
+    const fresh2 = run(dir, {});
+    assert.equal(fresh2.state.chunks[0].reviewDone, 8, "s1/s3 × 4 维仍 fresh");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

@@ -34,6 +34,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { sectionSlices } from "./status.mjs";
 
 // ---------- 文本抽取（fork 源继承，行为不回归） ----------
 
@@ -732,6 +733,10 @@ export function runCli(args) {
     }
   }
   const result = verify(originalText, translatedText, { keepList, projectionText, chunkNn: opts.chunkNn ?? null, waivers: opts.waivers ?? null, ...briefTh });
+  // 节级 sha 表（S2① 三脚本同源锚）：与 status.mjs sectionSlices 同推导——机械校验判据仍以
+  // 整 chunk translationSha 为闸（数字/代码等检查是 chunk 全局语义，不随节放宽），节表供
+  // 下游 delta 队列与对账消费。
+  const sectionTable = sectionSlices(translatedText).map(({ id, title, sha }) => ({ id, title, sha }));
   appendResultLog(pos[1], {
     time: new Date().toISOString(),
     original: path.basename(pos[0]),
@@ -740,6 +745,7 @@ export function runCli(args) {
     // 字段名 = status/merge/handoff 三消费方的冻结契约（M3 首跑实测漂移：曾误写 translatedSha1，
     // verify 永远判 stale，chunk 卡死在 verify 阶段——生产者自测断言同错故隔离测试不暴露）。
     translationSha: crypto.createHash("sha1").update(translatedText).digest("hex").slice(0, 12),
+    sections: sectionTable,
     passed: result.passed,
     failChecks: [...new Set(result.fails.map((f) => f.check))],
     failCount: result.fails.length,

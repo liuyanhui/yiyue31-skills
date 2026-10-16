@@ -28,6 +28,7 @@ import { spawnSync } from "node:child_process";
 import { runMerge } from "../../merge.mjs";
 import { runDerive } from "../../derive-bilingual.mjs";
 import { generate } from "../../probe.mjs";
+import { sectionSlices } from "../../status.mjs";
 import {
   runGate,
   parseLedger,
@@ -95,15 +96,15 @@ test("probeCheck：缺维度/缺报告/未命中", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fgp-"));
   try {
     const truth = [
-      { virtualNn: 901, dim: "accuracy", half: "a", text: "样本", defectType: "数字错", expectedHit: "18,000" },
-      { virtualNn: 902, dim: "readability", half: "b", text: "样本二", defectType: "长句", expectedHit: "接着" },
+      { virtualNn: 901, dim: "accuracy", text: "样本", defectType: "数字错", expectedHit: "18,000" },
+      { virtualNn: 902, dim: "readability", text: "样本二", defectType: "长句", expectedHit: "接着" },
     ];
     let fails = probeCheck(dir, truth);
     assert.equal(fails.length, 2 + 2); // 缺 accuracy/translationese/ai-tone 三维中缺二 + 两报告缺失
     assert.ok(fails.some((f) => f.includes("translationese") && f.includes("无探针")));
     assert.ok(fails.every((f) => !f.includes("未命中")), "报告都没有时不判未命中，判缺报告");
     fs.mkdirSync(path.join(dir, "reviews"), { recursive: true });
-    fs.writeFileSync(path.join(dir, "reviews", "review-accuracy-chunk-901a.md"), "审校报告：未发现任何问题，通过。\n", "utf-8");
+    fs.writeFileSync(path.join(dir, "reviews", "review-accuracy-chunk-901.md"), "审校报告：未发现任何问题，通过。\n", "utf-8");
     fails = probeCheck(dir, truth);
     assert.ok(fails.some((f) => f.includes("未命中") && f.includes("18,000")));
   } finally {
@@ -207,29 +208,25 @@ function greenDir() {
     "utf-8"
   );
 
-  // 全量审校报告（4 维 × 2 半块 × 3 chunk；头部 sha fresh；内容互异防模板签名）
+  // 全量审校报告（S2① 节级契约：4 维整 chunk 首审 × 3 chunk；头三行 + 逐节 sha 表 fresh；内容互异防模板签名）
   fs.mkdirSync(path.join(dir, "reviews"), { recursive: true });
-  const halves = (n) => ({
-    a: halfSha(trans[n], "a"),
-    b: halfSha(trans[n], "b"),
-  });
-  const hmap = { 1: halves(1), 2: halves(2), 3: halves(3) };
   for (const n of [1, 2, 3]) {
+    const secs = sectionSlices(trans[n]);
     for (const dim of DIMS) {
-      for (const h of ["a", "b"]) {
-        const body = `sha: ${hmap[n][h]}\nmodel: test\n结论：本半块（${dim} ${h}，chunk ${nn2(n)}）审校通过。观察：术语一致、数字无误、指代清晰、行文自然，无阻断性发现。\n`;
-        fs.writeFileSync(path.join(dir, "reviews", `review-${dim}-chunk-${nn2(n)}${h}.md`), body, "utf-8");
-      }
+      const L = [`sha: ${sha12(trans[n])}`, "model: test", `time: 2026-10-16T00:00:0${n}Z`];
+      for (const s of secs) L.push(`sec: ${s.id} ${s.sha} ${s.title}`);
+      L.push(`结论：本 chunk（${dim}，chunk ${nn2(n)}）审校通过。观察：术语一致、数字无误、指代清晰、行文自然，无阻断性发现（${dim}-${nn2(n)} 专属行）。\n`);
+      fs.writeFileSync(path.join(dir, "reviews", `review-${dim}-chunk-${nn2(n)}.md`), L.join("\n"), "utf-8");
     }
   }
 
-  // 探针 truth + 报告（命中：报告引用 expectedHit）
+  // 探针 truth + 报告（命中：报告引用 expectedHit；S2① 后报告名无半块后缀）
   const truth = generate({ seed: 5 });
   const truthFile = path.join(dir, "..", `fg-truth-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.json`);
   fs.writeFileSync(truthFile, JSON.stringify(truth), "utf-8");
   for (const t of truth) {
     const body = `sha: ${sha12(t.text)}\nmodel: test\n发现：植入缺陷已抓到——${t.defectType}（特征串「${t.expectedHit}」出现在样本中）。判定打回，建议修复后复核该处。\n`;
-    fs.writeFileSync(path.join(dir, "reviews", `review-${t.dim}-chunk-${nn2(t.virtualNn)}${t.half}.md`), body, "utf-8");
+    fs.writeFileSync(path.join(dir, "reviews", `review-${t.dim}-chunk-${nn2(t.virtualNn)}.md`), body, "utf-8");
   }
 
   // merge（真实走 merge.mjs——final-gate 的 diff 复用其纯函数，此处顺带集成）
@@ -267,20 +264,6 @@ function greenDir() {
   );
 
   return { dir, truthFile, truth, mergedSha, trans, names };
-}
-
-function halfSha(text, h) {
-  const paras = text.split(/\n{2,}/);
-  const total = Buffer.byteLength(text, "utf-8");
-  let acc = 0;
-  let best = { idx: 0, diff: Infinity };
-  for (let i = 0; i < paras.length; i++) {
-    acc += Buffer.byteLength(paras[i], "utf-8") + (i < paras.length - 1 ? 2 : 0);
-    const diff = Math.abs(acc - total / 2);
-    if (diff < best.diff) best = { idx: i + 1, diff };
-  }
-  const t = h === "a" ? paras.slice(0, best.idx).join("\n\n") : paras.slice(best.idx).join("\n\n");
-  return sha12(t);
 }
 
 // ---------- PASS 主路径 ----------
@@ -493,7 +476,7 @@ test("重执行：篡改 chunks/ 实文件（manifest↔磁盘不符 → 拼接�
 test("完备性：删一份 accuracy 报告 → scoped FAIL + 准确性无条件措辞", () => {
   const { dir, truthFile } = greenDir();
   try {
-    fs.rmSync(path.join(dir, "reviews", "review-accuracy-chunk-01a.md"));
+    fs.rmSync(path.join(dir, "reviews", "review-accuracy-chunk-01.md"));
     const r = runGate(dir, { probeTruth: truthFile });
     assert.equal(r.exitCode, 3);
     const f = r.fails.find((x) => x.check === "completeness");
@@ -505,14 +488,53 @@ test("完备性：删一份 accuracy 报告 → scoped FAIL + 准确性无条件
   }
 });
 
-test("完备性：报告头部 sha 过期（stale）→ scoped FAIL", () => {
+test("完备性：报告头逐节 sha 过期（stale）→ scoped FAIL", () => {
   const { dir, truthFile } = greenDir();
   try {
-    const p = path.join(dir, "reviews", "review-readability-chunk-03b.md");
-    fs.writeFileSync(p, fs.readFileSync(p, "utf-8").replace(/sha: [0-9a-f]{12}/, "sha: 000000000000"), "utf-8");
+    const p = path.join(dir, "reviews", "review-readability-chunk-03.md");
+    fs.writeFileSync(p, fs.readFileSync(p, "utf-8").replace(/^sec: s1 [0-9a-f]{12}/m, "sec: s1 000000000000"), "utf-8");
     const r = runGate(dir, { probeTruth: truthFile });
     assert.equal(r.exitCode, 3);
     assert.ok(r.fails.some((f) => f.check === "completeness" && f.message.includes("stale")));
+  } finally {
+    fs.rmSync(truthFile, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2① 验收：改 chunk01 节 s2 内容 → gate 豁免未变节 s1、仅节 s2 FAIL（scoped exit 3）；全 fresh 目录 exit 0（正向，PASS 主路径钉死）", () => {
+  const { dir, truthFile } = greenDir();
+  try {
+    // 正向断言（豁免的反向对照）：全 fresh 目录 exit 0
+    assert.equal(runGate(dir, { probeTruth: truthFile }).exitCode, 0, "前置：全 fresh 应 PASS");
+    // 回到门前置态（首跑 PASS 已改名并删 merged-draft——清交付物 + 重导出，负向场景才干净）
+    fs.rmSync(path.join(dir, "translated-fintest-zh.md"), { force: true });
+    assert.equal(runMerge(dir).exitCode, 0, "恢复 merged-draft 应成功");
+    // 改节 s2（"## 阿尔法细节" 节内追加中文句——不动标题/锚/数字/代码/结构判据）
+    const tp = path.join(dir, "translated-chunks", "translated-chunk-01.md");
+    const neu = fs.readFileSync(tp, "utf-8").replace("系统支持 `inline_code` 调用，数量为 1024。", "系统支持 `inline_code` 调用，数量为 1024。本节经修复补充说明一句。");
+    assert.notEqual(neu, fs.readFileSync(tp, "utf-8"), "夹具应实际改动节 s2");
+    fs.writeFileSync(tp, neu, "utf-8");
+    // 下游同源刷新：verify 流水按新 sha、merge 重导出、冷读逐 chunk 锚、pm merged-sha 锚
+    const vr = JSON.parse(fs.readFileSync(path.join(dir, "verify-results.json"), "utf-8"));
+    vr.results.find((x) => x.nn === 1).translationSha = sha12(neu);
+    fs.writeFileSync(path.join(dir, "verify-results.json"), JSON.stringify(vr), "utf-8");
+    const mr = runMerge(dir);
+    assert.equal(mr.exitCode, 0, "重 merge 应成功：" + JSON.stringify(mr.errors));
+    const coldPath = path.join(dir, "cold-read-fintest.md");
+    fs.writeFileSync(coldPath, fs.readFileSync(coldPath, "utf-8").replace(/- chunk 01: sha [0-9a-f]{12}/, `- chunk 01: sha ${sha12(neu)}`), "utf-8");
+    const pmPath = path.join(dir, "pm-review-fintest.md");
+    fs.writeFileSync(pmPath, fs.readFileSync(pmPath, "utf-8").replace(/merged-sha: [0-9a-f]{12}/, `merged-sha: ${mr.mergedSha}`), "utf-8");
+    // 首审报告的节表仍是旧值 → 仅 s2 失配；s1 未变 → 豁免（不得出现 s1 FAIL）
+    const r = runGate(dir, { probeTruth: truthFile });
+    assert.equal(r.exitCode, 3, JSON.stringify(r.fails.map((f) => [f.scope, f.check, f.message]), null, 2));
+    assert.equal(r.radius, "scoped");
+    assert.deepEqual(r.scopedChunks, [1], "半径收敛到 chunk 01");
+    const comp = r.fails.filter((f) => f.check === "completeness");
+    assert.equal(comp.length, 4, "4 维 × 节 s2");
+    assert.ok(comp.every((f) => f.message.includes("节 s2")), "FAIL 全部指向节 s2");
+    assert.ok(comp.every((f) => !f.message.includes("节 s1")), "未变节 s1 豁免不级联");
+    assert.ok(!fs.existsSync(path.join(dir, "translated-fintest-zh.md")), "FAIL 不得改名");
   } finally {
     fs.rmSync(truthFile, { force: true });
     fs.rmSync(dir, { recursive: true, force: true });
@@ -523,11 +545,11 @@ test("签名：undersize 报告 → FAIL；同内容模板签名 → FAIL", () =
   const { dir, truthFile } = greenDir();
   try {
     // undersize：把一份报告截短到阈值下
-    const p = path.join(dir, "reviews", "review-ai-tone-chunk-02a.md");
+    const p = path.join(dir, "reviews", "review-ai-tone-chunk-02.md");
     fs.writeFileSync(p, "sha: x\nok\n", "utf-8");
     // 模板签名：两份报告内容相同
-    const p2 = path.join(dir, "reviews", "review-ai-tone-chunk-02b.md");
-    const p3 = path.join(dir, "reviews", "review-translationese-chunk-03a.md");
+    const p2 = path.join(dir, "reviews", "review-translationese-chunk-03.md");
+    const p3 = path.join(dir, "reviews", "review-readability-chunk-03.md");
     const tpl = "sha: 000000000000\nmodel: t\n一样的模板内容，毫无信息量。\n";
     fs.writeFileSync(p2, tpl, "utf-8");
     fs.writeFileSync(p3, tpl, "utf-8");
@@ -692,7 +714,7 @@ test("探针：缺 truth 文件 / 缺报告 / 报告未命中 → global FAIL", 
   }
   const b = greenDir();
   try {
-    fs.rmSync(path.join(b.dir, "reviews", `review-${b.truth[0].dim}-chunk-${nn2(b.truth[0].virtualNn)}${b.truth[0].half}.md`));
+    fs.rmSync(path.join(b.dir, "reviews", `review-${b.truth[0].dim}-chunk-${nn2(b.truth[0].virtualNn)}.md`));
     const r = runGate(b.dir, { probeTruth: b.truthFile });
     assert.ok(r.fails.some((f) => f.check === "probe" && f.message.includes("缺报告")));
     assert.equal(r.exitCode, 4);
@@ -703,7 +725,7 @@ test("探针：缺 truth 文件 / 缺报告 / 报告未命中 → global FAIL", 
   const c = greenDir();
   try {
     const t = c.truth[0];
-    const p = path.join(c.dir, "reviews", `review-${t.dim}-chunk-${nn2(t.virtualNn)}${t.half}.md`);
+    const p = path.join(c.dir, "reviews", `review-${t.dim}-chunk-${nn2(t.virtualNn)}.md`);
     fs.writeFileSync(p, "sha: x\nmodel: t\n审校报告：一切正常，通过，无发现。\n", "utf-8");
     const r = runGate(c.dir, { probeTruth: c.truthFile });
     assert.ok(r.fails.some((f) => f.check === "probe" && f.message.includes("未命中")));

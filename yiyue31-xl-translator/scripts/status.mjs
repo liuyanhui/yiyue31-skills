@@ -7,10 +7,11 @@
 //    删掉可重建、伪造被下次推导覆盖（零信任不变）。
 // 2. 双段契约输出（R13）：人话一段（用户视角）+ 动作指令一段（主 agent 视角
 //    step/inputs[]/outputs[]）——探针在动作指令中与真单元**同构混排不可分辨**（R25/G5）。
-// 3. 统一物化（R25）：所有送审单元（真半块 + 探针）先清空 staging/ 再以
+// 3. 统一物化（R25）：所有送审单元（真 chunk/节 + 探针）先清空 staging/ 再以
 //    review-<dim>-unit-<seq>.md 同构命名物化后派发；ground truth 只存源侧，不落工作区。
-// 4. 半块 sha 从译文文件重算（§5.1 C-1/G5），半块不落盘；内容 sha 变化的半块 × 全部
-//    4 维报告 stale（a 修复仅触发 a，b 不级联）；N+1 邻 chunk handoff 失效重生成（R1）。
+// 4. 节级 sha 锚（S2①）：审校锚 = 逐节 sha 表（节 = 标题节，与 segment 分段小节同款
+//    fence 感知边界），从译文文件重算、不落盘；某节内容 sha 变化 → 仅该节 × 全部 4 维
+//    报告 stale（未变节不级联——新鲜度豁免降至节级）；N+1 邻 chunk handoff 失效重生成（R1）。
 // 5. 计数器全部由 events.jsonl 追加流水推导：机械打回 ≤2（R4）、重审 ≤3 轮、
 //    每轮修复循环升级至多一次、升级后清零、累计升级 ≥2 转挂起（G6，跨轮不重置）。
 // 6. 挂起旗标 pending.md（type: pending-user | rate-limit | sealed）；R18-③ 封存后
@@ -26,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { buildIndex, parseSections } from "./segment/segment.mjs";
 
 // ---------- 常量 ----------
 
@@ -113,41 +115,43 @@ export function deriveCounters(events) {
   return c;
 }
 
-// ---------- 半块切片（§5.1 C-1/G5：字节中点向最近段落边界取整；sha 由本函数重算） ----------
+// ---------- 节级切片 + 报告头解析（S2①：节级 sha 锚；S2②：头三行机械校验） ----------
 
-// C1 标题边界锚定（2026-09-14 M3 回写）：字节中点附近取最近标题行为切点，替代纯字节中点——
-// a 侧增删字节不再推动中点漂移越界（M3 三例实证：b 侧未动仍 stale，重审成本 ×2）。
-// 回退链：标题边界 → 段落边界（无标题时）。
-export function halfSlices(translation) {
-  const paras = translation.split(/\n{2,}/); // 段落边界（空行）
-  const total = Buffer.byteLength(translation, "utf-8");
-  let acc = 0;
-  let best = { idx: 0, diff: Infinity };
-  for (let i = 0; i < paras.length; i++) {
-    acc += Buffer.byteLength(paras[i], "utf-8") + (i < paras.length - 1 ? 2 : 0);
-    const diff = Math.abs(acc - total / 2);
-    if (diff < best.diff) best = { idx: i + 1, diff }; // 切点 = 前 i+1 段
-  }
-  // C1：在中点附近找最近的标题起始段（首行为 # 开头的段），优先在该段前切
-  let headingIdx = -1;
-  let headingDist = Infinity;
-  let bytePos = 0;
-  for (let i = 0; i < paras.length; i++) {
-    const pBytes = Buffer.byteLength(paras[i], "utf-8") + (i < paras.length - 1 ? 2 : 0);
-    if (/^#{1,6} /.test(paras[i]) && i > 0 && i < paras.length - 1) {
-      const d = Math.abs(bytePos - total / 2);
-      if (d < headingDist) { headingDist = d; headingIdx = i; }
+// 节级切片（S2①）：审校锚从"整报告单 sha（半块）"改为逐节 sha 表。节边界 = segment
+// 基础设施 parseSections（fence 感知标题节；首标题前内容为 preamble 节；无标题全文单节）。
+// 各节切片拼接恒等于原文（不增删一字节）；sha 按落盘字节原样计算。
+export function sectionSlices(text) {
+  const content = String(text ?? "");
+  const idx = buildIndex(content);
+  return parseSections(content, idx).map((s, i) => {
+    const t = content.slice(s.startChar, s.endChar);
+    return { id: `s${i + 1}`, title: s.title, text: t, sha: sha12(t) };
+  });
+}
+
+// 报告头契约（S2① 冻结；status/final-gate 同源解析）：
+//   sha: <被审单元整体 sha1 前 12>（首审=整 chunk 译文；delta 单节=该节文本；探针=样本文本）
+//   model: <模型 id>
+//   time: <ISO 8601>
+//   sec: <节id> <12hex> <节标题>   ← 逐节 sha 表，仅整 chunk 首审报告需要（每被审节一行）
+// 头三行齐备性 = S2② 机械校验（malformed 非空 → 报告按不 fresh 处理 + WARN）。
+export function parseReportHead(text) {
+  const head = { sha: null, model: null, time: null, secs: {}, secOrder: [], malformed: [] };
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    let m;
+    if (head.sha == null && (m = line.match(/^sha:\s*([0-9a-f]{12})/i))) head.sha = m[1].toLowerCase();
+    else if (head.model == null && (m = line.match(/^model:\s*(\S+)/))) head.model = m[1];
+    else if (head.time == null && (m = line.match(/^time:\s*(\S+)/))) head.time = m[1];
+    else if ((m = line.match(/^sec:\s*(s\d+)\s+([0-9a-f]{12})\s*(.*)$/i))) {
+      const id = m[1].toLowerCase();
+      head.secs[id] = m[2].toLowerCase();
+      head.secOrder.push(id);
     }
-    bytePos += pBytes;
   }
-  // 标题边界优先（若标题离中点足够近——本半块长度 ≥ 全文 30% 时接受），否则回退段落边界
-  if (headingIdx > 0) {
-    const aBytes = paras.slice(0, headingIdx).join("\n\n").length;
-    if (aBytes / total >= 0.3 && aBytes / total <= 0.7) best.idx = headingIdx;
-  }
-  const aText = paras.slice(0, best.idx).join("\n\n");
-  const bText = paras.slice(best.idx).join("\n\n");
-  return { a: { text: aText, sha: sha12(aText) }, b: { text: bText, sha: sha12(bText) } };
+  if (head.sha == null) head.malformed.push("缺 sha: 行");
+  if (head.model == null) head.malformed.push("缺 model: 行");
+  if (head.time == null) head.malformed.push("缺 time: 行");
+  return head;
 }
 
 // ---------- 工作目录扫描 ----------
@@ -193,17 +197,18 @@ export function scanWorkdir(dir) {
       ? fs.readdirSync(path.join(dir, "adjudications")).map((f) => Number(f.match(/(\d+)/)?.[1] ?? -1)).filter((n) => n > 0)
       : []
   );
-  inv.reviews = {}; // reviews[nn][dim][h] = reportSha（报告头部 sha: 行）
+  inv.reviews = {}; // reviews[nn][dim] = { whole: 头|null, secs: { sK: 头 } }（S2① 节级锚）
   const rdir = path.join(dir, "reviews");
   if (fs.existsSync(rdir)) {
     for (const f of fs.readdirSync(rdir)) {
-      const m = f.match(/^review-([\w-]+)-chunk-(\d+)([ab])\.md$/); // dim 可含连字符（ai-tone）
+      const m = f.match(/^review-([\w-]+)-chunk-(\d+)(?:-s(\d+))?\.md$/); // dim 可含连字符（ai-tone）
       if (!m) continue;
-      const [, dim, nnS, h] = m;
+      const [, dim, nnS, sK] = m;
       const nn = Number(nnS);
-      const head = safeRead(path.join(rdir, f))?.split("\n").find((l) => l.startsWith("sha:"));
-      (inv.reviews[nn] ??= {})[dim] ??= {};
-      inv.reviews[nn][dim][h] = head ? head.replace(/^sha:\s*/, "").trim().slice(0, 12) : null;
+      const head = parseReportHead(safeRead(path.join(rdir, f)) ?? "");
+      const slot = ((inv.reviews[nn] ??= {})[dim] ??= { whole: null, secs: {} });
+      if (sK == null) slot.whole = head; // 整 chunk 首审报告（逐节 sha 表在 head.secs）
+      else slot.secs[`s${sK}`] = head; // delta 单节报告（head.sha = 该节 sha）
     }
   }
 
@@ -248,7 +253,11 @@ export function fingerprint(inv) {
   const parts = [`original:${inv.originalSha}`, `manifest:${inv.manifestSha ?? "-"}`];
   for (const nn of Object.keys(inv.translated).map(Number).sort((a, b) => a - b)) parts.push(`t${nn}:${inv.translated[nn].sha}`);
   for (const nn of Object.keys(inv.reviews).map(Number).sort((a, b) => a - b)) {
-    for (const dim of DIMS) for (const h of ["a", "b"]) parts.push(`r${nn}${dim}${h}:${inv.reviews[nn]?.[dim]?.[h] ?? "-"}`);
+    for (const dim of DIMS) {
+      const slot = inv.reviews[nn]?.[dim];
+      parts.push(`r${nn}${dim}w:${slot?.whole?.sha ?? "-"}`);
+      for (const sid of Object.keys(slot?.secs ?? {}).sort()) parts.push(`r${nn}${dim}${sid}:${slot.secs[sid].sha ?? "-"}`);
+    }
   }
   parts.push(`pending:${inv.pending ?? "-"}`, `events:${inv.events.length}`);
   return sha12(parts.join("|"));
@@ -256,7 +265,7 @@ export function fingerprint(inv) {
 
 // ---------- 状态推导 ----------
 
-// 每 chunk 阶段与 stale 分类（R1 半块级 + re-keying 检测）
+// 每 chunk 阶段与 stale 分类（R1 节级（S2①）+ re-keying 检测）
 export function deriveState(inv) {
   const st = { title: inv.title, originalSha: inv.originalSha, chunks: [], global: null, warnings: [] };
   st.counters = deriveCounters(inv.events);
@@ -267,29 +276,40 @@ export function deriveState(inv) {
   for (const c of inv.chunks) {
     const t = inv.translated[c.nn] ?? null;
     const v = inv.verify[c.nn] ?? null;
-    const s = { nn: c.nn, name: c.name, stage: "translate", staleHalves: {}, reviewDone: 0 };
+    const s = { nn: c.nn, name: c.name, stage: "translate", staleSections: {}, reviewDone: 0 };
     if (!t) {
       st.chunks.push(s);
       continue;
     }
     s.translationSha = t.sha;
-    const halves = halfSlices(t.text);
-    s.halves = { a: halves.a.sha, b: halves.b.sha };
-    // 审校完备性：4 维 × 2 半块，报告头部 sha === 当前半块 sha
+    s.unitSha = sha12(t.text);
+    const secs = sectionSlices(t.text);
+    s.sections = secs.map((x) => ({ id: x.id, title: x.title, sha: x.sha }));
+    // 审校完备性（S2① 节级锚）：4 维 × 逐节。节 fresh = 首审报告 sec 表该节 sha 命中，
+    // 或 delta 单节报告头 sha 命中；有记录但不 fresh → stale（未变节不级联）；
+    // 无任何记录 → 首审缺席（不算 stale——首审按整 chunk 补派）。
     let done = 0;
     const stale = {};
     for (const dim of DIMS) {
-      for (const h of ["a", "b"]) {
-        const rep = inv.reviews[c.nn]?.[dim]?.[h] ?? null;
-        if (rep != null && rep === halves[h].sha) done++;
-        else if (rep != null) (stale[h] ??= []).push(dim); // 半块 sha 变化 → 该半块全部维度核对（4 维独立判定）
+      const slot = inv.reviews[c.nn]?.[dim];
+      const whole = slot?.whole ?? null;
+      const malformed = [
+        ...(whole?.malformed ?? []).map((x) => `whole:${x}`),
+        ...Object.entries(slot?.secs ?? {}).flatMap(([sid, h]) => (h.malformed ?? []).map((x) => `${sid}:${x}`)),
+      ];
+      if (malformed.length) st.warnings.push(`chunk ${c.nn} ${dim} 报告头不完整（${malformed.join("、")}）——S2② 头三行机械校验，按不 fresh 处理`);
+      for (const sec of secs) {
+        const secRep = slot?.secs?.[sec.id] ?? null;
+        const fresh = (whole?.secs?.[sec.id] === sec.sha) || (secRep?.sha === sec.sha);
+        if (fresh) done++;
+        else if (whole != null || secRep != null) (stale[sec.id] ??= []).push(dim);
       }
     }
     s.reviewDone = done;
-    s.staleHalves = stale;
+    s.staleSections = stale;
     if (!inv.adjudicated.has(c.nn)) s.stage = "adjudicate";
     else if (!v || v.passed !== true || v.translationSha !== t.sha) s.stage = "verify";
-    else if (done < DIMS.length * 2) s.stage = Object.keys(stale).length ? "re-review" : "review";
+    else if (done < DIMS.length * secs.length) s.stage = Object.keys(stale).length ? "re-review" : "review";
     else s.stage = "done";
     st.chunks.push(s);
   }
@@ -303,7 +323,7 @@ export function deriveState(inv) {
   // handoff②/串行增强失效（R1 冻结语义）：译文 sha 实际变化的 chunk → 仅 N+1 邻 chunk 失效重生成
   st.handoffStale = [];
   st.chunks.forEach((c, i) => {
-    if (Object.keys(c.staleHalves).length > 0) {
+    if (Object.keys(c.staleSections).length > 0) {
       const next = st.chunks[i + 1];
       if (next) st.handoffStale.push(next.nn);
     }
@@ -337,8 +357,8 @@ export function chapterMap(inv) {
 
 // ---------- 队列构建 + 统一物化（R25） ----------
 
-// 队列元素：{ dim, nn(真实或虚拟), half, kind: real|probe, srcText }
-// probe 元素来自源侧 truth 文件（{ dim, half, text }[]）——工作区不落任何真假映射。
+// 队列元素：{ dim, nn(真实或虚拟), sec: 节id|null(null=整 chunk 首审), kind: real|probe, text(仅 probe) }
+// probe 元素来自源侧 truth 文件（{ dim, text, ... }[]）——工作区不落任何真假映射。
 export function buildQueue(state, inv, opts = {}) {
   const q = [];
   if (state.needsResegment) return { q, action: { step: "resegment", inputs: ["original-" + state.title + ".md"], outputs: ["manifest.md"] } };
@@ -362,27 +382,32 @@ export function buildQueue(state, inv, opts = {}) {
     const step = c.stage === "translate" ? "translate" : c.stage === "adjudicate" ? "adjudicate" : "verify";
     return { q, action: { step, inputs: [`chunks/${c.name}`, "brief.md"], outputs: [step === "translate" ? `translated-chunks/translated-chunk-${String(c.nn).padStart(2, "0")}.md` : step === "adjudicate" ? `adjudications/adjudication-chunk-${String(c.nn).padStart(2, "0")}.md` : "verify-results.json"] } };
   }
-  // review / re-review：送审单元 = 缺失或 stale 的 (dim, half)
+  // review / re-review（S2①：节级锚判定；S2② 起 stale 维度派 delta 单节单元）：
+  // 首审缺席（无 whole 报告）→ 整 chunk 单元；有 whole 报告但存在不 fresh 节 → 该维度重审。
   for (const dim of DIMS) {
-    for (const h of ["a", "b"]) {
-      const rep = inv.reviews[c.nn]?.[dim]?.[h] ?? null;
-      if (rep !== c.halves[h]) q.push({ dim, nn: c.nn, half: h, kind: "real" });
+    const slot = inv.reviews[c.nn]?.[dim];
+    if (!slot?.whole) {
+      q.push({ dim, nn: c.nn, sec: null, kind: "real" });
+      continue;
     }
+    const needs = c.sections.some((sec) => {
+      const secRep = slot.secs?.[sec.id] ?? null;
+      return slot.whole.secs?.[sec.id] !== sec.sha && secRep?.sha !== sec.sha;
+    });
+    if (needs) q.push({ dim, nn: c.nn, sec: null, kind: "real" });
   }
   // 探针注入（源侧 truth 存在时）：混排在真单元之后，命名同构；text 随行携带（M1c 起
   // probe.mjs 生成的真实样本文本经 staging 物化派发，缺陷只存源侧 truth）
-  // C2 fresh 探针去重（2026-09-14 M3 回写）：探针报告 sha 与当前探针文本相符即不入队——
+  // C2 fresh 探针去重（2026-09-14 M3 回写）：探针报告头 sha 与当前探针文本相符即不入队——
   // 可靠性信号已取得（truth 命中）后重派零信息增益（M3 两轮共 8 单元冗余实证）
   const truth = opts.probeTruth ? JSON.parse(safeRead(opts.probeTruth) ?? "[]") : [];
   truth.forEach((p, i) => {
     const vNn = VIRTUAL_NN_MIN + i;
-    const half = p.half ?? "a";
-    const repPath = path.join(inv.dir, "reviews", `review-${p.dim}-chunk-${String(vNn).padStart(2, "0")}${half}.md`);
-    const repHead = safeRead(repPath) ?? "";
-    const repShaMatch = repHead.match(/^sha:\s*([0-9a-f]{12})/m);
+    const repPath = path.join(inv.dir, "reviews", `review-${p.dim}-chunk-${String(vNn).padStart(2, "0")}.md`);
+    const repHead = parseReportHead(safeRead(repPath) ?? "");
     const probeSha = sha12(p.text ?? "");
-    if (repShaMatch && repShaMatch[1] === probeSha) return; // fresh，跳过
-    q.push({ dim: p.dim, nn: vNn, half, kind: "probe", text: p.text });
+    if (repHead.sha === probeSha) return; // fresh，跳过
+    q.push({ dim: p.dim, nn: vNn, sec: null, kind: "probe", text: p.text });
   });
   return { q, action: null };
 }
@@ -397,21 +422,23 @@ export function materialize(dir, q) {
     const seq = String(i + 1).padStart(3, "0");
     const name = `review-${u.dim}-unit-${seq}.md`;
     const body = u.kind === "real"
-      ? halfText(dir, u.nn, u.half)
+      ? unitText(dir, u.nn, u.sec)
       : u.text ?? "__PROBE_BODY__"; // 探针样本文本来自源侧 truth（probe.mjs 生成）；缺 text 的旧 truth 退占位
     fs.writeFileSync(path.join(sdir, name), body ?? "", "utf-8");
     dispatch.push({
       input: `staging/${name}`,
-      output: `reviews/review-${u.dim}-chunk-${String(u.nn).padStart(2, "0")}${u.half}.md`,
+      output: `reviews/review-${u.dim}-chunk-${String(u.nn).padStart(2, "0")}${u.sec ? `-${u.sec}` : ""}.md`,
     });
   });
   return dispatch;
 }
 
-function halfText(dir, nn, h) {
+function unitText(dir, nn, sec) {
   const p = path.join(dir, "translated-chunks", `translated-chunk-${String(nn).padStart(2, "0")}.md`);
   const raw = safeRead(p);
-  return raw ? halfSlices(raw)[h].text : null;
+  if (raw == null) return null;
+  if (sec == null) return raw; // 整 chunk 首审
+  return sectionSlices(raw).find((x) => x.id === sec)?.text ?? null; // delta 单节
 }
 
 // ---------- status.md 渲染（双段契约 R13） ----------
@@ -491,18 +518,19 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
 }
 
 function unitCredit(c) {
-  // 已完成折算：有译文 1 + 已裁定 1 + 审校 done/2（8 单元）
+  // 已完成折算：有译文 1 + 已裁定 1 + 审校按维折算（满 = 4 维整 chunk 首审单元；S2① 起）
   let u = 0;
   if (c.translationSha) u += 1;
   if (c.stage === "adjudicate") return u;
   u += 1;
   if (c.stage === "verify") return u;
-  u += Math.floor(c.reviewDone / 2);
+  const secs = Math.max(1, c.sections?.length ?? 1);
+  u += Math.floor(c.reviewDone / secs);
   return u;
 }
 
 function stageCn(s) {
-  return { translate: "待翻译", adjudicate: "待裁定", verify: "待机械校验", review: "审校中", "re-review": "重审中（半块 stale）", done: "完成" }[s] ?? s;
+  return { translate: "待翻译", adjudicate: "待裁定", verify: "待机械校验", review: "审校中", "re-review": "重审中（节 stale）", done: "完成" }[s] ?? s;
 }
 
 // ---------- 用户动词 ----------
@@ -535,10 +563,16 @@ export function verb(dir, v, opts = {}) {
       const ch = map.find((c) => c.chapter === opts.chapter);
       if (!ch) return { exitCode: 1, errors: [`第 ${opts.chapter} 章不存在；章↔chunk 映射：` + map.map((c) => `第${c.chapter}章=${c.chunks.map((n) => String(n).padStart(2, "0")).join(",")}`).join("；")] };
       // 作废 = 删该章 chunk 的全部成果（重翻动词是用户显式要求，非自动）
+      const rdir = path.join(dir, "reviews");
       for (const nn of ch.chunks) {
         fs.rmSync(path.join(dir, "translated-chunks", `translated-chunk-${String(nn).padStart(2, "0")}.md`), { force: true });
         fs.rmSync(path.join(dir, "adjudications", `adjudication-chunk-${String(nn).padStart(2, "0")}.md`), { force: true });
-        for (const dim of DIMS) for (const h of ["a", "b"]) fs.rmSync(path.join(dir, "reviews", `review-${dim}-chunk-${String(nn).padStart(2, "0")}${h}.md`), { force: true });
+        const pad = String(nn).padStart(2, "0");
+        const victims = DIMS.map((dim) => `review-${dim}-chunk-${pad}.md`); // 整 chunk 首审报告
+        if (fs.existsSync(rdir)) {
+          for (const f of fs.readdirSync(rdir)) if (new RegExp(`^review-[\\w-]+-chunk-${pad}-s\\d+\\.md$`).test(f)) victims.push(f); // delta 单节报告
+        }
+        for (const f of victims) fs.rmSync(path.join(rdir, f), { force: true });
       }
       appendEvents(dir, ch.chunks.map((nn) => ({ ev: "invalidate", nn, detail: `重翻第${ch.chapter}章` })));
       return { exitCode: 0, disclosure: `第 ${ch.chapter} 章（${ch.title}）= chunk ${ch.chunks.join(", ")}——成果已作废，续跑将重译（R5 披露）` };
@@ -592,7 +626,7 @@ export function run(dir, opts = {}) {
   const wantDispatch = opts.verb === "dispatch";
   if (wantDispatch && queue.q.length && !inv.pending && !overBudget) {
     queue.dispatch = materialize(dir, queue.q);
-    appendEvents(dir, queue.q.map((u) => ({ ev: "dispatch", nn: u.nn, dim: u.dim, half: u.half })));
+    appendEvents(dir, queue.q.map((u) => ({ ev: "dispatch", nn: u.nn, dim: u.dim, sec: u.sec ?? null })));
   }
   const text = renderStatus(dir, inv, state, queue, opts);
   fs.writeFileSync(path.join(dir, STATUS), text, "utf-8");

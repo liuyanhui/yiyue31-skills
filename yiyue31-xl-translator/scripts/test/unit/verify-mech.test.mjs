@@ -381,6 +381,13 @@ test("CLI：译文在 translated-chunks/ 下 → verify-results.json 落盘（{r
     assert.equal(data.results[0].nn, 1, "记录须带 nn（status/merge 按此取每 chunk 末条为最新）");
     assert.equal(data.results[0].translated, "translated-chunk-01.md");
     assert.match(data.results[0].translationSha, /^[0-9a-f]{12}$/);
+    // S2① 节级锚：记录携带与 status.mjs 同源的逐节 sha 表（闸仍 = 整 chunk translationSha）
+    assert.ok(Array.isArray(data.results[0].sections) && data.results[0].sections.length >= 1, "记录须带逐节 sha 表");
+    for (const s of data.results[0].sections) {
+      assert.match(s.id, /^s\d+$/);
+      assert.match(s.sha, /^[0-9a-f]{12}$/);
+      assert.ok(typeof s.title === "string" && s.title.length > 0);
+    }
     assert.ok(data.results[0]._note.includes("终检不信任"));
     assert.ok(data.results[0].thresholds && data.results[0].thresholds.maxEnRun === 6);
   } finally {

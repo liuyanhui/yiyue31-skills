@@ -31,7 +31,7 @@ test("默认四维各 ≥1；虚拟 NN 901-999 唯一递增（与 status.mjs 同
   assert.deepEqual(byDim, [1, 1, 1, 1], "每维度恰 1 条");
   entries.forEach((e, i) => {
     assert.equal(e.virtualNn, 901 + i, "truth 内嵌 NN = 901 + index（status.mjs 同式）");
-    assert.ok(e.half === "a" || e.half === "b");
+    assert.ok(e.half === undefined, "S2① 后探针条目不再携带 half（报告名无半块后缀）");
     assert.ok(e.text.length > 10, "样本非空");
     assert.ok(e.defectType.length > 0, "缺陷类型非空");
     assert.ok(e.text.includes(e.expectedHit), "expectedHit 须出现在样本内（报告可引用性）");
