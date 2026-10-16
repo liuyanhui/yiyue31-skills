@@ -45,7 +45,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { scanWorkdir, sectionSlices, parseReportHead, appendEvents, chapterMap } from "./status.mjs";
+import { scanWorkdir, sectionSlices, parseReportHead, appendEvents, suspendTxn, chapterMap } from "./status.mjs";
 import { fenceAwareHeadings } from "./segment/segment.mjs";
 import { verify, loadKeepList, loadBrief, fenceAwareAnnotationMatches } from "./verify-mech.mjs";
 import { assemble } from "./merge.mjs";
@@ -628,8 +628,8 @@ export function runGate(dir, opts = {}) {
   }
   if (!finalPassed && consecutiveFails + 1 >= 3) {
     if (!fs.existsSync(path.join(dir, "pending.md"))) {
-      fs.writeFileSync(path.join(dir, "pending.md"), `type: pending-user\n原因：终检连续 FAIL ≥3——不无限空转（C-7）\n菜单：①继续（按半径分级重走：${hasGlobal ? "全局阶段作废重走" : `scoped chunk ${[...scoped].map(nn2).join(",")} 回退 Step 6/7` }）②手修后"继续翻译"（按新 sha 重审）③停止翻译\n`, "utf-8");
-      appendEvents(dir, { ev: "suspend", detail: "final-gate 连续 FAIL ≥3" });
+      // S2⑤：suspend/pending 同事务助手（事件先行提交 + pending 原子物化，中断自愈）
+      suspendTxn(dir, `type: pending-user\n原因：终检连续 FAIL ≥3——不无限空转（C-7）\n菜单：①继续（按半径分级重走：${hasGlobal ? "全局阶段作废重走" : `scoped chunk ${[...scoped].map(nn2).join(",")} 回退 Step 6/7` }）②手修后"继续翻译"（按新 sha 重审）③停止翻译\n`, { detail: "final-gate 连续 FAIL ≥3" });
     }
   }
 

@@ -35,6 +35,8 @@ import {
   chapterMap,
   deriveCounters,
   appendEvents,
+  readEvents,
+  suspendTxn,
 } from "../../status.mjs";
 
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
@@ -742,6 +744,147 @@ test("S2④ 修复环轮每 chunk ≤3：第 4 次物化被拒 → 停该 chunk 
     assert.ok(r2.statusText.includes("停修登记"), "人话段披露停修");
     // 停修后不再受理该 chunk 修复
     assert.equal(run(dir, { verb: "fix", nn: 1 }).exitCode, 1, "已停修 chunk 拒绝再派修复");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------- S2⑤ suspend/pending 同事务 + events 原子写 + 撕裂容错 + §9 mtime 对账 ----------
+
+test("S2⑤ appendEvents 原子写：追加后全文逐行可解析、末行换行恒在；遗留 .tmp 被覆盖清理", () => {
+  const dir = makeWorkdir(1);
+  try {
+    // 遗留 .tmp = 上次中断残影（rename 前被杀）——本次写入应覆盖清理，不入流不被扫
+    fs.writeFileSync(path.join(dir, "events.jsonl.tmp"), "垃圾半行 {\"ev\":", "utf-8");
+    appendEvents(dir, { ev: "resume" });
+    appendEvents(dir, [{ ev: "dispatch", nn: 1 }, { ev: "dispatch", nn: 2 }]); // 数组形态逐事件分行
+    const raw = fs.readFileSync(path.join(dir, "events.jsonl"), "utf-8");
+    assert.ok(raw.endsWith("\n"), "末行换行恒在（原子替换不产撕裂）");
+    for (const l of raw.split("\n").filter((x) => x.trim())) {
+      assert.doesNotThrow(() => JSON.parse(l), "中断夹具后 events.jsonl 逐行可解析");
+    }
+    assert.ok(!fs.existsSync(path.join(dir, "events.jsonl.tmp")), "遗留 .tmp 已被覆盖清理");
+    assert.equal(readEvents(dir).length, 3);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2⑤ 撕裂尾行容错：完整行照常解析、尾行 WARN 忽略（CLI stderr 在场，不阻塞）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    // 手工构造撕裂尾行（模拟旧机制写一半被杀）：两行完整 + 半行无换行
+    fs.writeFileSync(
+      path.join(dir, "events.jsonl"),
+      `{"t":"2026-10-16T00:00:00.000Z","ev":"resume"}\n{"t":"2026-10-16T00:00:01.000Z","ev":"dispatch","nn":1}\n{"t":"2026-10-16T00:00:0`,
+      "utf-8"
+    );
+    const evs = readEvents(dir);
+    assert.equal(evs.length, 2, "完整行照常解析、撕裂行忽略");
+    assert.equal(deriveCounters(evs).dispatchedSinceSessionEnd, 1, "计数器只吃完整行");
+    const v = spawnSync(process.execPath, [SCRIPT, dir, "--json"], { encoding: "utf-8" });
+    assert.equal(v.status, 0, "撕裂尾行不阻塞（exit 0）");
+    assert.match(v.stderr, /WARN S2⑤: .*撕裂尾行/, "读侧 WARN 在 stderr 在场");
+    assert.doesNotThrow(() => JSON.parse(v.stdout), "--json 输出照常可解析");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2⑤ 撕裂尾行追加隔离：不吞并新行、不改写历史字节", () => {
+  const dir = makeWorkdir(1);
+  try {
+    const torn = `{"t":"2026-10-16T00:00:00.000Z","ev":"resume"}\n{"ev":"dispatch","t":"20`;
+    fs.writeFileSync(path.join(dir, "events.jsonl"), torn, "utf-8");
+    appendEvents(dir, { ev: "fix", nn: 3 });
+    const raw = fs.readFileSync(path.join(dir, "events.jsonl"), "utf-8");
+    assert.ok(raw.startsWith(torn + "\n"), "历史字节原样保留（撕裂行不吞并新行、不回改）");
+    assert.ok(raw.endsWith("\n"), "追加后文件回到完整形态");
+    const evs = readEvents(dir);
+    assert.equal(evs.length, 2, "旧完整行 + 新行，撕裂行忽略");
+    assert.ok(evs.some((e) => e.ev === "fix" && e.nn === 3), "新行完整解析");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2⑤ suspendTxn 同事务：suspend 事件（携 pending 载荷）+ pending.md 双双在场", () => {
+  const dir = makeWorkdir(1);
+  try {
+    const text = `type: pending-user\n原因：计数器超限（chunk 1——机械打回 >2，G6/R4）\n`;
+    suspendTxn(dir, text, { detail: "over-limit:1" });
+    assert.ok(fs.existsSync(path.join(dir, "pending.md")), "suspend 后 pending.md 必在（验收钉死）");
+    assert.equal(fs.readFileSync(path.join(dir, "pending.md"), "utf-8"), text, "pending 内容逐字一致");
+    const e = readEvents(dir).find((x) => x.ev === "suspend");
+    assert.ok(e, "suspend 事件落流");
+    assert.equal(e.type, "pending-user");
+    assert.equal(e.pending, text, "载荷携 pending.md 全文（自愈重建依据）");
+    assert.equal(e.detail, "over-limit:1", "调用点 detail 保留");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2⑤ 同事务自愈：事件已提交而 pending 缺失（中断半态）→ scanWorkdir 重建；已消解不复活", () => {
+  const dir = makeWorkdir(1);
+  try {
+    const text = `type: pending-user\n原因：终检连续 FAIL ≥3\n`;
+    appendEvents(dir, { ev: "suspend", type: "pending-user", pending: text, detail: "final-gate 连续 FAIL ≥3" }); // 模拟提交后、物化前被杀
+    assert.ok(!fs.existsSync(path.join(dir, "pending.md")), "前置：半态（事件在、pending 缺）");
+    const inv = scanWorkdir(dir);
+    assert.ok(fs.existsSync(path.join(dir, "pending.md")), "对账自愈——pending.md 按事件载荷重建（不留半套）");
+    assert.equal(fs.readFileSync(path.join(dir, "pending.md"), "utf-8"), text, "重建逐字一致");
+    assert.equal(inv.pending, "pending-user", "自愈后挂起态生效");
+    // 消解（pending-clear 在后）→ 不再重建
+    fs.rmSync(path.join(dir, "pending.md"), { force: true });
+    appendEvents(dir, { ev: "pending-clear", detail: "终检 PASS——挂起旗标随终态消解" });
+    scanWorkdir(dir);
+    assert.ok(!fs.existsSync(path.join(dir, "pending.md")), "已消解的 suspend 不复活");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2⑤ 同事务反例（故障注入）：事件提交失败 → 事件与 pending 均不在（不留半套状态）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    fs.mkdirSync(path.join(dir, "events.jsonl")); // rename 落到目录恒败（EISDIR，root 亦然）= 提交点故障注入
+    assert.throws(() => suspendTxn(dir, "type: pending-user\n原因：x\n", { detail: "over-limit:1" }), "提交点故障须抛出");
+    assert.ok(!fs.existsSync(path.join(dir, "pending.md")), "提交失败 ⇒ pending 不写——要么都在要么都不在");
+    assert.equal(readEvents(dir).length, 0, "事件流无 suspend（提交点未过）");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2⑤ 历史无载荷 suspend：只 WARN 不重建（禁补记——不凭空造 pending 内容）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    appendEvents(dir, { ev: "suspend", detail: "legacy-run" }); // 旧格式事件（无 pending 载荷）
+    scanWorkdir(dir);
+    assert.ok(!fs.existsSync(path.join(dir, "pending.md")), "无载荷历史 suspend 不重建 pending");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2⑤ §9 mtime 对账：脚本成对产物晚于末事件 → WARN 人话+--json 同源在场；对齐后不 WARN", () => {
+  const dir = makeWorkdir(1);
+  try {
+    appendEvents(dir, { ev: "resume" });
+    const lastT = readEvents(dir).at(-1).t;
+    const m = path.join(dir, "merged-draft.md");
+    fs.writeFileSync(m, "# merged\n", "utf-8");
+    fs.utimesSync(m, new Date(), new Date(Date.parse(lastT) + 60000)); // 正例：mtime 晚于末事件 60s
+    let r = run(dir, {});
+    assert.equal(r.exitCode, 0, "只 WARN 不阻塞");
+    assert.ok(r.statusText.includes("S2⑤ 对账 WARN"), "人话段 WARN 在场");
+    assert.ok(r.state.warnings.some((w) => w.includes("对账 WARN") && w.includes("merged-draft.md")), "--json 通道（state.warnings）同源在场");
+    // 反例：对齐（mtime 早于末事件）后不 WARN
+    fs.utimesSync(m, new Date(), new Date(Date.parse(lastT) - 10000));
+    r = run(dir, {});
+    assert.ok(!r.state.warnings.some((w) => w.includes("对账 WARN")), "对齐后不 WARN");
+    assert.ok(!r.statusText.includes("S2⑤ 对账 WARN"), "人话段同步干净");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

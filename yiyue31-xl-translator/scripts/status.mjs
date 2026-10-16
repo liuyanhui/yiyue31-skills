@@ -70,23 +70,84 @@ export function nnKey(name) {
 
 // ---------- 事件流水（追加式；计数器/耗时/预算的事实源） ----------
 
-export function appendEvents(dir, events) {
-  const line = (events instanceof Array ? events : [events])
-    .map((e) => JSON.stringify({ t: nowIso(), ...e }))
-    .join("\n");
-  fs.appendFileSync(path.join(dir, EVENTS), line + "\n", "utf-8");
+// S2⑤ 原子写（③v3健3）：tmp + fsync + rename——任一中断时刻目标文件要么旧内容要么新内容，
+// 不产生撕裂行。并发前提 = 工作流恒单会话串行（CLAUDE.md），跨进程并发不加锁。
+function writeAtomic(file, data) {
+  const tmp = `${file}.tmp`;
+  const fd = fs.openSync(tmp, "w");
+  try {
+    fs.writeSync(fd, data);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmp, file); // 原子替换；遗留 .tmp（中断残留）下次写入时被覆盖清理，不入流不被扫
 }
 
+// S2⑤ events 追加收口：唯一写点（status/final-gate/merge/derive-bilingual/verify-mech 全经此）。
+// 原子语义 = 读旧全文 + 新行 → 一次性原子替换：任何中断时刻文件均为完整行集合。
+// 既存撕裂尾行（历史/外部中断遗留）不吞并新行、不改写历史字节——补换行隔离另起，读侧 WARN 忽略。
+export function appendEvents(dir, events) {
+  const file = path.join(dir, EVENTS);
+  const adds = (events instanceof Array ? events : [events])
+    .map((e) => JSON.stringify({ t: nowIso(), ...e }))
+    .join("\n") + "\n";
+  let prev = safeRead(file) ?? "";
+  if (prev && !prev.endsWith("\n")) {
+    console.error(`WARN S2⑤: events.jsonl 既存尾行无换行（撕裂遗留）——追加前补换行隔离，该撕裂行由读侧 WARN 忽略`);
+    prev += "\n";
+  }
+  writeAtomic(file, prev + adds);
+}
+
+// S2⑤ 撕裂尾行容错（①7）：不可解析行 WARN + 忽略，其余完整行照常解析——
+// 尾行 = 中断撕裂遗留；中段异常行 = 疑似外部改写（更强披露，同样跳过不阻塞）。
 export function readEvents(dir) {
   const raw = safeRead(path.join(dir, EVENTS));
   if (!raw) return [];
-  return raw.split("\n").filter((l) => l.trim()).map((l) => {
+  const lines = raw.split("\n");
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (!l.trim()) continue;
     try {
-      return JSON.parse(l);
+      out.push(JSON.parse(l));
     } catch {
-      return null;
+      const isTail = i === lines.length - 1;
+      console.error(`WARN S2⑤: events.jsonl 第 ${i + 1} 行不可解析（${isTail ? "撕裂尾行——中断遗留" : "中段异常行——疑似外部改写"}）——忽略该行，其余完整行照常解析`);
     }
-  }).filter(Boolean);
+  }
+  return out;
+}
+
+// S2⑤ suspend/pending 同事务（①6）：提交序 = suspend 事件先行（原子追加 = 提交点，载荷
+// 携 pending.md 全文，可重建）→ pending.md 原子物化。任一中断时刻：提交前 → 两者皆不在；
+// 提交后物化前 → 事件在而 pending 缺，由 scanWorkdir 对账自愈（reconcileSuspend）——
+// 收敛不变式：suspend 事件已提交且未消解 ⇒ pending.md 必在。
+export function suspendTxn(dir, pendingText, eventFields = {}) {
+  const type = pendingText.match(/^type:\s*(\S+)/m)?.[1] ?? "pending-user";
+  appendEvents(dir, { ev: "suspend", type, pending: pendingText, ...eventFields });
+  writeAtomic(path.join(dir, PENDING), pendingText);
+}
+
+// S2⑤ 同事务对账自愈（scanWorkdir 调用）：未消解 suspend（其后无 pending-clear/unseal/
+// restart）而 pending.md 缺失 → 有载荷则重建（WARN 披露）；无载荷历史事件只 WARN 不重建
+// （禁补记——不凭空造 pending 内容）。返回 null=无需处理，否则 { warn, pendingType }。
+function reconcileSuspend(dir, events, pendingExists) {
+  if (pendingExists) return null;
+  let last = null;
+  let cleared = true;
+  for (const e of events) {
+    if (e.ev === "suspend") { last = e; cleared = false; }
+    else if (e.ev === "pending-clear" || e.ev === "unseal" || e.ev === "restart") cleared = true;
+  }
+  if (!last || cleared) return null;
+  if (typeof last.pending !== "string") {
+    return { warn: `WARN S2⑤: 事件流存在未消解 suspend（${last.t}）而 pending.md 缺失，且事件无重建载荷（历史事件，禁补记）——请人工核对`, pendingType: null };
+  }
+  writeAtomic(path.join(dir, PENDING), last.pending);
+  const pendingType = last.pending.match(/^type:\s*(\S+)/m)?.[1] ?? "pending-user";
+  return { warn: `WARN S2⑤: suspend 事件已提交（${last.t}）而 pending.md 缺失——同事务自愈：已按事件载荷重建 pending.md（type: ${pendingType}）`, pendingType };
 }
 
 // 计数器推导（G6/R4）：按 chunk 聚合
@@ -273,6 +334,12 @@ export function scanWorkdir(dir) {
     inv.pending = t ? t[1] : "pending-user";
   }
   inv.events = readEvents(dir);
+  // S2⑤：同事务对账——suspend 事件已提交而 pending.md 缺失（提交后物化前被中断）→ 自愈重建
+  const healed = reconcileSuspend(dir, inv.events, inv.pending != null);
+  if (healed) {
+    console.error(healed.warn);
+    if (healed.pendingType) inv.pending = healed.pendingType;
+  }
   return inv;
 }
 
@@ -571,6 +638,40 @@ export function fixDispatch(dir, inv, state, opts = {}) {
   return { exitCode: 0, pkg: path.relative(dir, pkgPath), dims, round: rounds + 1, freeze, pkgBytes: Buffer.byteLength(pkg, "utf-8") };
 }
 
+// ---------- S2⑤ §9 mtime 对账兜底 ----------
+// 脚本同进程成对（产物写入 → 事件落流）的文件 mtime 晚于 events 末事件时间戳 ⇒ 落流被吞
+// （如 verify-mech 旁路 best-effort）或外部改写未落流 ⇒ WARN（①7 断档检测）。
+// 口径：只检测不回填（禁补记）、只 WARN 不阻塞。agent 步调产物（reviews/adjudications/
+// translated-chunks/chunks/manifest——事件配对跨步延迟，中间态晚于末事件属正常）与按设计
+// 晚于事件的视图/旗标件（status.md/pending.md/REPORT.md）不入审计集，防常态误报。
+// 末事件时间戳取实读文件尾（本次 run 已追加的事件也计入，防自误报）；1s 容差吸收时间戳粒度。
+function mtimeAudit(dir, inv) {
+  const raw = safeRead(path.join(dir, EVENTS));
+  if (!raw) return null;
+  let lastT = null;
+  const lines = raw.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!lines[i].trim()) continue;
+    try { lastT = JSON.parse(lines[i]).t ?? null; } catch { continue; } // 撕裂尾行跳过（readEvents 已 WARN）
+    break;
+  }
+  if (!lastT) return null;
+  const deadline = Date.parse(lastT) + 1000;
+  const cands = [path.join(dir, "merged-draft.md"), path.join(dir, "verify-results.json")];
+  if (inv.globals.delivered) cands.push(path.join(dir, `translated-${inv.title}-zh.md`));
+  if (inv.globals.bilingual) cands.push(path.join(dir, `translated-${inv.title}-bilingual.md`));
+  const sdir = path.join(dir, "staging");
+  if (fs.existsSync(sdir)) for (const f of fs.readdirSync(sdir)) cands.push(path.join(sdir, f));
+  let latest = null;
+  for (const p of cands) {
+    let m;
+    try { m = fs.statSync(p).mtimeMs; } catch { continue; }
+    if (m > deadline && (latest == null || m > latest.m)) latest = { p, m };
+  }
+  if (!latest) return null;
+  return `S2⑤ 对账 WARN（§9 断档兜底）：${path.relative(dir, latest.p)} mtime（${new Date(latest.m).toISOString()}）晚于 events 末事件（${lastT}）——疑有活动未落流；只检测不回填（禁补记）`;
+}
+
 // ---------- status.md 渲染（双段契约 R13） ----------
 
 export function renderStatus(dir, inv, state, queue, opts = {}) {
@@ -621,6 +722,8 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
     L.push(`第 ${cur.nn}/${total} chunk（${stageCn(cur.stage)}），已完成 ${done}/${total}，已耗时 ${elapsedH}h，预计剩余 ~${remainUnits} 单元（M3 前基线 ${UNITS_PER_CHUNK} 单元/chunk）。下次对我说：继续翻译 ${state.title}。`);
   }
   if (state.residue?.length) L.push(`停修登记：chunk ${state.residue.join(",")} 修复环超限（residue-chunk-NN.md）——其余 chunk 照常推进，处置见 residue 文件与 PENDING 流程。`);
+  // S2⑤：健康/对账 WARN 进人话段（--json 走 state.warnings 同源）——含 §9 mtime>末事件断档兜底
+  for (const w of state.warnings) L.push(`⚠ ${w}`);
   L.push("");
 
   // ---- 段 2：动作指令 ----
@@ -742,13 +845,9 @@ export function run(dir, opts = {}) {
   let state = deriveState(inv);
 
   // 计数器超限自动转挂起（G6/R4）——挂起是文件系统事实（pending.md），不是内存态
+  // S2⑤：走同事务助手（事件先行提交 + pending 原子物化，中断自愈见 reconcileSuspend）
   if (state.overLimit.length && !inv.pending) {
-    fs.writeFileSync(
-      path.join(dir, PENDING),
-      `type: pending-user\n原因：计数器超限（chunk ${state.overLimit.join(",")}——机械打回 >2 或累计升级 ≥2，G6/R4）\n`,
-      "utf-8"
-    );
-    appendEvents(dir, { ev: "suspend", detail: `over-limit:${state.overLimit.join(",")}` });
+    suspendTxn(dir, `type: pending-user\n原因：计数器超限（chunk ${state.overLimit.join(",")}——机械打回 >2 或累计升级 ≥2，G6/R4）\n`, { detail: `over-limit:${state.overLimit.join(",")}` });
     inv.pending = "pending-user";
   }
 
@@ -774,12 +873,7 @@ export function run(dir, opts = {}) {
     // （统稿完成后内容冻结，补审轮已尽须用户裁决；residue/冻结窗发现只登记的口径见 SKILL.md Step 8）
     const inFreeze = FREEZE_STAGES.includes(state.global);
     if (inFreeze && state.counters.freezeRounds >= FREEZE_ROUND_MAX) {
-      fs.writeFileSync(
-        path.join(dir, PENDING),
-        `type: pending-user\n原因：冻结窗补审轮超限（已 ${state.counters.freezeRounds} 轮，硬门 ≤${FREEZE_ROUND_MAX}，S2③）——统稿完成后内容冻结，pm-review 类发现只登记不修；用户点名修复的补审轮已尽，须用户裁决（菜单：①继续（换模型/调参）②手修后说"继续翻译"③说"停止翻译"封存）\n`,
-        "utf-8"
-      );
-      appendEvents(dir, { ev: "suspend", detail: `freeze-rounds:${state.counters.freezeRounds}` });
+      suspendTxn(dir, `type: pending-user\n原因：冻结窗补审轮超限（已 ${state.counters.freezeRounds} 轮，硬门 ≤${FREEZE_ROUND_MAX}，S2③）——统稿完成后内容冻结，pm-review 类发现只登记不修；用户点名修复的补审轮已尽，须用户裁决（菜单：①继续（换模型/调参）②手修后说"继续翻译"③说"停止翻译"封存）\n`, { detail: `freeze-rounds:${state.counters.freezeRounds}` });
       return { exitCode: 3, errors: [`冻结窗补审轮 ${state.counters.freezeRounds}/${FREEZE_ROUND_MAX} 已达硬门——拒绝补审派发，已写 pending.md 上报（S2③）`] };
     }
     queue.dispatch = materialize(dir, queue.q);
@@ -794,6 +888,9 @@ export function run(dir, opts = {}) {
     // S2③：冻结窗内补审派发批记一轮（freeze-round 事件——计数器事实源，脚本落流禁人工补记）
     if (inFreeze) appendEvents(dir, { ev: "freeze-round", units: queue.q.length });
   }
+  // S2⑤ §9：mtime 对账兜底（只 WARN 不阻塞；人话段 + --json state.warnings 双通道）
+  const mtimeWarn = mtimeAudit(dir, inv);
+  if (mtimeWarn) state.warnings.push(mtimeWarn);
   const text = renderStatus(dir, inv, state, queue, opts);
   fs.writeFileSync(path.join(dir, STATUS), text, "utf-8");
   const fixDisclosure = fixInfo
