@@ -889,3 +889,32 @@ test("S2⑤ §9 mtime 对账：脚本成对产物晚于末事件 → WARN 人话
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------- S2⑦ 派发计数 >90 WARN（§12 重评线观测点） ----------
+
+test("S2⑦ 派发计数 >90 WARN：91 → WARN 在场（人话+--json 同源、不阻塞）；90 → 不 WARN", () => {
+  // 正例：91 次派发（事件流事实）
+  const dir = makeWorkdir(1);
+  try {
+    appendEvents(dir, Array.from({ length: 91 }, (_, i) => ({ ev: "dispatch", nn: 1, dim: DIMS[i % 4], sec: null })));
+    assert.equal(deriveCounters(readEvents(dir)).dispatchTotal, 91, "口径 = 事件流总派发（与现有派发计数同源）");
+    const r = run(dir, {});
+    assert.equal(r.exitCode, 0, "WARN 不阻塞（停不停重评由人按 §12 裁决）");
+    const w = r.state.warnings.find((x) => x.includes(">90") && x.includes("§12"));
+    assert.ok(w, "--json 通道 WARN 在场");
+    assert.ok(w.includes("91"), "WARN 披露当前计数");
+    assert.ok(r.statusText.includes("⚠") && r.statusText.includes(">90"), "人话段 ⚠ 行同源在场");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  // 反例：恰 90 → 不 WARN
+  const dir2 = makeWorkdir(1);
+  try {
+    appendEvents(dir2, Array.from({ length: 90 }, (_, i) => ({ ev: "dispatch", nn: 1, dim: DIMS[i % 4], sec: null })));
+    const r2 = run(dir2, {});
+    assert.ok(!r2.state.warnings.some((x) => x.includes(">90")), "90 不 WARN（触发线 = >90）");
+    assert.ok(!r2.statusText.includes(">90"), "人话段同步干净");
+  } finally {
+    fs.rmSync(dir2, { recursive: true, force: true });
+  }
+});

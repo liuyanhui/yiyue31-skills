@@ -94,7 +94,7 @@ author: Yiyue31
 - `final-gate.mjs` **重执行一切确定性检查**（不信任何落盘日志）——判据 F1-F13 权威登记于 `scripts/test/README.md`（机械重跑/重导出 diff/拼接 sha/完备性矩阵（准确性缺失 = 无条件 FAIL）/签名/G3/R23/标题锚/G4/探针命中每维每 run ≥1）。
 - 探针：伪审校单元由 status 队列经 `staging/` 同构注入（与真 chunk 同构，照单派发）；ground truth 不落工作区。
 - 新鲜度：豁免 glob 精确到文件（**pm-review 的 merged-sha 内容锚不豁免**）；固定顺序 = 冷读发现清零 → pm-review 最后写 → 终检最后跑；mtime 只作 WARN，硬判 = 内容 sha + 重执行结果。
-- FAIL **半径分级**：单 chunk 根因 = scoped 重做（该 chunk 回 Step 6/7 + 接缝复查 + pm-review 重生成，其余成果保留）；全局根因（拼接 sha/完备性/探针未命中）= 全局阶段整体作废重走；连续 ≥3 次 FAIL 转 PENDING-USER。
+- FAIL **半径分级**：单 chunk 根因 = scoped 重做（该 chunk 回 Step 6/7 + 接缝复查 + pm-review 重生成，其余成果保留）；全局根因（拼接 sha/完备性/探针未命中）= 全局作废重走；连续 ≥3 次 FAIL 转 PENDING-USER。
 - PASS → 脚本**原子改名**为 `translated-<title>-zh.md`（已存在交付物时拒绝覆盖——手修保护）→ REPORT 定稿（**交付物 sha 内容锚入 REPORT**）+ **交付摘要内联聊天输出**（按 `{skill-dir}/references/delivery-template.md`）。
 
 ## 横切机制
@@ -103,7 +103,7 @@ author: Yiyue31
 - **节级锚与 delta 队列生于脚本**：审校锚 = 逐节 sha 表（`sectionSlices`——与分段同款 fence 感知节边界；status/final-gate/verify-mech 三脚本同源派生）；修复后重审队列 = 变化节 × 4 维差集。报告锚一律脚本从内容派生，**禁止人工拼接**；夹具钉死（`scripts/test/README.md` 判据契约）。
 - **决策落盘纪律（S2③）**：审校建议/统稿清单/历史参考的**采纳或不采纳当场落 analysis-notes**（逐条一句理由）——禁口头决策、禁事后补记。
 - **D1 环境处置与限流保证**（429 分型 / 流停滞核验 / 并发 ≤5 两波制 / 退避四层 / 上下文溢出同路径恢复）细则见 `{skill-dir}/references/env-playbook.md`。
-- **探针注入**：run 开始跑 `{skill-dir}/scripts/probe.mjs` 生成源侧 truth（`probe/truth/<run>.json`，不落工作区）；status 派发注入与 final-gate 命中比对均以 `--probe-truth` 传入。
+- **探针注入**：run 开始跑 `{skill-dir}/scripts/probe.mjs` 生成源侧 truth（`probe/truth/<run>.json`，不落工作区；新审校轮=`--run <name>`）；status 注入与 final-gate 命中比对均以 `--probe-truth` 传入。
 - **draft 导入（S2⑥）**：外部半成品目录经 `import-draft.mjs` 按边界清单受/拒/隔离导入；旧 status.md 无 `schema:` 戳非零拒收；events 归档新建禁补记。
 - **派发纪律**：派发指令 inputs/outputs 一律**绝对路径**（status 输出相对路径，subagent cwd 不定）；prompt 内相对路径以派发指令为准。
 - **用户动词表**（继续/进度/停止/重翻/重新翻译/样张/双语对照）逐动词出口见 `{skill-dir}/references/verbs.md`。
@@ -111,8 +111,8 @@ author: Yiyue31
 - **会话预算**：每会话 N 单元后干净退出；单元幂等；N 同约束内存与主上下文增长；**单元 = 一次 subagent 调用**（基线 ~11/chunk）。
 - **subagent 回传纪律**：仅回传 落盘路径 + 一行结论 + FAIL 项计数，报告/产物全文只落盘——保主上下文 O(1)。
 - **PENDING-USER 挂起态**：`pending.md` 存在即挂起；处理后自动续跑——零介入唯一合法例外；待决终态一律走此门（不带病交付）。菜单：①继续（换模型/调参并记录）②手修后说"继续翻译"（按新 sha 重审）③终止；status 挂起态人话行输出此菜单。
-- **并发参数** `--concurrency N` 默认 1；仅限"尴尬并行"阶段（翻译/裁定/校验/审校）；统稿、冷读、终检永远单发；**禁止自动上调**。
-- **原文变更 re-keying**：chunk 按内容 sha 匹配保留成果（非序号）；原文 sha 变更 → 仅内容 sha 变更的 chunk 作废重翻，下游仅 **N+1 邻 chunk** handoff②/串行增强段重生成，全局阶段（merge/统稿/冷读/终检）整体作废重走。
+- **并发参数** `--concurrency N` 默认 1；仅限"尴尬并行"阶段（翻译/裁定/校验/审校）；统稿/冷读/终检永远单发；**禁止自动上调**。
+- **原文变更 re-keying**：chunk 按内容 sha 匹配保留成果（非序号）；原文 sha 变更 → 仅内容 sha 变更的 chunk 作废重翻，下游仅 **N+1 邻 chunk** handoff②/串行增强段重生成，全局阶段（merge/统稿/冷读/终检）作废重走。
 - **交付后**：交付物 sha 已锚入 REPORT，再入不符 = 用户手改 → 询问"保留手修 or 重新交付"（手修永不覆盖）。**术语统一轻命令**：glossary 更新 → 全稿机械替换（逐条 diff 落盘）→ 受影响 chunk 重跑 Step 5 → final-gate 重入（复用统稿类通道，不重翻译）。
 
 ## 交付

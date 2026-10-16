@@ -10,12 +10,12 @@ scripts/test/
 ├── README.md                       # 本文件
 ├── unit/                           # 单元层：程序化合成夹具（确定性，不落盘），钉死算法行为
 │   ├── segment.test.mjs            #   分段算法：fence 感知/拼接 sha/落带/R11-B/产物/CLI
-│   ├── status.test.mjs             #   状态机（M1b+S2③④⑤）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账
+│   ├── status.test.mjs             #   状态机（M1b+S2③④⑤⑦）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账/派发 >90 WARN
 │   ├── import-draft.test.mjs       #   draft 导入（S2⑥）：版本戳拒旧格式/§7 边界执行/events 归档新建禁补记/幂等/探针小文档全流程
 │   ├── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
 │   ├── merge.test.mjs              #   合并（M1c）：M1-M7 纯函数与病态输入、CLI 冒烟
 │   ├── derive-bilingual.test.mjs   #   双语派生（Phase 1）：B1-B8 纯函数与病态输入、CLI 冒烟
-│   ├── probe.test.mjs              #   探针生成（M1c）：四维覆盖/虚拟 NN/确定性/truth 落盘与防覆盖
+│   ├── probe.test.mjs              #   探针生成（M1c+S2⑦）：四维覆盖/虚拟 NN/确定性/truth 落盘与防覆盖/--run 新轮命名/伪报告命中正反
 │   ├── final-gate.test.mjs         #   交付门（M1c+前置①③）：重执行/完备性/G3/R23/标题锚/G4/R15/探针/元信息头/R8-c
 │   ├── handoff.test.mjs            #   交接包机器件（M3 前置④）：glossary 解析/单复数归一/词边界投影/语境段/幂等
 │   ├── consistency.test.mjs        #   统稿清单（M3 前置②）：fork 三项继承 + 标题锚对/间距/接缝/文风拼料
@@ -183,6 +183,16 @@ E5 审计集口径：agent 步调产物（reviews/adjudications/translated-chunk
 | D3 | events 禁补记：旧流归档逐字节保留不迁移；新流自零新建（首事件 = import，携对账明细）；幂等重入（首事件=import → 跳过移动不追加） | 凭空续写历史事件（防造假红线）；重复导入重复归档 | "D2-D4…"、"D3 幂等…" |
 | D4 | verify-results 强制重跑：归档 ⇒ 全部 chunk 推回 verify 阶段（status 派发口径强制重跑） | 混存 verify 结果被继承（§7：混存不可信，重跑 S4④ 分档前口径） | "D2-D4 边界执行…"（stage=verify 断言） |
 | D5 | 探针小文档全流程：导入 → status 可派发 → verify 重跑 → dispatch（真+探针同构物化）→ 伪审校报告落位 → truth 命中（正反）→ 状态机推进至 **ready-merge**（覆盖深度止于此；merge 后归既有 merge/final-gate 用例域） | 机制各自为绿、链路断点 | "D5 探针小文档全流程…" |
+
+## probe 新 run+truth 判据（S2⑦ 落地）
+
+**判据权威登记于此**——改判据 = 改 `probe.mjs`/`status.mjs` + 本表 + 对应用例，三处同步。§7 probe truth 行：旧 run 的 truth 拒（新 run+truth，`--run <name>` 命名）。
+
+| # | 判据 | 防什么 | 钉死用例 |
+|---|------|--------|----------|
+| P1 | `--run <name>` 新审校轮新 run 命名（soai-r2 形态）：truth 落 `<name>.json` 四维齐、虚拟 NN 段不变、同 run 重跑拒绝（防覆盖）、同 run 跨目录生成字节相同（缺省 seed = runId 哈希） | 新轮混用/改写旧 run 的 ground truth | unit/probe.test.mjs "S2⑦ --run soai-r2…" |
+| P2 | `--probe-truth` 伪报告命中：报告含 expectedHit → `probeCheck` 零 FAIL；缺报告 = 直接 FAIL；未含 expectedHit → 未命中 FAIL 并披露期望串（注入已知缺陷被 truth 抓到；链路级正反另见 D5） | 审校有效性无证据 / 漏抓伪装通过（R20/F11） | unit/probe.test.mjs "S2⑦ --probe-truth 伪报告命中…" |
+| P3 | status 派发计数 >90 → WARN（§12 重评线观测点）：口径 = events 总 dispatch（`deriveCounters.dispatchTotal`，与现有派发计数同源，含探针）；91 → WARN 在场（人话 ⚠ 行 + `--json` state.warnings 同源、不阻塞）；90 → 不 WARN | 迁移+重审成本逼近重头译而无观测点（③v4-7/§12；只观测不代决） | unit/status.test.mjs "S2⑦ 派发计数 >90 WARN…" |
 
 ## 维护规约
 

@@ -49,6 +49,9 @@ const FREEZE_ROUND_MAX = 2; // 冻结窗补审轮项目级硬门（超限 → di
 // S2⑥ state schema 版本戳：status.md 头部 `schema:` 行（物化视图自述版本）——import-draft
 // 拒收无戳旧格式（旧状态不可信，"delivered" 系误报；跨版本迁移语义属 S4①）。
 export const SCHEMA_VERSION = 1;
+// S2⑦ §12 tripwire 观测点：事件流派生总派发 >90 → WARN（P1 审校派发 >90 即停重评——
+// 迁移+重审成本逼近重头译；只 WARN 不阻塞，停不停由人按 §12 裁决）。含探针派发。
+const DISPATCH_WARN_MAX = 90;
 
 // ---------- 基础工具 ----------
 
@@ -160,13 +163,15 @@ function reconcileSuspend(dir, events, pendingExists) {
 //                      冻结窗内一次补审派发批；与 reviewRounds 分开计数，P1 并行不挤占）
 // - escalations:       累计升级次数（跨轮不重置——G6 条款 3）
 // - sinceSessionEnd:   预算计数窗口
+// - dispatchTotal:     事件流总派发（S2⑦ §12 观测点——与 dispatchedSinceSessionEnd 同源派生）
 export function deriveCounters(events) {
-  const c = { mechanicalRejects: {}, reviewRounds: {}, escalations: {}, freezeRounds: 0, dispatchedSinceSessionEnd: 0 };
+  const c = { mechanicalRejects: {}, reviewRounds: {}, escalations: {}, freezeRounds: 0, dispatchedSinceSessionEnd: 0, dispatchTotal: 0 };
   for (const e of events) {
     const nn = e.nn ?? null;
     switch (e.ev) {
       case "dispatch":
         c.dispatchedSinceSessionEnd++;
+        c.dispatchTotal++;
         break;
       case "session-end":
         c.dispatchedSinceSessionEnd = 0;
@@ -374,6 +379,11 @@ export function fingerprint(inv) {
 export function deriveState(inv) {
   const st = { title: inv.title, originalSha: inv.originalSha, chunks: [], global: null, warnings: [] };
   st.counters = deriveCounters(inv.events);
+  // S2⑦ §12 tripwire 观测点：总派发 >90 → WARN（人话段 ⚠ 行 + --json state.warnings 同源；
+  // 只 WARN 不阻塞——停不停重评由人按 §12 裁决，脚本不代决）
+  if (st.counters.dispatchTotal > DISPATCH_WARN_MAX) {
+    st.warnings.push(`审校派发 ${st.counters.dispatchTotal} >90（§12 重评线：迁移+重审成本逼近重头译，即停重评）——观测点 WARN，不阻塞`);
+  }
   // S2④ residue 停修集（事件流事实源：residue 事件 / 修复环轮超限）——停该 chunk，项目不停
   const residueSet = new Set(inv.events.filter((e) => e.ev === "residue").map((e) => e.nn));
 
