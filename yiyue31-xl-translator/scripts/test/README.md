@@ -10,7 +10,7 @@ scripts/test/
 ├── README.md                       # 本文件
 ├── unit/                           # 单元层：程序化合成夹具（确定性，不落盘），钉死算法行为
 │   ├── segment.test.mjs            #   分段算法：fence 感知/拼接 sha/落带/R11-B/产物/CLI
-│   ├── status.test.mjs             #   状态机（M1b）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI
+│   ├── status.test.mjs             #   状态机（M1b+S2③④）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器
 │   ├── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
 │   ├── merge.test.mjs              #   合并（M1c）：M1-M7 纯函数与病态输入、CLI 冒烟
 │   ├── derive-bilingual.test.mjs   #   双语派生（Phase 1）：B1-B8 纯函数与病态输入、CLI 冒烟
@@ -18,7 +18,8 @@ scripts/test/
 │   ├── final-gate.test.mjs         #   交付门（M1c+前置①③）：重执行/完备性/G3/R23/标题锚/G4/R15/探针/元信息头/R8-c
 │   ├── handoff.test.mjs            #   交接包机器件（M3 前置④）：glossary 解析/单复数归一/词边界投影/语境段/幂等
 │   ├── consistency.test.mjs        #   统稿清单（M3 前置②）：fork 三项继承 + 标题锚对/间距/接缝/文风拼料
-│   └── word-counter.test.mjs       #   字数统计（M3 前置②）：bytes 判据/中英分项/CLI --json
+│   ├── word-counter.test.mjs       #   字数统计（M3 前置②）：bytes 判据/中英分项/CLI --json
+│   └── sizes.test.mjs              #   三档尺寸断言（S2）：SKILL.md ≤20KB 硬上限 / references ≤6KB/件 / fixer·审校单元包 ≤40KB（夹具实测口径）
 └── regression/                     # 回归层：git 管理的真实文档夹具，钉死真实世界回归
     ├── segment.regression.test.mjs
     ├── merge.regression.test.mjs   #   M1c：真实译文快照 × 合成场景装置（M1-M7）
@@ -147,6 +148,14 @@ SKILL.md Step 10 只保留指针与运行时纪律（半径分级/PENDING-USER/�
 | F11 | 探针命中（truth 比对源侧；每维度每 run ≥1；缺报告/未命中 = FAIL） | 审校有效性无证据 | "探针" 用例 |
 | F12 | 报告头三行机器解析（`sha:/model:/time:`(+`sec:` 表)——status.mjs `parseReportHead` 同源） | 头部契约漂移 | status 用例（S2② 头三行解析） |
 | F13 | C4 抽核（S2②）：dispatch 事件 `detail` 携带的 c4 口径 × 当前报告 sha 表一致（或被更晚同单元派发/invalidate 取代）；随机抽 ≥3、`--seed N` 同 seed 同抽样；结果落 events detail | 口径漂移/偷换单元/报告未 certify 所派发内容 | final-gate 用例（S2② C4 抽核） |
+
+## 尺寸三档判据（sizes，S2 落地；口径 = 十进制 KB=1000B）
+
+| 档 | 判据 | 防什么 |
+|---|---|---|
+| 1 | SKILL.md ≤ 20,000B 硬上限（批末交付态口径；16,000B 软目标仅 WARN） | SKILL.md 无界回胖（③v4-3） |
+| 2 | references/*.md 单件 ≤ 6,000B（glob 全量，新增件自动纳入） | 懒加载预算失守 |
+| 3 | fixer 包（--verb fix 实测物化）与审校单元包（staging 单元 + chunk 原文 + 附件预算 3,800B）各 ≤ 40,000B | 单元包超上下文预算（③v4-5；超限出口=首审切半/分维派发） |
 
 ## 维护规约
 
