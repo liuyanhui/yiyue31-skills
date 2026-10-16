@@ -41,6 +41,7 @@ const VIRTUAL_NN_MIN = 901; // 探针虚拟 NN 段（真实上界 640 = 5MB/8KB�
 const EVENTS = "events.jsonl";
 const PENDING = "pending.md";
 const STATUS = "status.md";
+const FIX_ROUND_MAX = 3; // S2③ 修复环轮上限（Step 7 每 chunk；超限停该 chunk 登 residue，项目不停）
 // S2③ 内容冻结窗：统稿（consistency 三段式）完成后开启——冷读/PM 通读/终检阶段。
 // 窗内 pm-review 类发现只登记不修（SKILL.md Step 8）；用户点名修复的 delta 补审在本窗内派发计数。
 const FREEZE_STAGES = ["cold-read", "pm-review", "final-gate"];
@@ -296,6 +297,8 @@ export function fingerprint(inv) {
 export function deriveState(inv) {
   const st = { title: inv.title, originalSha: inv.originalSha, chunks: [], global: null, warnings: [] };
   st.counters = deriveCounters(inv.events);
+  // S2④ residue 停修集（事件流事实源：residue 事件 / 修复环轮超限）——停该 chunk，项目不停
+  const residueSet = new Set(inv.events.filter((e) => e.ev === "residue").map((e) => e.nn));
 
   // re-keying 检测：原文 sha ≠ manifest 记录 → 分段过期（动作 = 重分段 + 内容 sha 匹配保成果）
   st.needsResegment = inv.manifestOriginalSha != null && inv.manifestOriginalSha !== inv.originalSha;
@@ -338,11 +341,16 @@ export function deriveState(inv) {
     else if (!v || v.passed !== true || v.translationSha !== t.sha) s.stage = "verify";
     else if (done < DIMS.length * secs.length) s.stage = Object.keys(stale).length ? "re-review" : "review";
     else s.stage = "done";
+    if (residueSet.has(c.nn) || (st.counters.reviewRounds[c.nn] ?? 0) > FIX_ROUND_MAX) {
+      s.stage = "residue"; // S2④：修复环超限停修（事件流事实源派生，非内存态）
+      st.warnings.push(`chunk ${c.nn} 修复环超限停修（residue 登记）——项目继续（S2③ 双计数器）`);
+    }
     st.chunks.push(s);
   }
 
-  // 全局阶段（R1：任一 chunk 未完成前不进全局；进入后整体作废重走）
-  const allDone = st.chunks.length > 0 && st.chunks.every((c) => c.stage === "done");
+  // 全局阶段（R1：任一 chunk 未完成前不进全局；进入后整体作废重走；S2④ residue 停修 chunk 不阻塞推进）
+  const allDone = st.chunks.length > 0 && st.chunks.every((c) => c.stage === "done" || c.stage === "residue");
+  st.residue = st.chunks.filter((c) => c.stage === "residue").map((c) => c.nn);
   const g = inv.globals;
   st.global = g.delivered ? "delivered" : g.report ? "final-gate" : g.pmReview ? "pm-review" : g.coldRead ? "cold-read"
     : g.consistency ? "consistency" : g.merged ? "merged" : allDone ? "ready-merge" : "per-chunk";
@@ -421,7 +429,7 @@ export function buildQueue(state, inv, opts = {}) {
     const [step, inputs, outputs] = stepMap[state.global] ?? ["none", [], []];
     return { q, action: { step, inputs, outputs } };
   }
-  const c = state.chunks.find((x) => x.stage !== "done");
+  const c = state.chunks.find((x) => x.stage !== "done" && x.stage !== "residue"); // S2④：residue 停修 chunk 跳过，项目不停
   if (!c) return { q, action: { step: "merge", inputs: ["manifest.md"], outputs: ["merged-draft.md"] } };
   if (c.stage === "translate" || c.stage === "adjudicate" || c.stage === "verify") {
     const step = c.stage === "translate" ? "translate" : c.stage === "adjudicate" ? "adjudicate" : "verify";
@@ -490,16 +498,89 @@ function unitText(dir, nn, sec) {
   return sectionSlices(raw).find((x) => x.id === sec)?.text ?? null; // delta 单节
 }
 
+// ---------- S2④ fixer 闭环：fix 动词物化 fixer 包（主上下文不进报告全文） ----------
+
+const nn2 = (n) => String(n).padStart(2, "0");
+
+// 包构成（≤40KB，sizes 夹具钉死）：头部定位块（unit-sha / fix-round / 逐节 sec: sha 表——与
+// 派发 c4 口径同构）+ 译文全文 + 所选维度 FAIL 报告全文（whole + delta 单节，逐字照抄）。
+// **不含 chunk 原文**：报告逐条自带"原文引用"；fixer 需整节原文对照时只读工作目录 chunks/<name>
+//（包外自取，不占包预算——主上下文纪律由"派 fixer 只给包路径"保证）。
+export function renderFixerPkg(inv, chunkState, dims, round, freeze) {
+  const t = inv.translated[chunkState.nn];
+  const L = [
+    "# fixer 包（status.mjs --verb fix 物化，S2④）——主上下文不进报告全文，fixer 只读本包 + 工作目录",
+    `unit-sha: ${t.sha}`,
+    `fix-round: ${round}/${FIX_ROUND_MAX}${freeze ? "（冻结窗内用户点名修复）" : ""}`,
+  ];
+  for (const s of chunkState.sections) L.push(`sec: ${s.id} ${s.sha} ${s.title}`);
+  L.push("", "## 译文（修复对象，全文）", "", String(t.text).replace(/\n$/, ""));
+  const rdir = path.join(inv.dir, "reviews");
+  for (const dim of dims) {
+    const whole = safeRead(path.join(rdir, `review-${dim}-chunk-${nn2(chunkState.nn)}.md`));
+    L.push("", `## 报告全文：${dim}（reviews/review-${dim}-chunk-${nn2(chunkState.nn)}.md 照抄）`, "", (whole ?? "（缺报告——该维首审未回）").replace(/\n$/, ""));
+    const deltas = fs.existsSync(rdir)
+      ? fs.readdirSync(rdir).filter((f) => new RegExp(`^review-${dim}-chunk-${nn2(chunkState.nn)}-s\\d+\\.md$`).test(f)).sort(nnKey)
+      : [];
+    for (const d of deltas) {
+      L.push("", `## 报告全文：${dim} delta（reviews/${d} 照抄）`, "", String(safeRead(path.join(rdir, d))).replace(/\n$/, ""));
+    }
+  }
+  return L.join("\n") + "\n";
+}
+
+// fix 动词：物化 fixer 包 + 落 fix 事件（修复环轮计数器事实源）。
+// 硬门：每 chunk 修复环 ≤FIX_ROUND_MAX 轮——超限停该 chunk（登记 residue-chunk-NN.md +
+// residue 事件），项目不停（S2③ 双计数器之二；挂起态不派发）。
+export function fixDispatch(dir, inv, state, opts = {}) {
+  if (opts.nn == null) return { exitCode: 1, errors: ["--verb fix 需要 --nn <N>（修复对象 chunk）"] };
+  const c = state.chunks.find((x) => x.nn === opts.nn);
+  if (!c) return { exitCode: 1, errors: [`chunk ${opts.nn} 不在 manifest 登记`] };
+  if (c.stage === "residue") return { exitCode: 1, errors: [`chunk ${opts.nn} 已停修（residue 登记）——不再派发修复`] };
+  if (!c.translationSha) return { exitCode: 1, errors: [`chunk ${opts.nn} 尚无译文，无可修复对象`] };
+  const dims = opts.dims ? String(opts.dims).split(",").map((s) => s.trim()).filter(Boolean) : [...DIMS];
+  for (const d of dims) if (!DIMS.includes(d)) return { exitCode: 1, errors: [`未知维度 ${d}（合法：${DIMS.join(",")}）`] };
+  const rdir = path.join(dir, "reviews");
+  const hasReport = dims.some((d) => safeRead(path.join(rdir, `review-${d}-chunk-${nn2(c.nn)}.md`)) != null);
+  if (!hasReport) return { exitCode: 1, errors: [`chunk ${c.nn} 无任何审校报告（reviews/review-*-chunk-${nn2(c.nn)}.md）——fix 无依据`] };
+  const rounds = state.counters.reviewRounds[c.nn] ?? 0;
+  if (rounds >= FIX_ROUND_MAX) {
+    const rs = path.join(dir, `residue-chunk-${nn2(c.nn)}.md`);
+    if (!fs.existsSync(rs)) {
+      const open = Object.entries(c.staleSections).map(([sid, ds]) => `${sid}（${[...ds].join("/")}）`).join("、") || "（无 stale 节——修复未收敛）";
+      fs.writeFileSync(rs, [
+        `# residue — chunk ${nn2(c.nn)}（机器登记：修复环轮超限停修，S2③/S2④）`,
+        `unit-sha: ${c.translationSha}`,
+        `rounds: ${rounds}/${FIX_ROUND_MAX}`,
+        `open: ${open}`,
+        `登记: ${nowIso()}`,
+        "处置: 欠账修复走 PENDING-USER/终稿 residue 内嵌（P1 对齐）；项目其余 chunk 不受影响。",
+        "",
+      ].join("\n"), "utf-8");
+    }
+    appendEvents(dir, { ev: "residue", nn: c.nn, detail: `fix-loop ${rounds}/${FIX_ROUND_MAX} 超限——停修登记` });
+    return { exitCode: 3, errors: [`chunk ${c.nn} 修复环轮 ${rounds}/${FIX_ROUND_MAX} 超限——停修并登记 residue-chunk-${nn2(c.nn)}.md（项目继续）`] };
+  }
+  const freeze = FREEZE_STAGES.includes(state.global);
+  const pkg = renderFixerPkg(inv, c, dims, rounds + 1, freeze);
+  const sdir = path.join(dir, "staging");
+  fs.mkdirSync(sdir, { recursive: true });
+  const pkgPath = path.join(sdir, `fixer-chunk-${nn2(c.nn)}.md`);
+  fs.writeFileSync(pkgPath, pkg, "utf-8");
+  appendEvents(dir, { ev: "fix", nn: c.nn, dims: dims.join(","), freeze, detail: `round ${rounds + 1}/${FIX_ROUND_MAX}；pkg ${Buffer.byteLength(pkg, "utf-8")}B` });
+  return { exitCode: 0, pkg: path.relative(dir, pkgPath), dims, round: rounds + 1, freeze, pkgBytes: Buffer.byteLength(pkg, "utf-8") };
+}
+
 // ---------- status.md 渲染（双段契约 R13） ----------
 
 export function renderStatus(dir, inv, state, queue, opts = {}) {
   const total = state.chunks.length;
-  const done = state.chunks.filter((c) => c.stage === "done").length;
-  const cur = state.chunks.find((c) => c.stage !== "done");
+  const done = state.chunks.filter((c) => c.stage === "done" || c.stage === "residue").length;
+  const cur = state.chunks.find((c) => c.stage !== "done" && c.stage !== "residue"); // S2④：residue 不再是当前动作位
   const fp = fingerprint(inv);
   const firstT = inv.events[0]?.t ?? null;
   const elapsedH = firstT ? ((Date.now() - Date.parse(firstT)) / 3600000).toFixed(1) : "0";
-  const remainUnits = state.chunks.reduce((a, c) => a + (c.stage === "done" ? 0 : UNITS_PER_CHUNK - unitCredit(c)), 0);
+  const remainUnits = state.chunks.reduce((a, c) => a + (c.stage === "done" || c.stage === "residue" ? 0 : UNITS_PER_CHUNK - unitCredit(c)), 0);
   const budget = opts.budget ?? null;
   const overBudget = budget != null && state.counters.dispatchedSinceSessionEnd >= budget;
   const pending = inv.pending;
@@ -539,6 +620,7 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
   } else if (cur) {
     L.push(`第 ${cur.nn}/${total} chunk（${stageCn(cur.stage)}），已完成 ${done}/${total}，已耗时 ${elapsedH}h，预计剩余 ~${remainUnits} 单元（M3 前基线 ${UNITS_PER_CHUNK} 单元/chunk）。下次对我说：继续翻译 ${state.title}。`);
   }
+  if (state.residue?.length) L.push(`停修登记：chunk ${state.residue.join(",")} 修复环超限（residue-chunk-NN.md）——其余 chunk 照常推进，处置见 residue 文件与 PENDING 流程。`);
   L.push("");
 
   // ---- 段 2：动作指令 ----
@@ -582,7 +664,7 @@ function unitCredit(c) {
 }
 
 function stageCn(s) {
-  return { translate: "待翻译", adjudicate: "待裁定", verify: "待机械校验", review: "审校中", "re-review": "重审中（节 stale）", done: "完成" }[s] ?? s;
+  return { translate: "待翻译", adjudicate: "待裁定", verify: "待机械校验", review: "审校中", "re-review": "重审中（节 stale）", residue: "停修（residue 登记）", done: "完成" }[s] ?? s;
 }
 
 // ---------- 用户动词 ----------
@@ -604,6 +686,8 @@ export function verb(dir, v, opts = {}) {
       break;
     }
     case "dispatch": // C3（2026-09-14 M3 回写）：dispatch 只影响 run() 的物化行为，verb 层无额外动作
+      break;
+    case "fix": // S2④：fixer 包物化在 run() 内（需 state：冻结窗判定/修复环轮/residue）——verb 层无动作
       break;
     case "stop": {
       fs.writeFileSync(path.join(dir, PENDING), `type: sealed\n封存于 ${nowIso()}；解封 = 继续翻译，新起 = 重新翻译\n`, "utf-8");
@@ -670,6 +754,15 @@ export function run(dir, opts = {}) {
 
   const queue = buildQueue(state, inv, opts);
   queue.dispatch = [];
+  // S2④ fix 动词：物化 fixer 包 + fix 事件（挂起态不派发；超限停 chunk 登 residue——项目不停）
+  let fixInfo = null;
+  if (opts.verb === "fix") {
+    if (inv.pending) return { exitCode: 1, errors: ["挂起中（pending.md 在场）——不派发修复；先经 PENDING-USER 菜单裁决"] };
+    const fr = fixDispatch(dir, inv, state, opts);
+    if (fr.exitCode !== 0) return fr;
+    fixInfo = fr;
+    state = deriveState(scanWorkdir(dir)); // fix 事件已入流——status.md 按最新轮次渲染
+  }
   // 预算到点 = 干净退出点：不物化、不派发（R14）
   const overBudget = opts.budget != null && state.counters.dispatchedSinceSessionEnd >= opts.budget;
   // C3 view/dispatch 拆分（2026-09-14 M3 回写）：默认只读渲染（零副作用），
@@ -703,7 +796,10 @@ export function run(dir, opts = {}) {
   }
   const text = renderStatus(dir, inv, state, queue, opts);
   fs.writeFileSync(path.join(dir, STATUS), text, "utf-8");
-  return { exitCode: 0, statusText: text, state, inv, queue, disclosure: verbResult.disclosure ?? null };
+  const fixDisclosure = fixInfo
+    ? `fixer 包已物化：${fixInfo.pkg}（修复环轮 ${fixInfo.round}/${FIX_ROUND_MAX}${fixInfo.freeze ? "，冻结窗内" : ""}，${fixInfo.pkgBytes}B）——派 fixer subagent 修复（主上下文不进报告全文），重跑 Step 5 后 --verb dispatch 复欠`
+    : null;
+  return { exitCode: 0, statusText: text, state, inv, queue, disclosure: fixDisclosure ?? verbResult.disclosure ?? null };
 }
 
 // ---------- CLI ----------
@@ -716,6 +812,8 @@ function parseArgs(argv) {
     if (a === "--verb") opts.verb = argv[++i];
     else if (a === "--chapter") opts.chapter = Number(argv[++i]);
     else if (a === "--budget") opts.budget = Number(argv[++i]);
+    else if (a === "--nn") opts.nn = Number(argv[++i]);
+    else if (a === "--dims") opts.dims = argv[++i];
     else if (a === "--probe-truth") opts.probeTruth = argv[++i];
     else if (a === "--json") opts.json = true;
     else if (a === "-h" || a === "--help") opts.help = true;
@@ -727,16 +825,18 @@ function parseArgs(argv) {
 const __help = `status.mjs — xl-translator 状态机与续跑（M1b）
 
 用法:
-  node status.mjs <workdir> [--verb progress|continue|stop|retranslate|sample|restart]
-                            [--chapter N] [--budget N] [--probe-truth <file>] [--json]
+  node status.mjs <workdir> [--verb progress|continue|stop|retranslate|sample|restart|fix|dispatch]
+                            [--chapter N] [--budget N] [--nn N] [--dims a,b] [--probe-truth <file>] [--json]
 
 动词（用户自然语言由主 agent 映射）:
   progress（默认）/ continue / stop / retranslate（--chapter，R5 披露章↔chunk）/
-  sample（--chapter，R16 样张）/ restart（R18-③ 新起全量）
+  sample（--chapter，R16 样张）/ restart（R18-③ 新起全量）/ dispatch（C3 物化派发）/
+  fix（S2④：--nn N [--dims accuracy,translationese,ai-tone,readability]——物化 fixer 包
+       staging/fixer-chunk-NN.md + fix 事件；修复环轮每 chunk ≤${FIX_ROUND_MAX}，超限停该 chunk 登 residue）
 
 产物: status.md（唯一续跑文档，整体重写）+ staging/（统一物化，每轮先清后写）+ events.jsonl（追加）
 
-退出码: 0 正常 / 1 用法或动词错 / 2 工作目录异常 / 3 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 等超限）`;
+退出码: 0 正常 / 1 用法或动词错 / 2 工作目录异常 / 3 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 / S2④ 修复环轮 >3）`;
 
 // CLI 守卫用 fileURLToPath：new URL().pathname 在 Windows 是 /D:/... 形态，path.resolve
 // 拼出 D:\D:\... 与 argv[1] 恒不等——M1c 实测抓到的 M1b 潜伏 bug（CLI 静默空转、退出码 0）

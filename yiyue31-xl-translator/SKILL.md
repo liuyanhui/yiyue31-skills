@@ -18,7 +18,7 @@ author: Yiyue31
 ## Directory
 
 - `{skill-dir}` = 本 SKILL.md 所在目录；`{translator-skill-dir}` = 兄弟 skill 目录 `../yiyue31-translator`（Step 0 自动交接用，读不到时按既定退化路径处理）。引用文件封闭集（引用格式 `{skill-dir}/references/<file>`、`{skill-dir}/scripts/<file>`）：
-  - **references/（10）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md、unify.md。（terms.md 系运行时用户态：首次从 translator 一次性拷贝种子至工作目录，非本目录资产。）
+  - **references/（11）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md、unify.md、fix-loop.md。（terms.md 系运行时用户态：首次从 translator 一次性拷贝种子至工作目录，非本目录资产。）
   - **scripts/（10，运行时封闭集）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、derive-bilingual.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs。另有 `test/`（开发期测试资产，判据契约登记于其 README——SKILL 正文所指"判据契约见 scripts/test/README.md"即此，不计入运行时封闭集）。
 - 工作目录 `xl-translator/<title>/`（refined-stock 仓库根下）；文件命名遵循下方命名三条红线，status/final-gate 按脚本内建 glob 工作。
 - 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生——PASS 前全目录不得命中任何发布模式；`translated-<title>-bilingual.md` 为 PASS 后机械派生的**只读视图**（非交付物、不经终检、sha 不锚、不受手修保护、幂等可重生成，命名永不以 `-zh.md` 结尾）。
@@ -75,10 +75,9 @@ author: Yiyue31
 - 关卡：四维报告齐备且非 stale。
 
 ### Step 7 修复闭环 `[主+脚本]`
-- 按报告修复→重跑 Step 5→**sha 实际变化的节 × 4 维 delta 重审**（未变节豁免；队列由 `status.mjs` 差集派生）；每 chunk 重审 ≤3 轮；修复中**增删括注的同步补记/勾销裁定台账行**（终检按台账集合对账，只改译文不改台账即 FAIL）。
-- **C5 跨维采纳回核规则**：凡采纳非 accuracy 维（翻译腔/可读性/AI 味）的**结构性改写**（化定语为主谓、拆句重组、语序重排），改后必须对照原文回核**数字、比例、否定极性**——如"the share of X"被改写成"有多少 X"即丢比例义；词级替换（换量词/换搭配）不触发此回核。
-- 超限自动**升级**：换模型重翻该 chunk（prompt 附邻 chunk 中文首末段 + 文风卡；重翻后接缝 scoped 统稿 + seam 复查）；仍不收敛→PENDING-USER。**不存在降级路径**。
-- **升级计数器三条款**：升级后该 chunk 重试计数器清零；每轮修复循环中升级至多一次；**累计升级 ≥2 次（跨轮，不随清零重置）→ 直接转 PENDING-USER**。
+- 按报告修复→重跑 Step 5→**sha 实际变化的节 × 4 维 delta 重审**（未变节豁免；队列由 `status.mjs` 差集派生）；修复中**增删括注的同步补记/勾销裁定台账行**（终检按台账集合对账，只改译文不改台账即 FAIL）。
+- **fixer 闭环（S2④）**：审校 FAIL → `status.mjs <workdir> --verb fix --nn N [--dims …]` 物化 **fixer 包**（`staging/fixer-chunk-NN.md`=定位块+译文全文+FAIL 报告全文，≤40KB）→ 派 fixer subagent（**主上下文不进报告全文**；回传仅路径+一行结论+FAIL 项计数）→ 重跑 Step 5 → **复欠**=变化节 delta 队列自动回队列。包构成、C5 跨维采纳回核、升级出口与升级计数器三条款细则见 `{skill-dir}/references/fix-loop.md`。
+- **修复环轮每 chunk ≤3**（`fix` 事件派生）：超限**停该 chunk** 登 `residue-chunk-NN.md`（项目不停）——与 Step 8 冻结窗补审轮分开计数，不挤占。
 
 ### Step 8 合并与统稿 `[脚本+subagent×1]`
 - merge **只由 `merge.mjs` 执行**（判据契约见 `scripts/test/README.md`）→ 临时名 `merged-draft.md` 落盘；final-gate 重导出复用其纯函数。**统稿先于终轮**（次序冻结：终轮冷读/PM 通读读到的是统稿后的稳定稿）。

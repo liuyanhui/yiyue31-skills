@@ -34,7 +34,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { sectionSlices } from "./status.mjs";
+import { sectionSlices, appendEvents } from "./status.mjs";
 
 // ---------- 文本抽取（fork 源继承，行为不回归） ----------
 
@@ -635,8 +635,17 @@ function appendResultLog(translatedPath, record) {
       data = { results: [] }; // 不存在或损坏 → 重建
     }
     const nnM = path.basename(translatedPath).match(/chunk-(\d+)\.md$/);
-    data.results.push(nnM ? { ...record, nn: Number(nnM[1]) } : record);
+    const nn = nnM ? Number(nnM[1]) : null;
+    data.results.push(nn != null ? { ...record, nn } : record);
     fs.writeFileSync(logPath, JSON.stringify(data, null, 2));
+    // S2④：verify 环节进事件流（reject/verify-pass——status.mjs 计数器事实源：机械打回 ≤2
+    // 由 reject 事件派生；final-gate 终检走 verify() 纯函数重执行，不产事件、不污染计数器）。
+    // best-effort：事件落流失败不拖垮校验主流程（与落盘同为旁路）。
+    if (nn != null) {
+      try {
+        appendEvents(root, { ev: record.passed ? "verify-pass" : "reject", nn, detail: `failChecks:${(record.failChecks ?? []).join(",") || "-"}` });
+      } catch (_e2) { /* 旁路静默 */ }
+    }
     return logPath;
   } catch (_e) {
     return null;

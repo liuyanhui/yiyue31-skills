@@ -634,3 +634,115 @@ test("S2③ grep 验收：SKILL.md Step 8 节含冻结语义、≤2 硬门与统
   assert.ok(sec.includes("统稿先于终轮"), "统稿先于终轮次序（源①④4）");
   assert.ok(sec.includes("unify.md"), "统稿细则迁出引用");
 });
+
+// ---------- S2④ fixer 闭环 ----------
+
+const VM_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "verify-mech.mjs");
+
+// 六节可校验译文：数字 0-5 全数在场、无英文长串、中文间距合规（verify-mech 真跑可过）
+function verifiableTranslation() {
+  const L = [];
+  for (let i = 0; i < 6; i++) L.push(`## 第 ${i} 部分标题\n\n段 ${i} 的译文内容：数字 ${i} 保持一致，术语落实。`);
+  return L.join("\n\n") + "\n";
+}
+
+test("S2④ fixer 包物化：报告全文+译文+定位块进包；--dims 选维；fix 事件计轮；入参校验", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushThroughVerify(dir, 1);
+    writeReviews(dir, 1);
+    fs.appendFileSync(path.join(dir, "reviews", "review-accuracy-chunk-01.md"), "\n| 1 | \"数字 42\" | 数字漂移：42 → 四十二 | 改回 42 |\n");
+    // 入参校验
+    assert.equal(run(dir, { verb: "fix" }).exitCode, 1, "缺 --nn 须用法错");
+    assert.equal(run(dir, { verb: "fix", nn: 1, dims: "nope" }).exitCode, 1, "未知维度须用法错");
+    assert.equal(run(dir, { verb: "fix", nn: 99 }).exitCode, 1, "不在 manifest 须用法错");
+    // 物化（单维）
+    const r = run(dir, { verb: "fix", nn: 1, dims: "accuracy" });
+    assert.equal(r.exitCode, 0, r.errors?.join(";"));
+    assert.ok(r.disclosure.includes("fixer 包已物化"), "披露包路径与轮次");
+    const pkgPath = path.join(dir, "staging", "fixer-chunk-01.md");
+    const pkg = fs.readFileSync(pkgPath, "utf-8");
+    assert.match(pkg, /^unit-sha: [0-9a-f]{12}$/m);
+    assert.match(pkg, /^fix-round: 1\/3$/m);
+    assert.match(pkg, /^sec: s1 [0-9a-f]{12} /m, "逐节定位表（c4 同构）");
+    assert.ok(pkg.includes("## 译文（修复对象，全文）"), "译文全文进包");
+    assert.ok(pkg.includes("数字漂移：42 → 四十二"), "FAIL 报告全文进包（主上下文不进）");
+    assert.ok(!pkg.includes("## 报告全文：translationese"), "--dims 选维：未选维度不进包");
+    assert.ok(!pkg.includes("__chunk_original__") && !pkg.includes("chunks/chunk-"), "chunk 原文不占包（fixer 包外自取）");
+    const evs = scanWorkdir(dir).events;
+    const fix = evs.find((e) => e.ev === "fix");
+    assert.ok(fix && fix.nn === 1 && fix.dims === "accuracy" && fix.freeze === false, "fix 事件落流（轮次事实源）");
+    assert.equal(deriveCounters(evs).reviewRounds[1], 1, "修复环轮=1");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2④ 全链路：FAIL→fixer→verify→复欠（事件流各环节在场；verify 事件由 verify-mech CLI 落流）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushThroughVerify(dir, 1, verifiableTranslation());
+    writeReviews(dir, 1); // 4 维 fresh 首审
+    fs.appendFileSync(path.join(dir, "reviews", "review-readability-chunk-01.md"), "\n| 1 | \"段 2\" | 句式冗长 | 拆句 |\n");
+    const tp = path.join(dir, "translated-chunks", "translated-chunk-01.md");
+    const origChunk = path.join(dir, "chunks", fs.readdirSync(path.join(dir, "chunks"))[0]);
+
+    // ① fixer 包物化（FAIL 发现驱动）
+    let r = run(dir, { verb: "fix", nn: 1, dims: "readability" });
+    assert.equal(r.exitCode, 0, r.errors?.join(";"));
+    // ② fixer 修复：改节 2（s2 = "第 1 部分"——sha 变化），数字/结构保持
+    const before = fs.readFileSync(tp, "utf-8");
+    fs.writeFileSync(tp, before.replace("段 1 的译文内容：数字 1 保持一致，术语落实。", "段 1 的译文内容：数字 1 保持一致，术语已落实（fixer 修复）。"), "utf-8");
+    // ③ verify-mech 真跑（CLI）：verify-pass 事件 + verify-results 新记录
+    const v = spawnSync(process.execPath, [VM_SCRIPT, origChunk, tp], { encoding: "utf-8" });
+    assert.equal(v.status, 0, "修复后机械校验应通过：\n" + v.stdout + v.stderr);
+    const evs = scanWorkdir(dir).events;
+    assert.ok(evs.some((e) => e.ev === "verify-pass" && e.nn === 1), "verify 环节进事件流");
+    // ④ 复欠：dispatch → 变化节 s2 × 4 维 delta 队列自动回队列
+    r = run(dir, { verb: "dispatch" });
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.queue.q.length, 4, "复欠 = 变化节 × 4 维");
+    assert.ok(r.queue.q.every((u) => u.sec === "s2" && u.nn === 1));
+    const evs2 = scanWorkdir(dir).events;
+    assert.ok(evs2.some((e) => e.ev === "fix" && e.nn === 1), "fixer 环节在场");
+    assert.equal(evs2.filter((e) => e.ev === "dispatch").length, 4, "复欠派发在场");
+    // ⑤ delta 报告落位 → 欠账清（chunk done）
+    const s2 = sectionSlices(fs.readFileSync(tp, "utf-8")).find((s) => s.id === "s2");
+    for (const dim of DIMS) {
+      fs.writeFileSync(path.join(dir, "reviews", `review-${dim}-chunk-01-s2.md`), `sha: ${s2.sha}\nmodel: test\ntime: 2026-10-16T00:00:00Z\n结论：${dim} 复欠补审通过。\n`, "utf-8");
+    }
+    r = run(dir, {});
+    assert.equal(r.state.chunks[0].stage, "done", "复欠清零 → done");
+    assert.equal(r.state.global, "ready-merge");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("S2④ 修复环轮每 chunk ≤3：第 4 次物化被拒 → 停该 chunk + residue 登记，项目不停", () => {
+  const dir = makeWorkdir(2);
+  try {
+    pushThroughVerify(dir, 1);
+    writeReviews(dir, 1);
+    // 三轮合法物化（fix 事件 = 轮次事实源）
+    for (let i = 1; i <= 3; i++) assert.equal(run(dir, { verb: "fix", nn: 1 }).exitCode, 0, `第 ${i} 轮应允许`);
+    assert.equal(deriveCounters(scanWorkdir(dir).events).reviewRounds[1], 3);
+    // 第 4 次拒绝：exit 3 + residue 文件 + residue 事件
+    const r = run(dir, { verb: "fix", nn: 1 });
+    assert.equal(r.exitCode, 3, "修复环轮超限须非零退出");
+    const rs = fs.readFileSync(path.join(dir, "residue-chunk-01.md"), "utf-8");
+    assert.ok(rs.includes("rounds: 3/3") && rs.includes("unit-sha:"), "residue 登记在场");
+    assert.ok(scanWorkdir(dir).events.some((e) => e.ev === "residue" && e.nn === 1), "residue 事件落流");
+    // 项目不停：chunk 1 让位，队列推进 chunk 2；无 pending.md（区别于冻结窗上报与打回挂起）
+    const r2 = run(dir, {});
+    assert.equal(r2.exitCode, 0);
+    assert.equal(r2.state.chunks[0].stage, "residue", "停修 chunk 标记 residue");
+    assert.equal(r2.queue.action.step, "translate", "动作位让给 chunk 2（项目不受损）");
+    assert.ok(!fs.existsSync(path.join(dir, "pending.md")), "不停项目——不写 pending.md");
+    assert.ok(r2.statusText.includes("停修登记"), "人话段披露停修");
+    // 停修后不再受理该 chunk 修复
+    assert.equal(run(dir, { verb: "fix", nn: 1 }).exitCode, 1, "已停修 chunk 拒绝再派修复");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
