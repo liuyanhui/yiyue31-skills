@@ -7,7 +7,10 @@
 //   - renderProjection：别名 `|` 渲染并经 parseProjection 回环（`::` 连接会被解析方并入 zh——2026-09-04 实证）
 //   - tailSegment：末段回取 300-500 字窗口
 //   - renderContext：首 chunk 缺省 / 邻未过审缺省 / fresh 附 sha 锚
+//   - renderStyleProjection：风格卡投影（S3 §3 注）确定性蒸馏——全标题逐字 + 每节首条主干 +
+//     超预算自末节弃内容（标题保留）+ 尾行截断披露（未截断同款）+ 源卡 sha 锚 + 恒 ≤ budget + 幂等
 //   - runHandoff：产物落盘 + 幂等字节相同（M5 纪律）+ 缺 glossary 退出 2 + --nn 不在 manifest 退出 1
+//     + 第三机器件 style-card-proj.md（SP1 有卡 / SP2 缺卡 WARN 不阻断）
 //   - CLI 冒烟（--help / 真实执行 --json）
 //
 // 运行：node --test scripts/test/unit/handoff.test.mjs
@@ -27,6 +30,7 @@ import {
   renderProjection,
   tailSegment,
   renderContext,
+  renderStyleProjection,
   runHandoff,
 } from "../../handoff.mjs";
 import { parseProjection } from "../../verify-mech.mjs";
@@ -224,6 +228,80 @@ test("runHandoff：缺 glossary 退出 2；--nn 不在 manifest 退出 1；--nn 
     assert.equal(r.generated.length, 2, "单 chunk 两件");
   } finally {
     fs.rmSync(d2.dir, { recursive: true, force: true });
+  }
+});
+
+// ---------- 风格卡投影（S3 §3 注：第三机器件） ----------
+
+// >6KB 合成卡：7 维度（references/style-card.md 生成指引）各一节 × 5 条"这样写/不这样写"对照规则行
+function bigStyleCard() {
+  const dims = ["句式节奏", "语体", "修辞习惯", "标点习惯", "称谓与人称", "比喻处理策略", "文体变化轴"];
+  const L = ["# 文风基准卡（合成夹具）", "", "> 判卷锚：7 维度规则，译者/审校/统稿/冷读共用（内容 lorem）。"];
+  dims.forEach((d, i) => {
+    L.push("", `## ${d}`);
+    for (let r = 1; r <= 5; r++) {
+      L.push(
+        `- ${d}规则${r}：这样写「lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna（${i}-${r}）」` +
+          `；不这样写「sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium（${i}-${r}）」。`
+      );
+    }
+  });
+  return L.join("\n") + "\n";
+}
+
+test("SP1：风格卡投影——>6KB 卡蒸馏 ≤2,000B、全标题逐字、尾行披露、sha 锚、超预算弃末节内容、幂等", () => {
+  const { dir } = miniDir();
+  try {
+    const card = bigStyleCard();
+    fs.writeFileSync(path.join(dir, "style-card.md"), card, "utf-8");
+    assert.ok(Buffer.byteLength(card, "utf-8") > 6000, `夹具自证：卡 ${Buffer.byteLength(card, "utf-8")}B >6KB`);
+    const cardSha = sha12(card);
+    const r = runHandoff(dir);
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.warns.length, 0, "有卡不 WARN");
+    // 第三机器件与既有两件并列落盘（projection/context 不回归）
+    const projPath = path.join(dir, "handoff", "style-card-proj.md");
+    assert.ok(fs.existsSync(projPath), "style-card-proj.md 落盘");
+    assert.ok(r.generated.includes(projPath), "入 generated（与既有两件并列）");
+    assert.ok(fs.existsSync(path.join(dir, "handoff", "projection-chunk-01.md")), "既有投影件不回归");
+    assert.ok(fs.existsSync(path.join(dir, "handoff", "context-chunk-01.md")), "既有语境件不回归");
+    assert.equal(r.generated.length, 5, "2 chunk × 2 件 + 风格卡投影 1 件");
+    const proj = fs.readFileSync(projPath, "utf-8");
+    const projB = Buffer.byteLength(proj, "utf-8");
+    assert.ok(projB <= 2000, `投影 ${projB}B ≤2,000B（§5 红线：卡全文进每包属超红线）`);
+    assert.equal(r.styleCardProj?.bytes, projB, "--json 结果附字节数");
+    const heads = card.split(/\r?\n/).filter((l) => /^#{1,6}\s/.test(l));
+    assert.equal(heads.length, 8, "夹具自证：1 主标题 + 7 维度节");
+    for (const h of heads) assert.ok(proj.includes(h), `标题逐字保留：${h}`);
+    assert.ok(proj.includes(cardSha), "源卡 sha 锚");
+    assert.ok(proj.includes("style-card.md"), "判卷全文指针（全文仅进主上下文）");
+    assert.ok(proj.includes("截断披露"), "尾行披露在场（未截断也附同款——口径统一）");
+    assert.equal(Number(proj.match(/投影 (\d+) B/)[1]), projB, "披露 M = 投影实际字节");
+    // 幂等：同输入重跑字节相同（确定性蒸馏、无时间戳）
+    runHandoff(dir);
+    assert.equal(fs.readFileSync(projPath, "utf-8"), proj);
+    // 超预算路径（判据"自最后一个节起逐节弃内容行，标题保留"）：收紧预算直接驱动同一纯函数
+    const tight = renderStyleProjection(card, { cardSha, budget: 500 });
+    assert.ok(Buffer.byteLength(tight, "utf-8") <= 500, "收紧预算仍恒 ≤ budget");
+    for (const h of heads) assert.ok(tight.includes(h), "弃内容不弃标题");
+    assert.ok(!tight.includes("这样写「"), "节内容已弃尽（仅剩头两行 + 全标题 + 披露尾行）");
+    assert.ok(tight.includes("截断披露"), "弃内容后披露尾行仍在场");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("SP2：缺 style-card.md——WARN 不阻断（exit 0）、投影不落盘、既有两件不受影响", () => {
+  const { dir } = miniDir();
+  try {
+    const r = runHandoff(dir);
+    assert.equal(r.exitCode, 0, "缺卡不阻断");
+    assert.ok(r.warns.some((w) => w.includes("style-card.md") && w.includes("Step 2")), "warns 含缺卡提示");
+    assert.ok(!fs.existsSync(path.join(dir, "handoff", "style-card-proj.md")), "投影不落盘");
+    assert.equal(r.styleCardProj, null);
+    assert.equal(r.generated.length, 4, "既有 projection/context 两件照常（2 chunk × 2）");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

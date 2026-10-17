@@ -7,6 +7,10 @@
 //       格式冻结：每行 `English :: 中文 [| 别名]`，`#` 注释行与空行忽略（与精选表同解析法）。
 //     handoff/context-chunk-<NN>.md — 串行增强段：N-1 邻 chunk **最新机械校验 passed** 译文
 //       末段 300-500 字 + sha 锚（源译文变更即重生成——与 status.mjs handoffStale 同语义）。
+//     handoff/style-card-proj.md — 风格卡投影（S3 §3 注）：工作目录 style-card.md 的确定性蒸馏
+//       （全标题逐字 + 每节首条规则主干，恒 ≤2,000B；超预算自末节弃内容 + 尾行截断披露 + 源卡 sha 锚）。
+//       消费口径：审校单元包附件自此用本投影（≤2KB），卡**全文仅进主上下文**（§5 红线：卡
+//       7,036B 全文进每包属超红线）；缺卡 WARN 不阻断（Step 2 应产卡）。
 //   判断件（主 agent 组装，本脚本不碰）：handoff/chunk-<NN>.md（②"留下了什么"④贯穿台账
 //     ⑤文风卡引用）与 map.md。标题条目/反复用语并入投影待 map.md 格式冻结（M3 标定观察）。
 //
@@ -125,24 +129,97 @@ export function renderContext({ nn, prev, prevSha, segment, fresh }) {
   return L.join("\n") + "\n";
 }
 
+// ---------- 风格卡投影（纯函数，S3 §3 注） ----------
+
+// 确定性蒸馏（同输入同字节、无时间戳）：全标题逐字保留（原顺序）+ 每节首条内容行（列表项前缀原样，
+// >80 字符截断加 …）；超预算自最后一个节起逐节弃内容行（标题保留）直至达标；尾行截断披露未截断
+// 也附（N/M 实数——披露口径统一）。产物恒 ≤ budget 字节（UTF-8，Buffer.byteLength 计）。
+export function renderStyleProjection(cardText, { cardSha, budget = 2000 } = {}) {
+  const card = String(cardText ?? "");
+  const srcB = Buffer.byteLength(card, "utf-8");
+  const trunc80 = (s) => (s.length > 80 ? s.slice(0, 80) + "…" : s);
+
+  // 分节：ATX 标题行锚定；节内容行 = 其后非空非标题行，仅取首条（首标题前正文不属任何节，不入投影）
+  const secs = [];
+  for (const line of card.split(/\r?\n/)) {
+    if (/^#{1,6}(?:\s|$)/.test(line)) secs.push({ head: line, first: null });
+    else if (secs.length && line.trim() && secs[secs.length - 1].first == null) secs[secs.length - 1].first = trunc80(line);
+  }
+
+  // 组装：k = 带内容行的节下标上界（i < k 才附首条），h = 保留标题的节数（病态兜底收缩用）
+  const body = (k, h = secs.length) => {
+    const L = [
+      "# 风格卡投影（机器生成 handoff.mjs——勿手改；重跑覆盖）",
+      `> 源卡 sha1 ${cardSha}｜判卷全文见工作目录 style-card.md（主上下文）——本投影只携带规则主干`,
+    ];
+    secs.slice(0, h).forEach((s, i) => {
+      L.push(s.head);
+      if (i < k && s.first != null) L.push(s.first);
+    });
+    return L;
+  };
+  // 尾行 M 自指（投影总字节含尾行自身）：从体字节起迭代至不动点——体字节恒定，仅 M 位数变，数轮收敛
+  const text = (k, h = secs.length) => {
+    const base = body(k, h).join("\n") + "\n\n";
+    let m = Buffer.byteLength(base, "utf-8") + 60;
+    let out = "";
+    for (let i = 0; i < 6; i++) {
+      out = base + `> 截断披露：源卡 ${srcB} B → 投影 ${m} B（超预算节内容略）` + "\n";
+      const actual = Buffer.byteLength(out, "utf-8");
+      if (actual === m) break;
+      m = actual;
+    }
+    return out;
+  };
+
+  const withContent = secs.map((s, i) => (s.first != null ? i : -1)).filter((i) => i >= 0);
+  let k = secs.length;
+  let out = text(k);
+  // 超预算：自最后一个有内容的节起逐节弃内容行（标题保留）直至达标
+  for (let i = withContent.length - 1; i >= 0 && Buffer.byteLength(out, "utf-8") > budget; i--) {
+    k = withContent[i];
+    out = text(k);
+  }
+  // 病态兜底（标题本体即超预算——正常卡不可达）：自末节起连标题一并收缩，保"恒 ≤ budget"不变量
+  let h = secs.length;
+  while (h > 0 && Buffer.byteLength(out, "utf-8") > budget) out = text(Math.min(k, --h), h);
+  return out;
+}
+
 // ---------- 主流程 ----------
 
 // 语境段新鲜口径与 merge.mjs collectSet 同源：记录存在 + passed === true + sha === 当前译文
 export function runHandoff(dir, opts = {}) {
   const inv = scanWorkdir(dir);
-  if (inv.errors.length) return { exitCode: 2, errors: inv.errors };
-  if (!inv.chunks.length) return { exitCode: 2, errors: ["manifest.md 无 chunk 登记"] };
+  if (inv.errors.length) return { exitCode: 2, errors: inv.errors, warns: [] };
+  if (!inv.chunks.length) return { exitCode: 2, errors: ["manifest.md 无 chunk 登记"], warns: [] };
 
   const glossaryFile = fs.readdirSync(dir).find((f) => /^glossary-/.test(f)) ?? null;
-  if (!glossaryFile) return { exitCode: 2, errors: ["缺 glossary-<title>.md（Step 2 未跑）——投影无源"] };
+  if (!glossaryFile) return { exitCode: 2, errors: ["缺 glossary-<title>.md（Step 2 未跑）——投影无源"], warns: [] };
   const glossary = parseGlossary(fs.readFileSync(path.join(dir, glossaryFile), "utf-8"));
   const glossarySha = sha12(fs.readFileSync(path.join(dir, glossaryFile), "utf-8"));
 
   const targets = opts.nn ? inv.chunks.filter((c) => c.nn === opts.nn) : inv.chunks;
-  if (!targets.length) return { exitCode: 1, errors: [`chunk ${opts.nn} 不在 manifest 登记`] };
+  if (!targets.length) return { exitCode: 1, errors: [`chunk ${opts.nn} 不在 manifest 登记`], warns: [] };
 
   fs.mkdirSync(path.join(dir, "handoff"), { recursive: true });
   const generated = [];
+  const warns = [];
+
+  // 第三机器件：风格卡投影（S3 §3 注）——chunk 无关、单次生成；缺卡 WARN 不阻断（Step 2 应产卡）
+  const styleFile = path.join(dir, "style-card.md");
+  let styleCardProj = null;
+  if (fs.existsSync(styleFile)) {
+    const card = fs.readFileSync(styleFile, "utf-8");
+    const proj = renderStyleProjection(card, { cardSha: sha12(card) });
+    const projPath = path.join(dir, "handoff", "style-card-proj.md");
+    fs.writeFileSync(projPath, proj, "utf-8");
+    generated.push(projPath);
+    styleCardProj = { bytes: Buffer.byteLength(proj, "utf-8") };
+  } else {
+    warns.push("缺 style-card.md——风格卡投影未生成（Step 2 应产卡）");
+  }
+
   for (const c of targets) {
     const chunkText = fs.readFileSync(path.join(dir, "chunks", c.name), "utf-8");
     const proj = renderProjection(projectionFor(glossary, chunkText), { glossarySha, chunkSha: sha12(chunkText), nn: c.nn });
@@ -165,7 +242,7 @@ export function runHandoff(dir, opts = {}) {
     fs.writeFileSync(ctxPath, ctx, "utf-8");
     generated.push(ctxPath);
   }
-  return { exitCode: 0, generated, glossaryEntries: glossary.length };
+  return { exitCode: 0, generated, glossaryEntries: glossary.length, styleCardProj, warns };
 }
 
 // ---------- CLI ----------
@@ -182,7 +259,7 @@ function parseArgs(argv) {
   return { pos, opts };
 }
 
-const __help = `handoff.mjs — 交接包机器件生成器（投影 + 串行增强段）
+const __help = `handoff.mjs — 交接包机器件生成器（投影 + 串行增强段 + 风格卡投影）
 
 用法:
   node handoff.mjs <workdir> [--nn N] [--json]
@@ -190,6 +267,7 @@ const __help = `handoff.mjs — 交接包机器件生成器（投影 + 串行增
 产物（handoff/ 下，幂等重生成；判断件 chunk-<NN>.md 由主 agent 组装，本脚本不碰）:
   projection-chunk-<NN>.md   既定译法投影（R8-b；verify-mech --projection 消费，R8-c）
   context-chunk-<NN>.md      串行增强段（邻 chunk 已审末段 + sha 锚）
+  style-card-proj.md         风格卡投影（S3 §3 注：style-card.md 蒸馏 ≤2KB，卡全文仅进主上下文；缺卡 WARN 不阻断）
 
 退出码: 0 成功 / 1 用法错（--nn 不在 manifest） / 2 工作目录异常 / 4 symlink 调用防呆（S3⑤）`;
 
@@ -204,7 +282,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   const r = runHandoff(path.resolve(pos[0]), opts);
   if (opts.json) console.log(JSON.stringify(r, null, 2));
   else if (r.exitCode === 0) {
-    console.log(`✅ 交接包机器件 ${r.generated.length} 个（glossary ${r.glossaryEntries} 条）：`);
+    console.log(`✅ 交接包机器件 ${r.generated.length} 个（glossary ${r.glossaryEntries} 条${r.styleCardProj ? `；风格卡投影 ${r.styleCardProj.bytes}B` : ""}）：`);
     for (const g of r.generated) console.log(`  - ${path.relative(path.resolve(pos[0]), g)}`);
   } else for (const e of r.errors ?? []) console.error(`❌ ${e}`);
   process.exit(r.exitCode);

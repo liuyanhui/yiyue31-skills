@@ -156,7 +156,16 @@ SKILL.md Step 10 只保留指针与运行时纪律（半径分级/PENDING-USER/�
 |---|---|---|
 | 1 | SKILL.md ≤ 20,000B 硬上限（批末交付态口径；16,000B 软目标仅 WARN） | SKILL.md 无界回胖（③v4-3） |
 | 2 | references/*.md 单件 ≤ 6,000B（glob 全量，新增件自动纳入） | 懒加载预算失守 |
-| 3 | fixer 包（--verb fix 实测物化）与审校单元包（staging 单元 + chunk 原文 + 附件预算 3,800B）各 ≤ 40,000B | 单元包超上下文预算（③v4-5；超限出口=首审切半/分维派发） |
+| 3 | fixer 包（--verb fix 实测物化）与审校单元包（staging 单元 + chunk 原文 + 附件预算 3,800B = 风格卡投影 ≤2,000[S3 已落地] + handoff 投影 ~1,400 + brief ~400）各 ≤ 40,000B | 单元包超上下文预算（③v4-5；超限出口=首审切半/分维派发） |
+
+## 风格卡投影判据（S3 §3 注落地）
+
+**判据权威登记于此**——改判据 = 改 `handoff.mjs`（`renderStyleProjection` 纯函数 + runHandoff 第三机器件）+ 本表 + 对应用例，三处同步。消费口径：审校单元包附件自此用本投影（≤2KB），**卡全文仅进主上下文**（§5 红线：卡 7,036B 全文进每包属超红线）。
+
+| # | 判据 | 防什么 | 钉死用例 |
+|---|------|--------|----------|
+| SP1 | 确定性蒸馏 ≤2,000B：全标题逐字保留（原顺序）+ 每节首条内容行（列表前缀原样、>80 字符截断加 …）+ 超预算自最后一个节起逐节弃内容行（标题保留）直至达标 + 尾行截断披露（`源卡 N B → 投影 M B`，未截断也附同款——披露口径统一）+ 源卡 sha 锚；同输入重跑字节相同（幂等，无时间戳）；产物恒 ≤ budget 字节 | 卡全文进审校包超 §5 红线 / 投影不可复现 | unit/handoff.test.mjs "SP1…"（含收紧预算驱动弃内容路径）；unit/sizes.test.mjs 档 3b（>6KB 合成卡 → renderStyleProjection 实测 ≤2,000B、全标题与 sha 在场、ATTACH = 投影实测 +1,400+400 ≤3,800） |
+| SP2 | handoff.mjs 第三机器件：工作目录有 style-card.md → `handoff/style-card-proj.md` 落盘（入 generated 与 --json 结果，附字节数），既有 projection/context 两件不回归；缺卡 → warns 提示且不阻断（exit 0）、投影不落盘 | 缺卡硬失败阻断交接 / 第三件与既有件相互回归 | unit/handoff.test.mjs "SP2…" |
 
 ## 事件流事务判据（events/pending 同事务，S2⑤ 落地）
 

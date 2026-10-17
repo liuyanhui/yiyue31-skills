@@ -6,7 +6,7 @@
 //   3. fixer 包 / 审校单元包 ≤ 40,000B（夹具实测口径）：
 //      - fixer 包：max 尺寸 chunk（译文 ~16.7KB）+ 四维报告全文 → status.mjs --verb fix 实测物化字节
 //      - 审校单元包：staging 被审单元 + chunk 原文 + 附件预算 3,800B
-//        （风格卡投影 ≤2,000[S3 口径] + handoff 投影 ~1,400 + brief ~400）
+//        （风格卡投影 ≤2,000[S3 已落地——档 3b 用 renderStyleProjection 实测] + handoff 投影 ~1,400 + brief ~400）
 //
 // 运行：node --test scripts/test/unit/sizes.test.mjs（run.sh glob unit/*.test.mjs 自动纳入）
 
@@ -18,6 +18,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { run as segRun } from "../../segment/segment.mjs";
+import { renderStyleProjection } from "../../handoff.mjs";
 import { run } from "../../status.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -52,6 +53,22 @@ test("档 2：references/*.md 单件 ≤ 6,000B（懒加载预算，glob 全量�
 // ---------- 档 3：fixer 包 / 审校单元包 ≤ 40KB（夹具实测） ----------
 
 // 夹具：单 chunk 目标带文档（原文 ~14.5KB 落带内）+ max 尺寸译文（~16.5KB > 实测最大 chunk 16,676B 同量级）
+//   + >6,000B 合成风格卡（S3 §3 注——7 维度 × 各 5 条"这样写/不这样写"对照，仿 references/style-card.md 指引）
+function bigStyleCard() {
+  const dims = ["句式节奏", "语体", "修辞习惯", "标点习惯", "称谓与人称", "比喻处理策略", "文体变化轴"];
+  const L = ["# 文风基准卡（合成夹具）", "", "> 判卷锚：7 维度规则，译者/审校/统稿/冷读共用（内容 lorem）。"];
+  dims.forEach((d, i) => {
+    L.push("", `## ${d}`);
+    for (let r = 1; r <= 5; r++) {
+      L.push(
+        `- ${d}规则${r}：这样写「lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna（${i}-${r}）」` +
+          `；不这样写「sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium（${i}-${r}）」。`
+      );
+    }
+  });
+  return L.join("\n") + "\n";
+}
+
 function bigWorkdir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sz-"));
   const paras = [];
@@ -59,6 +76,9 @@ function bigWorkdir() {
   fs.writeFileSync(path.join(dir, "original-bigdoc.md"), paras.join("\n\n") + "\n", "utf-8");
   const r = segRun(path.join(dir, "original-bigdoc.md"), dir, { quiet: true });
   assert.equal(r.exitCode, 0, "夹具分段失败");
+  const card = bigStyleCard();
+  fs.writeFileSync(path.join(dir, "style-card.md"), card, "utf-8");
+  assert.ok(Buffer.byteLength(card, "utf-8") > 6 * KB, `夹具自证：风格卡 ${Buffer.byteLength(card, "utf-8")}B >6KB（防空转）`);
   return dir;
 }
 
@@ -104,7 +124,7 @@ test("档 3a：fixer 包 ≤ 40,000B（max 尺寸译文 + 四维报告全文，-
   }
 });
 
-test("档 3b：审校单元包 ≤ 40,000B（staging 单元 + chunk 原文 + 附件预算 3,800B）", () => {
+test("档 3b：审校单元包 ≤ 40,000B（staging 单元 + chunk 原文 + 附件预算——投影实测口径，S3 已落地）", () => {
   const dir = bigWorkdir();
   try {
     const t = bigTranslation();
@@ -121,9 +141,20 @@ test("档 3b：审校单元包 ≤ 40,000B（staging 单元 + chunk 原文 + 附
     const unit = sizeOf(staging);
     const chunkFile = path.join(dir, "chunks", fs.readdirSync(path.join(dir, "chunks")).find((f) => /chunk-01/.test(f)));
     const orig = sizeOf(chunkFile);
-    const ATTACH_BUDGET = 3800; // 风格卡投影 ≤2,000（S3 口径）+ handoff 投影 ~1,400 + brief ~400
+    // S3 已落地：风格卡投影用 handoff.mjs 同一纯函数现算（与 runHandoff 写盘同源），附件预算改投影实测口径
+    const cardPath = path.join(dir, "style-card.md");
+    const cardText = fs.readFileSync(cardPath, "utf-8");
+    const proj = renderStyleProjection(cardText, { cardSha: sha12Of(cardPath) });
+    const projBytes = Buffer.byteLength(proj, "utf-8");
+    assert.ok(projBytes <= 2 * KB, `风格卡投影 ${projBytes}B 超 2,000B（S3 §3 注红线）`);
+    for (const h of cardText.split(/\r?\n/).filter((l) => /^#{1,6}\s/.test(l))) {
+      assert.ok(proj.includes(h), `投影保留全部标题行：${h}`);
+    }
+    assert.ok(proj.includes(sha12Of(cardPath)), "投影含源卡 sha 锚");
+    const ATTACH_BUDGET = projBytes + 1400 + 400; // 风格卡投影实测 + handoff 投影 ~1,400 + brief ~400
+    assert.ok(ATTACH_BUDGET <= 3800, `附件预算 ${ATTACH_BUDGET}B 超 3,800B（= 投影实测 +1,400+400 的上界）`);
     const total = unit + orig + ATTACH_BUDGET;
-    console.log(`  审校单元包实测口径 ${total}B（staging ${unit}B + 原文 ${orig}B + 附件预算 ${ATTACH_BUDGET}B）`);
+    console.log(`  审校单元包实测口径 ${total}B（staging ${unit}B + 原文 ${orig}B + 附件预算 ${ATTACH_BUDGET}B——风格卡投影实测 ${projBytes}B）`);
     assert.ok(total <= 40 * KB, `审校单元包 ${total}B 超 40,000B（超限出口=首审切半送审，delta 仍节级）`);
     assert.ok(unit > 16 * KB, "夹具自证：被审单元本体已 >16KB");
   } finally {
