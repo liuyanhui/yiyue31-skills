@@ -45,6 +45,7 @@ import {
   dispatchEventsBatch,
   availableRamMb,
   ctxPctFromEnv,
+  parseGuardEnv,
 } from "../../status.mjs";
 import { symlinkCliGuard } from "../../cli-guard.mjs";
 import { runGate } from "../../final-gate.mjs";
@@ -52,7 +53,13 @@ import { runGate } from "../../final-gate.mjs";
 // S3① 测试环境钉死（availableRamMb 注入点，优先级最高）：真实系统读数随机器波动（本机
 // 1.87GB 低内存机），不进断言路径——in-process dispatch 用例（CS/S2③/GR3 等）守卫须恒放行。
 // 子进程用例显式传 env 覆盖（GR1 正反例）。
-process.env.GUARD_RAM_MB ??= "99999";
+// E1+Q2（S3b）：无条件赋值（原 ??= 会被外层 shell 残留的低值放行→in-process 用例假红/
+// 假绿）+ 顶部剥 GUARD_CTX_PCT（外层残留 <20 会让一切 in-process dispatch 整体假红）+
+// 自证行（钉不牢即文件级失败，不静默通过）。
+process.env.GUARD_RAM_MB = "99999";
+delete process.env.GUARD_CTX_PCT;
+assert.equal(process.env.GUARD_RAM_MB, "99999", "守卫 env 钉死自证：GUARD_RAM_MB");
+assert.equal(process.env.GUARD_CTX_PCT, undefined, "守卫 env 钉死自证：GUARD_CTX_PCT 已剥");
 
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "status.mjs");
@@ -587,6 +594,7 @@ test("S2③ 冻结窗复欠队列：窗内修复 → 变化节 × 4 维补审优
     assert.equal(r.exitCode, 0);
     assert.equal(r.queue.q.length, 4, "s2 × 4 维补审单元");
     assert.ok(r.queue.q.every((u) => u.sec === "s2" && u.nn === 1));
+    assert.equal(r.queue.action, null, "Q1（S3b）FR5 字面断言：复欠队列在场时 action === null（优先于全局动作——原仅注释无断言）");
     const evs = scanWorkdir(dir).events;
     assert.equal(evs.filter((e) => e.ev === "freeze-round").length, 1, "派发批落 freeze-round 事件（计数器事实源）");
     assert.equal(evs.filter((e) => e.ev === "dispatch").length, 4);
@@ -673,6 +681,7 @@ test("S2④ fixer 包物化：报告全文+译文+定位块进包；--dims 选�
     assert.equal(run(dir, { verb: "fix" }).exitCode, 1, "缺 --nn 须用法错");
     assert.equal(run(dir, { verb: "fix", nn: 1, dims: "nope" }).exitCode, 1, "未知维度须用法错");
     assert.equal(run(dir, { verb: "fix", nn: 99 }).exitCode, 1, "不在 manifest 须用法错");
+    assert.equal(run(dir, { verb: "fix", nn: 901 }).exitCode, 1, "Q4（S3b）FX4 真实探针 NN 夹具：探针虚拟 NN 段（901-999）不在 manifest——进不了 fixer（原以 nn=99 替身隐式覆盖）");
     // 物化（单维）
     const r = run(dir, { verb: "fix", nn: 1, dims: "accuracy" });
     assert.equal(r.exitCode, 0, r.errors?.join(";"));
@@ -1326,6 +1335,200 @@ test("GR6 ENG-4 预算收尾 session-end：--budget 1 dispatch → exit 0 不物
     // R14 跨会话复位自此真正工作：重读事件流推导 → 窗计数归零
     assert.equal(deriveCounters(readEvents(dir)).dispatchedSinceSessionEnd, 0, "跨会话复位生效");
     assert.ok(r.statusText.includes("干净退出点"), "人话仍按已渲染口径（预算退出点文案不重推导）");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------- S3b riders：A2 守卫 env 解析 / E2 free locale / A3 守卫注行 / A4 resume 消解 / E3+Q3 目录 fsync ----------
+
+test("A2 parseGuardEnv 纯函数：空串/纯空白视同缺省（null）；\"500\"/\"12.5\" 合法——勿用 isInteger 收紧", () => {
+  // 纯函数正反例（修复形态限定：空/空白=缺省；可解析有限数=值）
+  assert.equal(parseGuardEnv(""), null, "空串 = 缺省（原 Number(\"\")=0 → RAM 假 exit 4 / 水位假 0%）");
+  assert.equal(parseGuardEnv("   "), null, "纯空白 = 缺省");
+  assert.equal(parseGuardEnv("\t \n"), null, "混空白 = 缺省");
+  assert.equal(parseGuardEnv(undefined), null, "未设置 = 缺省");
+  assert.equal(parseGuardEnv("500"), 500, "整数合法");
+  assert.equal(parseGuardEnv("12.5"), 12.5, "小数合法（isInteger 收紧会误拒——禁止）");
+  assert.equal(parseGuardEnv(" 20 "), 20, "带空白包裹的合法数可解析");
+  assert.equal(parseGuardEnv("abc"), null, "不可解析 = 缺省");
+  // 信号函数消费（原缺陷路径：Number(\"\")=0 → 0<500 假拒绝 / 0<20 假水位）
+  const savedRam = process.env.GUARD_RAM_MB;
+  const savedCtx = process.env.GUARD_CTX_PCT;
+  try {
+    process.env.GUARD_RAM_MB = "";
+    process.env.GUARD_CTX_PCT = "";
+    assert.notEqual(availableRamMb(), 0, "GUARD_RAM_MB=\"\" 视同缺省——不返回假性 0（走 free/os.freemem 真值）");
+    assert.equal(ctxPctFromEnv(), null, "GUARD_CTX_PCT=\"\" 视同缺省 → null（不假性 0%）");
+    process.env.GUARD_RAM_MB = "   ";
+    process.env.GUARD_CTX_PCT = "   ";
+    assert.notEqual(availableRamMb(), 0, "纯空白同缺省");
+    assert.equal(ctxPctFromEnv(), null, "纯空白同缺省");
+  } finally {
+    if (savedRam === undefined) delete process.env.GUARD_RAM_MB; else process.env.GUARD_RAM_MB = savedRam;
+    if (savedCtx === undefined) delete process.env.GUARD_CTX_PCT; else process.env.GUARD_CTX_PCT = savedCtx;
+  }
+});
+
+test("A2 集成行：子进程 GUARD_CTX_PCT=\"\" 走缺省 WARN 放行（与未注入同款；GUARD_RAM_MB=\"\" 不假 exit 4）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushThroughVerify(dir, 1);
+    // GUARD_CTX_PCT 空串 = 缺省 WARN 放行（原假性 0% → 假水位退出不物化）
+    const r = cli(dir, ["--verb", "dispatch", "--json"], { GUARD_CTX_PCT: "" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(fs.readdirSync(path.join(dir, "staging")).length, 4, "空串水位不拦物化");
+    const j = JSON.parse(r.stdout);
+    assert.ok(j.state.warnings.some((w) => w.includes("水位信号缺省")), "--json warnings 含缺省 WARN（与未注入同款）");
+    // GUARD_RAM_MB 空串 = 缺省放行（原假性 0MB → 假 exit 4）
+    const dir2 = makeWorkdir(1);
+    try {
+      pushThroughVerify(dir2, 1);
+      const r2 = cli(dir2, ["--verb", "dispatch"], { GUARD_RAM_MB: "" });
+      assert.equal(r2.status, 0, "GUARD_RAM_MB=\"\" 不假 exit 4（走真实读数）\n" + r2.stdout + r2.stderr);
+      assert.equal(fs.readdirSync(path.join(dir2, "staging")).length, 4, "照常物化");
+    } finally {
+      fs.rmSync(dir2, { recursive: true, force: true });
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("E2 availableRamMb free -m 解析钉 LC_ALL=C：PATH 注入探针 free——非 C 环境输出本地化列形则不可判，C 形态可判", () => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "e2free-"));
+  try {
+    // 探针 free：LC_ALL=C 时输出标准 C 列形（available=777）；否则输出本地化形态（表头译化
+    // + 逗号小数）——模拟非 C locale 下 free 的真实风险（E2 缺陷场景）。修复后 spawn 恒带
+    // LC_ALL=C → 探针恒走 C 分支 → 解析出 777；未带则走本地化分支 → 解析失败退 os.freemem。
+    fs.writeFileSync(path.join(bin, "free"), [
+      "#!/usr/bin/env bash",
+      'if [ "$LC_ALL" = "C" ]; then',
+      '  printf "               total        used        free      shared  buff/cache   available\n"',
+      '  printf "Mem:           1000         200         100           0          100         777\n"',
+      "else",
+      '  printf "              总计         已用         空闲      共享    缓冲/缓存    可用\n"',
+      '  printf "Mem:           1.000         200         100           0          100       777,5\n"',
+      "fi",
+      "",
+    ].join("\n"), "utf-8");
+    fs.chmodSync(path.join(bin, "free"), 0o755);
+    const savedPath = process.env.PATH;
+    const savedRam = process.env.GUARD_RAM_MB;
+    try {
+      process.env.PATH = `${bin}:${process.env.PATH}`;
+      delete process.env.GUARD_RAM_MB;
+      const v = availableRamMb();
+      assert.equal(v, 777, `free 输出须以 LC_ALL=C 解析（available 列 777；实得 ${v} = 非 C 分支解析失败退 os.freemem——E2 缺陷形态）`);
+    } finally {
+      process.env.PATH = savedPath;
+      if (savedRam === undefined) delete process.env.GUARD_RAM_MB; else process.env.GUARD_RAM_MB = savedRam;
+    }
+  } finally {
+    fs.rmSync(bin, { recursive: true, force: true });
+  }
+});
+
+test("A3 守卫/水位出口动作指令段镜像注行：RAM/ctx 分支各带\"注：…本轮不派发\"行；yaml 结构不动（头行+空清单形态保持）；常态无注行", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushThroughVerify(dir, 1);
+    // RAM 守卫出口：动作段 yaml（step: review 头行 + 空清单）保持 + 注行在场
+    const r = cli(dir, ["--verb", "dispatch"], { GUARD_RAM_MB: "1" });
+    assert.equal(r.status, 4);
+    const md = fs.readFileSync(path.join(dir, "status.md"), "utf-8");
+    const actionSec = md.slice(md.indexOf("## 动作指令"));
+    assert.ok(actionSec.includes("```yaml") && actionSec.includes("step: review"), "yaml 结构不动（S3 前默认预览既有形态：头行+空清单）");
+    assert.equal(actionSec.split("\n").filter((l) => /^- in: /.test(l)).length, 0, "守卫出口空清单（不物化）");
+    assert.ok(actionSec.includes("注：RAM 守卫拒绝派发（S3①），本轮不派发"), "RAM 注行镜像 overBudget 注行形态");
+    // 水位出口：同款注行
+    const dir2 = makeWorkdir(1);
+    try {
+      pushThroughVerify(dir2, 1);
+      const r2 = cli(dir2, ["--verb", "dispatch"], { GUARD_CTX_PCT: "5" });
+      assert.equal(r2.status, 0);
+      const md2 = fs.readFileSync(path.join(dir2, "status.md"), "utf-8");
+      assert.ok(md2.slice(md2.indexOf("## 动作指令")).includes("注：上下文水位退出（S3②），本轮不派发"), "水位注行在场");
+    } finally {
+      fs.rmSync(dir2, { recursive: true, force: true });
+    }
+    // 常态（正常派发/只读渲染）：无守卫注行（不误挂）
+    const dir3 = makeWorkdir(1);
+    try {
+      pushThroughVerify(dir3, 1);
+      run(dir3, { verb: "dispatch" });
+      assert.ok(!fs.readFileSync(path.join(dir3, "status.md"), "utf-8").includes("本轮不派发"), "常态无注行");
+    } finally {
+      fs.rmSync(dir3, { recursive: true, force: true });
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("A4 suspendUnresolved 消解集含 resume：[suspend,resume]→已消解；[suspend,resume,suspend]→再次未消解；reconcileSuspend 同判", () => {
+  const dir = makeWorkdir(1);
+  try {
+    // 正例：suspend（无载荷历史形态）→ resume（verb continue 对无 pending 挂起史落的事件）→ 已消解
+    appendEvents(dir, [{ ev: "suspend", detail: "legacy-run" }, { ev: "resume" }]);
+    let r = run(dir, {});
+    assert.equal(r.state.suspendUnresolved, false, "[suspend,resume] → 已消解（原消解集缺 resume：\"继续翻译\"后仍按挂起卡菜单）");
+    assert.ok(!r.statusText.includes("挂起史未消解"), "人话段不出挂起史菜单");
+    assert.ok(!fs.existsSync(path.join(dir, "pending.md")), "reconcileSuspend 不重建（已消解）");
+    // 防修过头（反例）：再次 suspend → 重新未消解
+    appendEvents(dir, { ev: "suspend", detail: "second-run" });
+    r = run(dir, {});
+    assert.equal(r.state.suspendUnresolved, true, "[suspend,resume,suspend] → 再次未消解（resume 不前向豁免后续 suspend）");
+    assert.ok(r.statusText.includes("挂起史未消解"), "菜单兜底恢复");
+    // 既有消解事件不回归：pending-clear / unseal / restart 照旧消解
+    for (const ev of ["pending-clear", "unseal", "restart"]) {
+      appendEvents(dir, { ev: "resume" }); // 先制造未消解？——直接追 suspend 后接消解事件
+      appendEvents(dir, { ev: "suspend", detail: `pre-${ev}` });
+      appendEvents(dir, { ev });
+      r = run(dir, {});
+      assert.equal(r.state.suspendUnresolved, false, `既有消解事件 ${ev} 不回归`);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("E3+Q3 目录 fsync 抛错（平台不支持形态）：appendEvents 仍成功（Q3 catch 分支）且目录 fd 必 closeSync（E3 无泄漏）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    const fdPaths = new Map();
+    const closedPaths = [];
+    const dirPath = path.dirname(path.join(dir, "events.jsonl"));
+    const origOpen = fs.openSync;
+    const origFsync = fs.fsyncSync;
+    const origClose = fs.closeSync;
+    fs.openSync = function (p, ...rest) {
+      const fd = origOpen.call(fs, p, ...rest);
+      fdPaths.set(fd, String(p));
+      return fd;
+    };
+    fs.fsyncSync = function (fd, ...rest) {
+      if (fdPaths.get(fd) === dirPath) throw new Error("EISDIR-fsync-unsupported（探针：目录 fsync 平台不支持）");
+      return origFsync.call(fs, fd, ...rest);
+    };
+    fs.closeSync = function (fd, ...rest) {
+      if (fdPaths.has(fd)) closedPaths.push(fdPaths.get(fd));
+      return origClose.call(fs, fd, ...rest);
+    };
+    try {
+      appendEvents(dir, { ev: "resume" }); // Q3：目录 fsync 抛错 → best-effort catch → 追加仍成功
+      assert.equal(readEvents(dir).length, 1, "appendEvents 成功（目录 fsync 抛错被容错，事件照常落流）");
+      assert.ok(closedPaths.includes(dirPath), "E3：目录 fd 已 closeSync（原 fsync 抛出时 closeSync 被 catch 吞 → fd 泄漏一次/调用）");
+      assert.ok(closedPaths.includes(path.join(dir, "events.jsonl.tmp")), "内容 fd close 不回归");
+      // 连发两次：每次调用的目录 fd 都关闭（无累积泄漏）
+      appendEvents(dir, { ev: "resume" });
+      assert.equal(closedPaths.filter((p) => p === dirPath).length, 2, "逐调用关闭（无累积）");
+      assert.equal(readEvents(dir).length, 2, "两次追加均成功");
+    } finally {
+      fs.openSync = origOpen;
+      fs.fsyncSync = origFsync;
+      fs.closeSync = origClose;
+    }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

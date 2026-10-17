@@ -135,7 +135,10 @@ export function renderContext({ nn, prev, prevSha, segment, fresh }) {
 // >80 字符截断加 …）；超预算自最后一个节起逐节弃内容行（标题保留）直至达标；尾行截断披露未截断
 // 也附（N/M 实数——披露口径统一）。产物恒 ≤ budget 字节（UTF-8，Buffer.byteLength 计）。
 export function renderStyleProjection(cardText, { cardSha, budget = 2000 } = {}) {
-  const card = String(cardText ?? "");
+  // E4（G3 工程师位，S3b 修）：split 前剥前导 BOM（U+FEFF）——BOM 开头的卡首行 "﻿# 标题"
+  // 不命中 /^#{1,6}(?:\s|$)/ → 卡首节被"标题前正文"静默丢弃（无 WARN）。只剥前导一个：
+  // 节内容行内的 BOM 原样保留（零改写纪律）；无 BOM 卡路径字节不变（SP1 全量断言不回归）。
+  const card = String(cardText ?? "").replace(/^\uFEFF/, "");
   const srcB = Buffer.byteLength(card, "utf-8");
   const trunc80 = (s) => (s.length > 80 ? s.slice(0, 80) + "…" : s);
 

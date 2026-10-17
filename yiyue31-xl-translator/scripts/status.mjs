@@ -101,11 +101,17 @@ function writeAtomic(file, data) {
   fs.renameSync(tmp, file); // 原子替换；遗留 .tmp（中断残留）下次写入时被覆盖清理，不入流不被扫
   // ENG-2（G2 工程师位）：rename 后无目录 fsync——文件内容已 fsync 而目录项未持久，断电下
   // rename 本身可能丢失（目标文件回退为旧内容或缺失）。补 best-effort 目录 fsync：
+  // E3（G3 工程师位，S3b 修）：目录 fd 的 closeSync 移入 finally——原实现 fsyncSync 抛出时
+  // closeSync 被 catch 吞 → fd 泄漏一次/调用（best-effort 容错 ≠ 句柄泄漏）。
+  let dfd = null;
   try {
-    const dfd = fs.openSync(path.dirname(file), "r");
+    dfd = fs.openSync(path.dirname(file), "r");
     fs.fsyncSync(dfd);
-    fs.closeSync(dfd);
-  } catch { /* 目录 fsync best-effort：平台不支持（如 Windows 目录句柄）跳过 */ }
+  } catch { /* 目录 fsync best-effort：平台不支持（如 Windows 目录句柄）跳过 */ } finally {
+    if (dfd != null) {
+      try { fs.closeSync(dfd); } catch { /* close 也 best-effort */ }
+    }
+  }
 }
 
 // S2⑤ events 追加收口：唯一写点（status/final-gate/merge/derive-bilingual/verify-mech 全经此）。
@@ -142,16 +148,30 @@ export function dispatchEventsBatch(q, dispatch, inFreeze) {
 
 // ---------- S3①② 守卫信号（RAM / 上下文水位） ----------
 
+// A2（G3 架构位，S3b 修）：守卫 env 解析纯函数——空串/纯空白视同缺省（null）。原实现
+// `Number("")` = 0：GUARD_RAM_MB="" → 假性 0MB < 500 → 假 exit 4；GUARD_CTX_PCT="" → 假性
+// 0% < 20% → 假水位退出。外层 shell `GUARD_X=` 形态残留即触发，故缺省判定必须显式。
+// 修复形态限定：**勿用 isInteger 收紧**（合法值如 "500"、"12.5" 不得被拒）——可解析为有限
+// 数则返回该数，否则 null（缺省语义交还调用方）。
+export function parseGuardEnv(raw) {
+  const t = raw == null ? "" : String(raw).trim();
+  if (t === "") return null; // 空串/纯空白 = 缺省（非 0）
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
 // S3① 可用内存（MB）：
 // ① env GUARD_RAM_MB 可解析为有限数 ≥0 → 直接返回（测试注入点，优先级最高）；
 // ② spawn free -m 解析 Mem: 行 available 列（无 available 列的旧版退 buff/cache）；
 // ③ free 不可用/不可解析 → Math.round(os.freemem()/1048576)；
 // ④ 彻底失败 → null（fail-open——守卫信号缺失不阻塞派发）。
 export function availableRamMb() {
-  const env = Number(process.env.GUARD_RAM_MB);
-  if (Number.isFinite(env) && env >= 0) return env;
+  const env = parseGuardEnv(process.env.GUARD_RAM_MB); // A2：空串/纯空白视同缺省
+  if (env != null && env >= 0) return env;
   try {
-    const out = spawnSync("free", ["-m"], { encoding: "utf-8", timeout: 5000 });
+    // E2（G3 工程师位，S3b 修）：LC_ALL=C 钉死输出列形——非 C locale 下 free 的表头/小数
+    // 形态本地化（如逗号小数、译表头）会误判 available 列
+    const out = spawnSync("free", ["-m"], { encoding: "utf-8", timeout: 5000, env: { ...process.env, LC_ALL: "C" } });
     if (out.status === 0 && out.stdout) {
       const rows = out.stdout.split("\n");
       const memRow = rows.find((l) => /^Mem:/.test(l));
@@ -174,8 +194,8 @@ export function availableRamMb() {
 // 成本估算；代理计数 = events dispatchedSinceSessionEnd）；可解析为 0-100 有限数 → 值，
 // 否则 null（缺省 → WARN 放行，不阻塞）。
 export function ctxPctFromEnv() {
-  const v = Number(process.env.GUARD_CTX_PCT);
-  return Number.isFinite(v) && v >= 0 && v <= 100 ? v : null;
+  const v = parseGuardEnv(process.env.GUARD_CTX_PCT); // A2：空串/纯空白视同缺省（原 Number("")=0 假水位）
+  return v != null && v >= 0 && v <= 100 ? v : null;
 }
 
 // S2⑤ 撕裂尾行容错（①7）：不可解析行 WARN + 忽略，其余完整行照常解析——
@@ -209,15 +229,18 @@ export function suspendTxn(dir, pendingText, eventFields = {}) {
 }
 
 // S2⑤ 同事务对账自愈（scanWorkdir 调用）：未消解 suspend（其后无 pending-clear/unseal/
-// restart）而 pending.md 缺失 → 有载荷则重建（WARN 披露）；无载荷历史事件只 WARN 不重建
-// （禁补记——不凭空造 pending 内容）。返回 null=无需处理，否则 { warn, pendingType }。
+// restart/resume——A4〔S3b〕补 resume：verb continue 对无 pending 挂起史本就落 resume 事件，
+// 消解集缺它 = "继续翻译"后仍按未消解挂起处理）而 pending.md 缺失 → 有载荷则重建（WARN
+// 披露）；无载荷历史事件只 WARN 不重建（禁补记——不凭空造 pending 内容）。
+// 返回 null=无需处理，否则 { warn, pendingType }。
+const SUSPEND_RESOLVERS = new Set(["pending-clear", "unseal", "restart", "resume"]); // A4：两处消解集同源常量
 function reconcileSuspend(dir, events, pendingExists) {
   if (pendingExists) return null;
   let last = null;
   let cleared = true;
   for (const e of events) {
     if (e.ev === "suspend") { last = e; cleared = false; }
-    else if (e.ev === "pending-clear" || e.ev === "unseal" || e.ev === "restart") cleared = true;
+    else if (SUSPEND_RESOLVERS.has(e.ev)) cleared = true;
   }
   if (!last || cleared) return null;
   if (typeof last.pending !== "string") {
@@ -467,13 +490,14 @@ export function deriveState(inv) {
   // S2④ residue 停修集（事件流事实源：residue 事件 / 修复环轮超限）——停该 chunk，项目不停
   const residueSet = new Set(inv.events.filter((e) => e.ev === "residue").map((e) => e.nn));
 
-  // S3④ 挂起史未消解：事件流存在未消解 suspend（其后无 pending-clear/unseal/restart——与
-  // reconcileSuspend 的 cleared 扫描同款）而 pending.md 缺失 → 人话段按挂起态给 PENDING-USER
-  // 菜单（无载荷历史事件不可重建 pending，禁补记——菜单兜底出口，防状态机无出口卡死）。
+  // S3④ 挂起史未消解：事件流存在未消解 suspend（其后无 SUSPEND_RESOLVERS 消解事件——与
+  // reconcileSuspend 的 cleared 扫描同源常量，A4 补 resume）而 pending.md 缺失 → 人话段按
+  // 挂起态给 PENDING-USER 菜单（无载荷历史事件不可重建 pending，禁补记——菜单兜底出口，
+  // 防状态机无出口卡死）。
   let suspUncleared = false;
   for (const e of inv.events) {
     if (e.ev === "suspend") suspUncleared = true;
-    else if (e.ev === "pending-clear" || e.ev === "unseal" || e.ev === "restart") suspUncleared = false;
+    else if (SUSPEND_RESOLVERS.has(e.ev)) suspUncleared = false;
   }
   st.suspendUnresolved = suspUncleared && inv.pending == null;
 
@@ -922,6 +946,17 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
   }
   if (overBudget) L.push("");
   if (overBudget) L.push("注：会话预算已到，本轮不派发；干净退出点。");
+  // A3（G3 架构位，S3b）：守卫/水位出口镜像 overBudget 的注行（原守卫分支动作段无注行——
+  // 头行+空清单裸收尾）。yaml 结构不动（头行+空清单系 S3 前默认预览既有形态）。
+  const guardNote = opts.guard?.type === "ram"
+    ? "注：RAM 守卫拒绝派发（S3①），本轮不派发；释放内存后重跑 dispatch 续派。"
+    : opts.guard?.type === "ctx"
+      ? "注：上下文水位退出（S3②），本轮不派发；干净退出点——交接卡已再生，下次继续翻译。"
+      : null;
+  if (guardNote) {
+    L.push("");
+    L.push(guardNote);
+  }
   return L.join("\n") + "\n";
 }
 

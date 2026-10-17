@@ -27,6 +27,14 @@ const REFS_DIR = path.join(ROOT, "references");
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
 const KB = 1000; // 十进制（S1 钉死口径：KB = 1000B，非 1024）
 
+// E1+Q2（S3b）守卫 env 钉死：本文件档 3a/3b 含 in-process --verb fix / dispatch——原完全未钉
+// GUARD_RAM_MB（低内存真机真实读数 <500MB 时假 exit 4）也未剥 GUARD_CTX_PCT（外层残留 <20%
+// 时不物化→档 3b 断言整体假红）。无条件赋值 + 自证行（钉不牢即文件级失败）。
+process.env.GUARD_RAM_MB = "99999";
+delete process.env.GUARD_CTX_PCT;
+assert.equal(process.env.GUARD_RAM_MB, "99999", "守卫 env 钉死自证：GUARD_RAM_MB");
+assert.equal(process.env.GUARD_CTX_PCT, undefined, "守卫 env 钉死自证：GUARD_CTX_PCT 已剥");
+
 const sha12Of = (p) => crypto.createHash("sha1").update(fs.readFileSync(p, "utf-8"), "utf-8").digest("hex").slice(0, 12);
 const nn2 = (n) => String(n).padStart(2, "0");
 const sizeOf = (p) => fs.statSync(p).size;

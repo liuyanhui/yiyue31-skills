@@ -10,17 +10,17 @@ scripts/test/
 ├── README.md                       # 本文件
 ├── unit/                           # 单元层：程序化合成夹具（确定性，不落盘），钉死算法行为
 │   ├── segment.test.mjs            #   分段算法：fence 感知/拼接 sha/落带/R11-B/产物/CLI
-│   ├── status.test.mjs             #   状态机（M1b+S2③④⑤⑦+S3③④+S3①②⑤守卫）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账/派发 >90 WARN/冷启动卡/人话同源/RAM·水位·symlink 守卫/合并追加·目录 fsync·session-end 生产者
-│   ├── import-draft.test.mjs       #   draft 导入（S2⑥）：版本戳拒旧格式/§7 边界执行/events 归档新建禁补记/幂等/探针小文档全流程
+│   ├── status.test.mjs             #   状态机（M1b+S2③④⑤⑦+S3③④+S3①②⑤守卫+S3b riders）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账/派发 >90 WARN/冷启动卡/人话同源/RAM·水位·symlink 守卫/合并追加·目录 fsync·session-end 生产者/A2 守卫 env 解析/E2 free locale/A3 守卫注行/A4 resume 消解/E3+Q3 fsync 容错无泄漏
+│   ├── import-draft.test.mjs       #   draft 导入（S2⑥+S3b）：版本戳拒旧格式/§7 边界执行/events 归档新建禁补记/幂等/探针小文档全流程/ARCH-A 重入收敛（①③④+②机械枚举 k=1..N）/ENG-3 失败码传播
 │   ├── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
 │   ├── merge.test.mjs              #   合并（M1c）：M1-M7 纯函数与病态输入、CLI 冒烟
 │   ├── derive-bilingual.test.mjs   #   双语派生（Phase 1）：B1-B8 纯函数与病态输入、CLI 冒烟
 │   ├── probe.test.mjs              #   探针生成（M1c+S2⑦）：四维覆盖/虚拟 NN/确定性/truth 落盘与防覆盖/--run 新轮命名/伪报告命中正反
 │   ├── final-gate.test.mjs         #   交付门（M1c+前置①③）：重执行/完备性/G3/R23/标题锚/G4/R15/探针/元信息头/R8-c
-│   ├── handoff.test.mjs            #   交接包机器件（M3 前置④）：glossary 解析/单复数归一/词边界投影/语境段/幂等
+│   ├── handoff.test.mjs            #   交接包机器件（M3 前置④+S3b）：glossary 解析/单复数归一/词边界投影/语境段/幂等/风格卡投影 BOM（SP3/E4）
 │   ├── consistency.test.mjs        #   统稿清单（M3 前置②）：fork 三项继承 + 标题锚对/间距/接缝/文风拼料
 │   ├── word-counter.test.mjs       #   字数统计（M3 前置②）：bytes 判据/中英分项/CLI --json
-│   └── sizes.test.mjs              #   三档尺寸断言（S2）：SKILL.md ≤20KB 硬上限 / references ≤6KB/件 / fixer·审校单元包 ≤40KB（夹具实测口径）
+│   └── sizes.test.mjs              #   三档尺寸断言（S2+S3b 守卫 env 钉死）：SKILL.md ≤20KB 硬上限 / references ≤6KB/件 / fixer·审校单元包 ≤40KB（夹具实测口径）
 └── regression/                     # 回归层：git 管理的真实文档夹具，钉死真实世界回归
     ├── segment.regression.test.mjs
     ├── merge.regression.test.mjs   #   M1c：真实译文快照 × 合成场景装置（M1-M7）
@@ -177,7 +177,7 @@ SKILL.md Step 10 只保留指针与运行时纪律（半径分级/PENDING-USER/�
 | FR2 | 补审轮派发批口径：冻结窗内一次补审派发批 = 一轮 freeze-round 事件；计数器事实源 = 事件流派生（freezeRounds） | 轮次凭会话记忆/渲染口径计数（重启丢轮或重复计） | 「S2③ 冻结窗复欠队列…」（批落 1 条 freeze-round）；「GR3 ENG-1 dispatchEventsBatch 纯函数…」「GR3 ENG-1 集成…」（同批原子落流） |
 | FR3 | 项目级 ≤2 硬门：超限 dispatch exit 3 + pending.md 上报 + 不物化 + 不追加派发事件（suspend 事件落流） | 冻结窗补审无限膨胀（点名修复变相重译） | 「S2③ 冻结窗补审轮 >2 硬门：第 3 轮 dispatch → 非零退出 + pending.md 上报 + 不物化」 |
 | FR4 | 双计数器不挤占：freezeRounds（项目级）与 reviewRounds（per-chunk 修复环轮）分开派生；修复环每 chunk ≤3 超限停 chunk 登 residue、项目不停 | 两轮互占额度（冻结窗轮耗尽阻断正常修复 / 修复轮虚增冻结窗轮） | 「S2③ 双计数器不挤占：冻结窗轮已耗 2 不影响 per-chunk 阶段派发；fix/freeze-round 分开派生」＋「S2④ 修复环轮每 chunk ≤3…」（residue 停修半段） |
-| FR5 | 窗内修复优先级：变化节 × 4 维补审队列优先于全局动作（pm-review 等），复欠清零才回全局 | 点名修复的复欠被全局动作插队（欠账沉到终检才爆） | 「S2③ 冻结窗复欠队列…」（action 空、队列 = s2×4 维；复欠清零回 pm-review） |
+| FR5 | 窗内修复优先级：变化节 × 4 维补审队列优先于全局动作（pm-review 等），复欠清零才回全局 | 点名修复的复欠被全局动作插队（欠账沉到终检才爆） | 「S2③ 冻结窗复欠队列…」（action 空〔S3b Q1 补字面断言 `queue.action === null`〕、队列 = s2×4 维；复欠清零回 pm-review） |
 
 ## fixer 闭环判据（S2④ 落地）
 
@@ -188,7 +188,7 @@ SKILL.md Step 10 只保留指针与运行时纪律（半径分级/PENDING-USER/�
 | FX1 | `--verb fix` 物化 fixer 包 `staging/fixer-chunk-NN.md` = 定位块（sec 表，c4 同构）+ 译文全文 + FAIL 报告全文（主上下文不进报告）；`--dims` 选维；fix 事件计轮 | 主上下文被报告全文撑爆 / 修复无定位无依据 | 「S2④ fixer 包物化：报告全文+译文+定位块进包；--dims 选维；fix 事件计轮；入参校验」（unit/status.test.mjs） |
 | FX2 | 全链路 FAIL → fixer → verify 真跑 → 复欠 = 变化节 × 4 维 → done（事件流 fix/verify-pass/dispatch 各环节在场） | 机制各自为绿、链路断点（修了没验、验了没复欠） | 「S2④ 全链路：FAIL→fixer→verify→复欠（事件流各环节在场；verify 事件由 verify-mech CLI 落流）」 |
 | FX3 | 修复环轮每 chunk ≤3：超限停该 chunk + 登记 residue-chunk-NN.md + residue 事件、项目不停（无 pending.md；已停修 chunk 拒再派修复） | 无限修复循环 / 单 chunk 拖死整个项目 | 「S2④ 修复环轮每 chunk ≤3：第 4 次物化被拒 → 停该 chunk + residue 登记，项目不停」 |
-| FX4 | 包尺寸 ≤40,000B（sizes 档 3a：max 尺寸译文 + 四维报告全文实测物化）；fixer 按真 chunk 派发（`--nn` 须在 manifest——探针虚拟 NN 进不了 fixer）、chunk 原文不占包 | 包超上下文预算 / 探针混入修复流 | 「档 3a：fixer 包 ≤ 40,000B（max 尺寸译文 + 四维报告全文，--verb fix 实测物化）」（unit/sizes.test.mjs）；"探针不进 fixer/原文不占包"由「S2④ fixer 包物化…」入参校验断言隐式覆盖（nn 不在 manifest exit 1） |
+| FX4 | 包尺寸 ≤40,000B（sizes 档 3a：max 尺寸译文 + 四维报告全文实测物化）；fixer 按真 chunk 派发（`--nn` 须在 manifest——探针虚拟 NN 进不了 fixer）、chunk 原文不占包 | 包超上下文预算 / 探针混入修复流 | 「档 3a：fixer 包 ≤ 40,000B（max 尺寸译文 + 四维报告全文，--verb fix 实测物化）」（unit/sizes.test.mjs）；"探针不进 fixer"由「S2④ fixer 包物化…」入参校验断言覆盖（nn 不在 manifest exit 1；S3b Q4 补真实探针 NN 901 字面断言——原以 nn=99 替身） |
 
 ## 事件流事务判据（events/pending 同事务，S2⑤ 落地）
 
@@ -248,7 +248,7 @@ E5 审计集口径：agent 步调产物（reviews/adjudications/translated-chunk
 
 ## 守卫判据（S3①②⑤ + ENG-1/2/4 落地）
 
-**判据权威登记于此**——改判据 = 改 `status.mjs`（守卫信号/事件生产/writeAtomic）或 `cli-guard.mjs` + 本表 + 对应用例，三处同步。S3② 语义：**水位为主信号、budget 为兜底上限**（N 降级为保险丝——只改措辞与文档，budget 判定逻辑不动）。守卫信号 env 注入点：`GUARD_RAM_MB` / `GUARD_CTX_PCT`（测试经 CLI 子进程传 env 钉死正反；两测试文件顶部 `GUARD_RAM_MB=99999` 钉死缺省，真实系统读数不进断言路径）。
+**判据权威登记于此**——改判据 = 改 `status.mjs`（守卫信号/事件生产/writeAtomic）或 `cli-guard.mjs` + 本表 + 对应用例，三处同步。S3② 语义：**水位为主信号、budget 为兜底上限**（N 降级为保险丝——只改措辞与文档，budget 判定逻辑不动）。守卫信号 env 注入点：`GUARD_RAM_MB` / `GUARD_CTX_PCT`（测试经 CLI 子进程传 env 钉死正反；S3b〔E1+Q2〕起三测试文件〔status/import-draft/sizes〕顶部**无条件** `GUARD_RAM_MB="99999"` + 剥 `GUARD_CTX_PCT` + 自证行，真实系统读数不进断言路径；env 解析空串/纯空白视同缺省——RA2）。
 
 | # | 判据 | 防什么 | 钉死用例（unit/status.test.mjs） |
 |---|------|--------|----------------------------------|
@@ -258,6 +258,26 @@ E5 审计集口径：agent 步调产物（reviews/adjudications/translated-chunk
 | GR4 | ENG-2 目录 fsync：writeAtomic rename 后 best-effort fsync 目标所在目录（平台不支持（如 Windows 目录句柄）catch 跳过）——断电下目录项持久（文件内容 fsync 而目录项丢失 → rename 丢失）；行为级断言（monkey-patch fs.openSync/fs.fsyncSync 记录 fsync 路径，patch finally 还原），禁 source grep | rename 后断电目录项未持久 | "GR4 ENG-2 目录 fsync…" |
 | GR5 | S3⑤ symlink 调用防呆：`cli-guard.mjs` `symlinkCliGuard(argv1)`（resolve ≠ realpath → 命中 {real, msg}；realpath 失败 → null 不误伤）接入全部 11 个 CLI 脚本（既有 CLI 守卫之前顶层执行，segment 从 `../cli-guard.mjs` import）——经 symlink 调用 → stderr 警示（含真实路径）+ exit 4；真实路径直连不受影响 | symlink 目录（.claude/skills 等）下 CLI 入口守卫静默失配 no-op 假绿（memory 记载事故） | "GR5 S3⑤ symlink 防呆…" |
 | GR6 | ENG-4 预算收尾 session-end 生产者：`wantDispatch && overBudget && !pending` 且本轮因此未物化 → 渲染前一次性 appendEvents `session-end`(budget:N)（追加后不重推导 state，人话仍按已渲染口径）；重读 `deriveCounters` → `dispatchedSinceSessionEnd=0`——R14 计数器跨会话复位自此真正工作（RAM 守卫/水位退出同产 session-end，守卫出口也是会话边界） | 预算退出只渲染不落流，窗计数永不归零 | "GR6 ENG-4 预算收尾 session-end…" |
+
+## S3b 判据（ARCH-A 重入收敛 + ENG-3 + riders，S3b 落地）
+
+**判据权威登记于此**——改判据 = 改 `import-draft.mjs`（重入收敛/失败码传播）/ `status.mjs`（parseGuardEnv/LC_ALL/注行/resume 消解集/writeAtomic finally）/ `handoff.mjs`（BOM 剥离）+ 本表 + 对应用例，三处同步。G3 三角色评审收敛语义五点的验收口径 = ② 的两出口成员判定（QA 收紧版）。
+
+| # | 判据 | 防什么 | 钉死用例 |
+|---|------|--------|----------|
+| BA1 | ARCH-A①③ 已移件识别 + 在途态续完：归档产物（reviews-r1/、events-r1.jsonl、verify-results-r1.json）与 writeAtomic 中断残留（*.tmp）重入时识别为已完成标记跳过（不进缺省隔离/WARN/quarantine）；events 已迁而 import 事件未落 → 以 import 事件为提交点续完（不重做已迁移部分，未移件照常执行） | 边界执行中断重入的**静默再分桶**半态（已移件二次挪进 quarantine + WARN → exit 0 假象收敛） | unit/import-draft.test.mjs "ARCH-A①③ 在途半态重入续完：已移件识别（-r1/tmp 跳过不隔离）+ events 已迁而 import 未落 → exit 0 收敛" |
+| BA2 | ARCH-A④ 真冲突保留：源+目标并存（events 两侧/reviews sibling/隔离区同名）→ 重入 exit 1 + 可操作文案，不覆盖既有归档；人工处置后重入恢复收敛（exit 1 是出口不是死路） | 收敛修复把真冲突"修复"掉（静默覆盖/丢弃人工裁决域） | unit/import-draft.test.mjs "ARCH-A④ 真冲突保留：源+目标并存 → 重入 exit 1 不"修复"（归档/隔离区/events 三形态）" |
+| BA3 | ARCH-A② 收敛性机械枚举（QA 收紧验收口径）：monkey-patch fs 变异计数器包住 import-draft 执行路径全部变异调用（mkdir/rename/rm/writeFile/writeSync/fsync/写型 open），第 k 次变异**前**抛错模拟中断，k=1..N 全遍历（N 随实现自动演进）；对每个 k 首次部分执行 → 重入 ∈ 两出口之一：**exit 0 且二次重入不动点**（归一化树快照全等 + events 首事件=import + "已导入过"披露 + 终态=参照终态 + quarantine 终集=参照且 partial 已在场件不挪动 + r1/tmp 绝不入 quarantine）或 **exit 1 且 errors 含可操作文案**；被 best-effort 容错吞没的变异点（writeAtomic 目录 fsync catch）如实跳过计数披露 | 重入不收敛的任何形态（新增变异点/新半态逃逸枚举——改实现不改测试即自动纳入） | unit/import-draft.test.mjs "ARCH-A② 收敛性机械枚举：k=1..N 全遍历——重入 ∈ {exit 0 二次重入不动点+零漂移, exit 1 可操作文案}" |
+| BE3 | ENG-3 已导入分支失败码传播：幂等重入（首事件=import）时 statusRun 失败 → 返回其非零码与 errors（含 `--json` 通道），仍披露幂等上下文；确定性夹具 = manifest 目录化（预检 existsSync 过、读侧失败） | 幂等分支恒 exit 0 吞码（状态重建失败被"已导入过"掩盖） | unit/import-draft.test.mjs "ENG-3 已导入分支失败码传播：manifest 损毁 → 重入返回 statusRun 非零码 + errors（--json 通道同断言）" |
+| RA2 | A2 守卫 env 解析：`parseGuardEnv` 纯函数——空串/纯空白视同缺省（null），可解析有限数（"500"/"12.5"）返回值（**勿用 isInteger 收紧**）；GUARD_RAM_MB="" 不假性 0MB exit 4、GUARD_CTX_PCT="" 走缺省 WARN 放行（子进程集成） | `Number("")`=0 假触发（外层 shell `GUARD_X=` 残留即假 exit 4 / 假水位 0%） | unit/status.test.mjs "A2 parseGuardEnv 纯函数…"、"A2 集成行：子进程 GUARD_CTX_PCT=\"\" 走缺省 WARN 放行…" |
+| RE2 | E2 free -m 解析钉 LC_ALL=C：spawn env 恒带 `LC_ALL: "C"`（PATH 注入探针 free 行为级验证——非 C 分支输出本地化列形解析失败，C 分支 available 列可判） | 非 C locale 误判 available 列（本地化表头/逗号小数） | unit/status.test.mjs "E2 availableRamMb free -m 解析钉 LC_ALL=C…" |
+| RA3 | A3 守卫/水位出口动作指令段注行：RAM/水位分支 status.md 动作段各带"注：…本轮不派发…"行（镜像 overBudget 注行形态）；yaml 结构不动（头行+空清单系既有形态）；常态无注行 | 守卫出口动作段裸收尾（头行+空清单无解释——PL1 字节等式夹具保持绿的前提下补披露） | unit/status.test.mjs "A3 守卫/水位出口动作指令段镜像注行…" |
+| RA4 | A4 suspendUnresolved 消解集含 resume（两处同源常量 `SUSPEND_RESOLVERS`：reconcileSuspend cleared 扫描 + deriveState suspUncleared 扫描）：[suspend,resume]→已消解；[suspend,resume,suspend]→再次未消解（防修过头）；pending-clear/unseal/restart 不回归 | "继续翻译"（verb continue 对无 pending 挂起史落 resume 事件）后仍按未消解挂起卡菜单 | unit/status.test.mjs "A4 suspendUnresolved 消解集含 resume…" |
+| RE3 | E3+Q3 目录 fsync 容错与句柄：writeAtomic 目录 fsync 抛错（平台不支持形态，monkey-patch 定向抛）→ appendEvents 仍成功（Q3 catch 分支）且目录 fd 必 closeSync（E3：原 fsync 抛出时 closeSync 被 catch 吞 → fd 泄漏一次/调用；逐调用关闭无累积） | best-effort 容错演变成句柄泄漏 | unit/status.test.mjs "E3+Q3 目录 fsync 抛错（平台不支持形态）…" |
+| SE4 | E4 风格卡投影 BOM：renderStyleProjection split 前剥前导 U+FEFF——BOM 开头卡首节不丢（原被"标题前正文"静默丢弃）；只剥前导（节内容行内 BOM 原样保留）；无 BOM 卡输出字节不变（BOM 版=无 BOM 版逐字节） | BOM 卡首节规则静默丢失（无 WARN 无披露） | unit/handoff.test.mjs "SP3（E4, S3b）：BOM 开头卡首节不丢…" |
+| TE1 | E1+Q2 守卫 env 测试钉死封闭：status / import-draft / sizes 三测试文件顶部**无条件赋值** `GUARD_RAM_MB="99999"`（原 `??=` 条件赋值会被外层残留低值放行）+ 剥 GUARD_CTX_PCT + 自证行（钉不牢即文件级失败，不静默假红/假绿）；sizes 原完全未钉 | 外层 shell 守卫 env 残留致 in-process 用例整体假红（水位<20 不物化）/假 exit 4 | 三文件顶部钉死块 + 自证行（夹具级判据，无具名用例；GR2 的 in-process 信号段与 A2 集成行即消费方） |
+| TQ1 | Q1 FR5 "action 空"字面断言：冻结窗复欠队列在场时 `r.queue.action === null`（原仅注释） | 复欠优先级契约无字面钉（回归时 action 悄悄带回全局动作） | unit/status.test.mjs "S2③ 冻结窗复欠队列…"（S3b 补断言） |
+| TQ4 | Q4 FX4 真实探针 NN 夹具：`--verb fix --nn 901`（探针虚拟 NN 段）→ exit 1（原以 nn=99 替身隐式覆盖"探针进不了 fixer"） | 探针虚拟段与真实段将来若解耦（manifest 收录 901+）静默混入修复流 | unit/status.test.mjs "S2④ fixer 包物化：报告全文+译文+定位块进包；--dims 选维；fix 事件计轮；入参校验"（S3b 补断言） |
 
 ## 维护规约
 

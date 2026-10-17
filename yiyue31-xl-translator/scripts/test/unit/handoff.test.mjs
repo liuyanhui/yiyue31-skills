@@ -322,3 +322,23 @@ test("CLI：--help 退出 0；真实执行 --json 出 generated", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------- S3b rider：E4 风格卡投影 BOM ----------
+
+test("SP3（E4, S3b）：BOM 开头卡首节不丢——前导 U+FEFF 剥后再 split；只剥前导（节内容内 BOM 原样）；无 BOM 卡输出字节不变", () => {
+  const card = bigStyleCard();
+  const cardSha = sha12(card);
+  // 反例钉死（无 BOM 卡输出字节不变）：BOM 剥离对无 BOM 输入必须是恒等变换——
+  // 带 BOM 版与无 BOM 版投影逐字节相等（任何多余剥离/改写都会破坏该等式）
+  const noBom = renderStyleProjection(card, { cardSha });
+  const bomLed = renderStyleProjection("﻿" + card, { cardSha });
+  assert.equal(bomLed, noBom, "BOM 开头卡投影 = 无 BOM 卡投影（前导 BOM 完全中和）");
+  const heads = card.split(/\r?\n/).filter((l) => /^#{1,6}\s/.test(l));
+  for (const h of heads) assert.ok(bomLed.includes(h), `BOM 卡首节不丢（标题逐字保留）：${h}`);
+  assert.ok(noBom.includes(heads[0]), "夹具自证：主标题（原被\"标题前正文\"静默丢弃位）在场");
+  // 只剥前导一个：节内容行内的 BOM 原样保留（零改写纪律——不扩散成全局清洗）
+  const midBom = "## 甲\n\n- 规则﻿行（BOM 居中）\n";
+  const mid = renderStyleProjection(midBom, { cardSha: "x" });
+  assert.ok(mid.includes("规则﻿行"), "行内 BOM 原样保留（只剥前导）");
+  assert.ok(!mid.startsWith("﻿"), "输出自身不带前导 BOM");
+});
