@@ -45,7 +45,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { scanWorkdir, sectionSlices, parseReportHead, appendEvents, suspendTxn, chapterMap } from "./status.mjs";
+import { scanWorkdir, sectionSlices, parseReportHead, appendEvents, suspendTxn, chapterMap, secFresh } from "./status.mjs";
 import { fenceAwareHeadings } from "./segment/segment.mjs";
 import { verify, loadKeepList, loadBrief, fenceAwareAnnotationMatches } from "./verify-mech.mjs";
 import { assemble } from "./merge.mjs";
@@ -417,7 +417,7 @@ export function runGate(dir, opts = {}) {
       for (const sec of secs) {
         const secRep = slot?.secs?.[sec.id] ?? null;
         row.reviews++;
-        const fresh = (whole?.secs?.[sec.id] === sec.sha) || (secRep?.sha === sec.sha);
+        const fresh = secFresh(slot, sec); // ARCH-B 单点谓词（S3④）——与 status.mjs 三消费点同源
         if (whole == null && secRep == null) {
           row.missingDims.add(dim);
           push(c.nn, "completeness", `chunk ${nn2(c.nn)} 缺 ${dim} 节 ${sec.id}（${sec.title}）报告${dim === "accuracy" ? "（准确性维度缺失 = 无条件 FAIL，不可降级）" : ""}`);

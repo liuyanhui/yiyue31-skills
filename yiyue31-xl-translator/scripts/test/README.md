@@ -10,7 +10,7 @@ scripts/test/
 ├── README.md                       # 本文件
 ├── unit/                           # 单元层：程序化合成夹具（确定性，不落盘），钉死算法行为
 │   ├── segment.test.mjs            #   分段算法：fence 感知/拼接 sha/落带/R11-B/产物/CLI
-│   ├── status.test.mjs             #   状态机（M1b+S2③④⑤⑦）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账/派发 >90 WARN
+│   ├── status.test.mjs             #   状态机（M1b+S2③④⑤⑦+S3③④）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账/派发 >90 WARN/冷启动卡/人话同源
 │   ├── import-draft.test.mjs       #   draft 导入（S2⑥）：版本戳拒旧格式/§7 边界执行/events 归档新建禁补记/幂等/探针小文档全流程
 │   ├── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
 │   ├── merge.test.mjs              #   合并（M1c）：M1-M7 纯函数与病态输入、CLI 冒烟
@@ -193,6 +193,26 @@ E5 审计集口径：agent 步调产物（reviews/adjudications/translated-chunk
 | P1 | `--run <name>` 新审校轮新 run 命名（soai-r2 形态）：truth 落 `<name>.json` 四维齐、虚拟 NN 段不变、同 run 重跑拒绝（防覆盖）、同 run 跨目录生成字节相同（缺省 seed = runId 哈希） | 新轮混用/改写旧 run 的 ground truth | unit/probe.test.mjs "S2⑦ --run soai-r2…" |
 | P2 | `--probe-truth` 伪报告命中：报告含 expectedHit → `probeCheck` 零 FAIL；缺报告 = 直接 FAIL；未含 expectedHit → 未命中 FAIL 并披露期望串（注入已知缺陷被 truth 抓到；链路级正反另见 D5） | 审校有效性无证据 / 漏抓伪装通过（R20/F11） | unit/probe.test.mjs "S2⑦ --probe-truth 伪报告命中…" |
 | P3 | status 派发计数 >90 → WARN（§12 重评线观测点）：口径 = events 总 dispatch（`deriveCounters.dispatchTotal`，与现有派发计数同源，含探针）；91 → WARN 在场（人话 ⚠ 行 + `--json` state.warnings 同源、不阻塞）；90 → 不 WARN | 迁移+重审成本逼近重头译而无观测点（③v4-7/§12；只观测不代决） | unit/status.test.mjs "S2⑦ 派发计数 >90 WARN…" |
+
+## 冷启动卡判据（S3③ 落地）
+
+**判据权威登记于此**——改判据 = 改 `status.mjs`（`renderColdStart` + run() dispatch 收尾再生点）+ 本表 + 对应用例，三处同步。冷启动卡 = `handoff/cold-start.md` 机器生成的交接卡（**物化视图，可删可重建**；重跑覆盖）：`--verb dispatch` 收尾时与 status.md 同源再生（无论本轮是否实际物化），供新会话零记忆冷启动；守卫出口的再生点随守卫批次接入。
+
+| # | 判据 | 防什么 | 钉死用例（unit/status.test.mjs） |
+|---|------|--------|----------------------------------|
+| CS1 | dispatch 自动再生：`--verb dispatch` 收尾写 `handoff/cold-start.md`（目录缺则 mkdir -p）；头部含机器生成披露、再生时间、产物指纹（`fingerprint(inv)`——与 status.md 同源）、数据源披露；欠账表逐 chunk 行（nn 两位/stageCn 中文/stale 节 id 逗号串或 `-`）**直接派生自 state.chunks**（--json 输出的同一对象，不重扫文件系统）；下次动作行 = 人话下次口令同源（继续翻译 \<title\>） | 冷启动卡与状态机双源漂移（会话记忆依赖回潮；第二事实源） | "CS1 冷启动卡自动再生…" |
+| CS2 | 视图新鲜：两次 dispatch 间状态变化（补齐 delta 报告清欠）→ 再生的欠账表反映新状态（整体重写覆盖，非增量追加）；本轮无可物化单元也再生 | 陈旧视图误导续跑（读到已清欠账重复派发） | "CS2 冷启动卡视图新鲜…" |
+
+## 人话同源判据（S3④ 落地）
+
+**判据权威登记于此**——改判据 = 改 `status.mjs`（`plainLines`/`viewStats`/`plainSelfCheck`/`secFresh`/`suspendUnresolved`）或 `final-gate.mjs`（secFresh import 消费）+ 本表 + 对应用例，三处同步。
+
+| # | 判据 | 防什么 | 钉死用例（unit/status.test.mjs） |
+|---|------|--------|----------------------------------|
+| PL1 | plainLines 单一来源：人话段行构造整体提取为导出函数（统计量收口 `viewStats`），renderStatus 消费同函数——**输出字节不变**（重构非改文案） | 双份人话构造漂移（status.md 与冷启动卡/守卫各说各话） | "PL1 plainLines 与 renderStatus 同源…" |
+| PL2 | 自一致性断言：`plainSelfCheck(lines, state)` 从 state（--json 同一对象）重推关键事实（done/total 进度分数、当前 chunk nn 与 stageCn、冻结窗轮次 freezeRounds/FREEZE_ROUND_MAX（行在场时）、residue 行、⚠ 行数 = warnings 条数）对 lines 断言——健康空失配、篡改报失配、失配 push 进 state.warnings（"人话自检失配：…"前缀，人话 + --json 双通道同源可见）且不改退出码；失配非持久（重推导即复原） | 人话与 --json 双通道静默分叉 | "PL2 plainSelfCheck…" |
+| PL3 | suspend 史无 pending → PENDING-USER 菜单：`deriveState.suspendUnresolved`（未消解 suspend 判定与 reconcileSuspend cleared 扫描同款）为真而 pending.md 缺失 → 人话段输出与挂起态同款菜单（①继续 ②手修后继续 ③停止），前缀披露"挂起史未消解而 pending.md 缺失（历史事件无载荷不可重建）"；消解后不触发；常规挂起菜单不回归 | 无载荷挂起史静默丢失（状态机无出口卡死） | "PL3 suspend 史无 pending…" |
+| PL4 | ARCH-B secFresh 单点收敛：节新鲜度判定（whole sec 表命中 ∨ delta 头 sha 命中）收敛为单一导出函数，deriveState 完备性 / buildQueue 冻结窗队列 / buildQueue review 队列 / final-gate 完备性矩阵四消费点同源；preamble-only（首标题前正文）/ 无标题全文 / 空节（标题后无正文）/ BOM 开头四态两侧同判（BOM 不产生两侧分歧） | 谓词拷贝漂移（status 判 fresh、终检判 stale 的对立裁判） | "PL4 ARCH-B 四态…" |
 
 ## 维护规约
 

@@ -212,6 +212,14 @@ export function sectionSlices(text) {
   });
 }
 
+// ARCH-B 节新鲜度谓词单点收敛（S3④）：节 fresh = 整 chunk 首审报告 sec 表该节 sha 命中，
+// 或 delta 单节报告头 sha 命中。deriveState 审校完备性 / buildQueue 冻结窗队列 / buildQueue
+// review 队列 / final-gate 完备性矩阵四消费点同源调用——禁再拷贝该表达式（两侧对立裁判即此病）。
+export function secFresh(slot, sec) {
+  const secRep = slot?.secs?.[sec.id] ?? null;
+  return (slot?.whole?.secs?.[sec.id] === sec.sha) || (secRep?.sha === sec.sha);
+}
+
 // C4 派发口径（S2② 机械归属拆分）：行数/起止标题/节名枚举/sha 全部从物化单元内容派生——
 // status.mjs 自动生成进派发清单与 events detail（防造假红线：报告锚由脚本从内容派生，
 // 禁止人工拼接）；第四项 grep 节序核对留 agent 派发前自觉 + final-gate 随机抽核兜底。
@@ -387,6 +395,16 @@ export function deriveState(inv) {
   // S2④ residue 停修集（事件流事实源：residue 事件 / 修复环轮超限）——停该 chunk，项目不停
   const residueSet = new Set(inv.events.filter((e) => e.ev === "residue").map((e) => e.nn));
 
+  // S3④ 挂起史未消解：事件流存在未消解 suspend（其后无 pending-clear/unseal/restart——与
+  // reconcileSuspend 的 cleared 扫描同款）而 pending.md 缺失 → 人话段按挂起态给 PENDING-USER
+  // 菜单（无载荷历史事件不可重建 pending，禁补记——菜单兜底出口，防状态机无出口卡死）。
+  let suspUncleared = false;
+  for (const e of inv.events) {
+    if (e.ev === "suspend") suspUncleared = true;
+    else if (e.ev === "pending-clear" || e.ev === "unseal" || e.ev === "restart") suspUncleared = false;
+  }
+  st.suspendUnresolved = suspUncleared && inv.pending == null;
+
   // re-keying 检测：原文 sha ≠ manifest 记录 → 分段过期（动作 = 重分段 + 内容 sha 匹配保成果）
   st.needsResegment = inv.manifestOriginalSha != null && inv.manifestOriginalSha !== inv.originalSha;
 
@@ -417,7 +435,7 @@ export function deriveState(inv) {
       if (malformed.length) st.warnings.push(`chunk ${c.nn} ${dim} 报告头不完整（${malformed.join("、")}）——S2② 头三行机械校验，按不 fresh 处理`);
       for (const sec of secs) {
         const secRep = slot?.secs?.[sec.id] ?? null;
-        const fresh = (whole?.secs?.[sec.id] === sec.sha) || (secRep?.sha === sec.sha);
+        const fresh = secFresh(slot, sec); // ARCH-B 单点谓词（S3④）
         if (fresh) done++;
         else if (whole != null || secRep != null) (stale[sec.id] ??= []).push(dim);
       }
@@ -496,8 +514,7 @@ export function buildQueue(state, inv, opts = {}) {
           const slot = inv.reviews[c.nn]?.[dim];
           if (!slot?.whole) continue; // 首审缺席非冻结窗场景（进窗前已全 done）
           for (const sec of c.sections ?? []) {
-            const secRep = slot.secs?.[sec.id] ?? null;
-            if (slot.whole.secs?.[sec.id] === sec.sha || secRep?.sha === sec.sha) continue;
+            if (secFresh(slot, sec)) continue; // ARCH-B 单点谓词（S3④）
             fq.push({ dim, nn: c.nn, sec: sec.id, kind: "real" });
           }
         }
@@ -532,8 +549,7 @@ export function buildQueue(state, inv, opts = {}) {
       continue;
     }
     for (const sec of c.sections) {
-      const secRep = slot.secs?.[sec.id] ?? null;
-      if (slot.whole.secs?.[sec.id] === sec.sha || secRep?.sha === sec.sha) continue;
+      if (secFresh(slot, sec)) continue; // ARCH-B 单点谓词（S3④）
       q.push({ dim, nn: c.nn, sec: sec.id, kind: "real" });
     }
   }
@@ -694,35 +710,36 @@ function mtimeAudit(dir, inv) {
 
 // ---------- status.md 渲染（双段契约 R13） ----------
 
-export function renderStatus(dir, inv, state, queue, opts = {}) {
+// S3④ 人话统计量收口：done/cur/remainUnits/elapsedH/overBudget 等的单一计算点
+//（供 plainLines 与后续守卫复用——人话、--json、守卫三处不许各算各的）。
+export function viewStats(inv, state, opts = {}) {
   const total = state.chunks.length;
   const done = state.chunks.filter((c) => c.stage === "done" || c.stage === "residue").length;
   const cur = state.chunks.find((c) => c.stage !== "done" && c.stage !== "residue"); // S2④：residue 不再是当前动作位
-  const fp = fingerprint(inv);
   const firstT = inv.events[0]?.t ?? null;
   const elapsedH = firstT ? ((Date.now() - Date.parse(firstT)) / 3600000).toFixed(1) : "0";
   const remainUnits = state.chunks.reduce((a, c) => a + (c.stage === "done" || c.stage === "residue" ? 0 : UNITS_PER_CHUNK - unitCredit(c)), 0);
   const budget = opts.budget ?? null;
   const overBudget = budget != null && state.counters.dispatchedSinceSessionEnd >= budget;
   const pending = inv.pending;
+  return { total, done, cur, firstT, elapsedH, remainUnits, budget, overBudget, pending };
+}
 
+// S3④ 人话行单一来源：renderStatus 段 1 的行构造整体提取（renderStatus 消费同函数）——
+// 重构不改字节；冷启动卡（renderColdStart）的下次口令与这里的"继续翻译 <title>"同源。
+export function plainLines(dir, inv, state, queue, opts = {}) {
+  const { total, done, cur, elapsedH, remainUnits, budget, overBudget, pending } = viewStats(inv, state, opts);
   const L = [];
-  L.push(`# status — ${state.title}（唯一续跑文档）`);
-  L.push("");
-  L.push(`> schema: ${SCHEMA_VERSION}（state 版本戳——import-draft 据此拒收无戳旧格式，S2⑥）`);
-  L.push(`> 推导锚：原文 sha1 ${state.originalSha}｜产物指纹 ${fp}｜推导时间 ${nowIso()}｜本文件为物化视图，可随时删除重建`);
-  if (inv.verifyThresholds) L.push(`> 阈值披露（R22）：${JSON.stringify(inv.verifyThresholds)}`);
-  L.push("");
-
-  // ---- 段 1：人话 ----
-  L.push("## 人话");
-  L.push("");
   if (state.needsResegment) {
     L.push(`原文已变更（sha ${inv.manifestOriginalSha} → ${state.originalSha}），需重分段后按内容 sha 保留未变 chunk 成果。下次对我说：继续翻译 ${state.title}。`);
   } else if (pending === "sealed") {
     L.push(`已封存（停止翻译）。说"继续翻译 ${state.title}"解封续跑，说"重新翻译 ${state.title}"新起全量。`);
   } else if (pending) {
     L.push(`挂起中（${pending}）。菜单：① 说"继续翻译"由系统换模型/调参重试 ② 手修后说"继续翻译"（按新 sha 重审，间距类由脚本自动补空格，永不自动重翻）③ 说"停止翻译"封存。`);
+  } else if (state.suspendUnresolved) {
+    // S3④：挂起史未消解而 pending.md 缺失（无载荷历史事件不可重建，禁补记）——按挂起态给菜单兜底
+    L.push(`挂起史未消解而 pending.md 缺失（历史事件无载荷不可重建）——按挂起态处理。`);
+    L.push(`菜单：① 说"继续翻译"由系统换模型/调参重试 ② 手修后说"继续翻译"（按新 sha 重审，间距类由脚本自动补空格，永不自动重翻）③ 说"停止翻译"封存。`);
   } else if (overBudget) {
     L.push(`本会话预算 ${budget} 单元已用完（干净退出点）。进度 ${done}/${total} chunk，已耗时 ${elapsedH}h。下次对我说：继续翻译 ${state.title}。`);
   } else if (state.global === "delivered") {
@@ -745,6 +762,61 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
   if (state.residue?.length) L.push(`停修登记：chunk ${state.residue.join(",")} 修复环超限（residue-chunk-NN.md）——其余 chunk 照常推进，处置见 residue 文件与 PENDING 流程。`);
   // S2⑤：健康/对账 WARN 进人话段（--json 走 state.warnings 同源）——含 §9 mtime>末事件断档兜底
   for (const w of state.warnings) L.push(`⚠ ${w}`);
+  return L;
+}
+
+// S3④ 人话自一致性断言：从 state 对象（--json 输出的同一对象）重推关键事实并断言在 lines
+// 拼接文本中在场/一致。空 = 一致；非空 = 失配清单。run() 渲染前调用：console.error 逐条 +
+// push 进 state.warnings（"人话自检失配：…"——人话与 --json 双通道同源可见），不改退出码。
+// 口径：进度分数/当前 chunk 行/冻结窗轮次按"在场即须一致"（分支抢占属正常缺席）；residue 行
+// 与 ⚠ 行数为无条件双向断言（任何分支都渲染）。
+export function plainSelfCheck(lines, state) {
+  const text = lines.join("\n");
+  const issues = [];
+  const total = state.chunks.length;
+  const done = state.chunks.filter((c) => c.stage === "done" || c.stage === "residue").length;
+  const cur = state.chunks.find((c) => c.stage !== "done" && c.stage !== "residue");
+  for (const m of text.matchAll(/(?:已完成|进度)\s+(\d+)\/(\d+)/g)) {
+    if (Number(m[2]) !== total) issues.push(`进度分母失配：人话「${m[0]}」分母 ${m[2]} ≠ state 推导 total ${total}`);
+    if (Number(m[1]) !== done) issues.push(`进度分子失配：人话「${m[0]}」已完成 ${m[1]} ≠ state 推导 done ${done}`);
+  }
+  // 当前 chunk 行："第 X/Y chunk（阶段），已完成"——阶段名可含全角括号（重审中（节 stale）），
+  // 故锚定行尾沿 "），已完成" 而非首个闭括号
+  const curM = text.match(/第\s*(\d+)\/(\d+)\s*chunk（(.+)），已完成/);
+  if (curM) {
+    if (Number(curM[1]) !== cur?.nn) issues.push(`当前 chunk 失配：人话第 ${curM[1]} chunk ≠ state 推导 nn ${cur?.nn}`);
+    if (Number(curM[2]) !== total) issues.push(`进度分母失配：人话「第 ${curM[1]}/${curM[2]} chunk」≠ state 推导 ${cur?.nn}/total ${total}`);
+    if (curM[3] !== stageCn(cur?.stage)) issues.push(`当前阶段失配：人话「${curM[3]}」≠ state 推导 ${stageCn(cur?.stage)}`);
+  }
+  if (text.includes("补审轮") && !text.includes(`${state.counters.freezeRounds}/${FREEZE_ROUND_MAX}`)) {
+    issues.push(`冻结窗轮次失配：人话未见 ${state.counters.freezeRounds}/${FREEZE_ROUND_MAX}（counters.freezeRounds/FREEZE_ROUND_MAX）`);
+  }
+  if (state.residue?.length) {
+    if (!text.includes("停修登记")) issues.push(`residue 行缺失：state.residue=[${state.residue.join(",")}] 而人话无停修登记行`);
+  } else if (text.includes("停修登记")) {
+    issues.push("residue 行在场而 state.residue 为空");
+  }
+  const wCount = lines.filter((l) => l.startsWith("⚠")).length;
+  if (wCount !== state.warnings.length) issues.push(`⚠ 行数失配：人话 ${wCount} 行 ≠ state.warnings ${state.warnings.length} 条`);
+  return issues;
+}
+
+export function renderStatus(dir, inv, state, queue, opts = {}) {
+  const fp = fingerprint(inv);
+  const { overBudget } = viewStats(inv, state, opts);
+
+  const L = [];
+  L.push(`# status — ${state.title}（唯一续跑文档）`);
+  L.push("");
+  L.push(`> schema: ${SCHEMA_VERSION}（state 版本戳——import-draft 据此拒收无戳旧格式，S2⑥）`);
+  L.push(`> 推导锚：原文 sha1 ${state.originalSha}｜产物指纹 ${fp}｜推导时间 ${nowIso()}｜本文件为物化视图，可随时删除重建`);
+  if (inv.verifyThresholds) L.push(`> 阈值披露（R22）：${JSON.stringify(inv.verifyThresholds)}`);
+  L.push("");
+
+  // ---- 段 1：人话（S3④ 单一来源 plainLines——重构提取，输出字节不变）----
+  L.push("## 人话");
+  L.push("");
+  L.push(...plainLines(dir, inv, state, queue, opts));
   L.push("");
 
   // ---- 段 2：动作指令 ----
@@ -772,6 +844,40 @@ export function renderStatus(dir, inv, state, queue, opts = {}) {
   }
   if (overBudget) L.push("");
   if (overBudget) L.push("注：会话预算已到，本轮不派发；干净退出点。");
+  return L.join("\n") + "\n";
+}
+
+// S3③ 冷启动交接卡（handoff/cold-start.md）：机器生成的物化视图——新会话零记忆冷启动读它即知
+// 全局。与 status.md / --json 同源派生（同一 inv/state 对象），可删可重建（重跑覆盖）；
+// 除再生时间行外全部内容为纯派生（同输入同字节）。欠账表**直接从 state.chunks 派生**
+// （--json 输出的同一对象），不重扫文件系统。
+export function renderColdStart(dir, inv, state, queue, opts = {}) {
+  const L = [];
+  L.push(`# cold-start — ${state.title}（冷启动交接卡）`);
+  L.push("");
+  L.push("> 机器生成（status.mjs）——勿手改；重跑覆盖");
+  L.push(`> 再生时间：${nowIso()}｜产物指纹：${fingerprint(inv)}｜数据源 = status 推导（与 --json 同源）`);
+  L.push("");
+  L.push("## 下次动作");
+  L.push("");
+  L.push(`继续翻译 ${state.title}`);
+  L.push("状态由 status.mjs 从文件系统推导，零会话记忆依赖。");
+  L.push("");
+  L.push("## 欠账表");
+  L.push("");
+  L.push("| chunk | 阶段 | stale 节 |");
+  L.push("|-------|------|----------|");
+  for (const c of state.chunks) {
+    const staleIds = Object.keys(c.staleSections ?? {});
+    L.push(`| ${nn2(c.nn)} | ${stageCn(c.stage)} | ${staleIds.length ? staleIds.join(",") : "-"} |`);
+  }
+  L.push("");
+  const freeze = FREEZE_STAGES.includes(state.global);
+  L.push(`- 全局阶段：${state.global}${freeze ? `（内容冻结窗：补审轮 ${state.counters.freezeRounds}/${FREEZE_ROUND_MAX}，项目级硬门）` : ""}`);
+  L.push(`- 挂起：${inv.pending ?? "无"}`);
+  L.push(`- 停修（residue）：${state.residue?.length ? state.residue.map(nn2).join(",") : "无"}`);
+  for (const w of state.warnings) L.push(`- ⚠ ${w}`);
+  L.push("");
   return L.join("\n") + "\n";
 }
 
@@ -912,8 +1018,19 @@ export function run(dir, opts = {}) {
   // S2⑤ §9：mtime 对账兜底（只 WARN 不阻塞；人话段 + --json state.warnings 双通道）
   const mtimeWarn = mtimeAudit(dir, inv);
   if (mtimeWarn) state.warnings.push(mtimeWarn);
+  // S3④ 人话自检：渲染前从 state 重推关键事实对 plainLines 断言（空 = 一致）——非空则
+  // console.error 逐条 + 进 state.warnings（人话与 --json 双通道同源可见），不改退出码。
+  const plainIssues = plainSelfCheck(plainLines(dir, inv, state, queue, opts), state);
+  for (const x of plainIssues) console.error(`人话自检失配：${x}`);
+  for (const x of plainIssues) state.warnings.push(`人话自检失配：${x}`);
   const text = renderStatus(dir, inv, state, queue, opts);
   fs.writeFileSync(path.join(dir, STATUS), text, "utf-8");
+  // S3③ 冷启动卡再生：dispatch 收尾（无论本轮是否实际物化）与 status.md 同时写 handoff/cold-start.md
+  // ——物化视图同源派生，可删可重建；守卫（RAM/水位）出口的再生点随下一段守卫接入。
+  if (opts.verb === "dispatch") {
+    fs.mkdirSync(path.join(dir, "handoff"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "handoff", "cold-start.md"), renderColdStart(dir, inv, state, queue, opts), "utf-8");
+  }
   const fixDisclosure = fixInfo
     ? `fixer 包已物化：${fixInfo.pkg}（修复环轮 ${fixInfo.round}/${FIX_ROUND_MAX}${fixInfo.freeze ? "，冻结窗内" : ""}，${fixInfo.pkgBytes}B）——派 fixer subagent 修复（主上下文不进报告全文），重跑 Step 5 后 --verb dispatch 复欠`
     : null;

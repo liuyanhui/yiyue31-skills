@@ -37,7 +37,11 @@ import {
   appendEvents,
   readEvents,
   suspendTxn,
+  plainLines,
+  plainSelfCheck,
+  fingerprint,
 } from "../../status.mjs";
+import { runGate } from "../../final-gate.mjs";
 
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "status.mjs");
@@ -916,5 +920,193 @@ test("S2⑦ 派发计数 >90 WARN：91 → WARN 在场（人话+--json 同源、
     assert.ok(!r2.statusText.includes(">90"), "人话段同步干净");
   } finally {
     fs.rmSync(dir2, { recursive: true, force: true });
+  }
+});
+
+// ---------- S3③ 冷启动卡（cold-start.md 自动再生） ----------
+
+const STAGE_CN = { translate: "待翻译", adjudicate: "待裁定", verify: "待机械校验", review: "审校中", "re-review": "重审中（节 stale）", residue: "停修（residue 登记）", done: "完成" };
+
+test("CS1 冷启动卡自动再生：dispatch 收尾写 handoff/cold-start.md；欠账表与 state.chunks（--json 同一对象）逐行一致", () => {
+  const dir = makeWorkdir(3);
+  try {
+    pushThroughVerify(dir, 1);
+    writeReviews(dir, 1, ["s2"]); // 节 s2 失配 → chunk 1 欠账（重审）在场
+    const r = run(dir, { verb: "dispatch" });
+    assert.equal(r.exitCode, 0);
+    const csPath = path.join(dir, "handoff", "cold-start.md");
+    assert.ok(fs.existsSync(csPath), "dispatch 收尾须写冷启动卡（handoff/ 目录缺则建）");
+    const cs = fs.readFileSync(csPath, "utf-8");
+    assert.ok(cs.includes("机器生成（status.mjs）——勿手改；重跑覆盖"), "机器生成披露行");
+    assert.ok(cs.includes(`产物指纹：${fingerprint(r.inv)}`), "产物指纹与 status.md 同源（fingerprint(inv)）");
+    assert.ok(cs.includes("数据源 = status 推导（与 --json 同源）"), "数据源披露行");
+    assert.ok(cs.includes("## 下次动作") && cs.includes("继续翻译 testdoc"), "下次动作行 = 人话下次口令同源");
+    assert.ok(cs.includes("零会话记忆依赖"), "冷启动纪律句");
+    // 欠账表逐行与 run() 返回的 state.chunks（即 --json 输出的同一对象）一致
+    const tableSec = cs.slice(cs.indexOf("## 欠账表"), cs.indexOf("- 全局阶段"));
+    const rows = tableSec.split("\n").filter((l) => /^\| \d+ /.test(l));
+    assert.equal(rows.length, r.state.chunks.length, "每 chunk 一行");
+    r.state.chunks.forEach((c, i) => {
+      const staleIds = Object.keys(c.staleSections);
+      assert.equal(rows[i], `| ${nn2(c.nn)} | ${STAGE_CN[c.stage]} | ${staleIds.length ? staleIds.join(",") : "-"} |`, `chunk ${c.nn} 行同源`);
+    });
+    assert.ok(rows[0].includes("重审中（节 stale）") && rows[0].includes("s2"), "chunk 01 欠账（stale 节）在场");
+    // --json 通道同源复核：CLI 再推导一次，欠账事实一致（卡片 = 物化视图非第二事实源）
+    const cli = spawnSync(process.execPath, [SCRIPT, dir, "--json"], { encoding: "utf-8" });
+    assert.equal(cli.status, 0, cli.stdout + cli.stderr);
+    const j = JSON.parse(cli.stdout);
+    j.state.chunks.forEach((c, i) => {
+      assert.equal(rows[i], `| ${nn2(c.nn)} | ${STAGE_CN[c.stage]} | ${Object.keys(c.staleSections).join(",") || "-"} |`, "与 --json 重推导一致");
+    });
+    // 头部行（全局阶段/挂起/residue）
+    assert.ok(cs.includes(`- 全局阶段：${r.state.global}`));
+    assert.ok(cs.includes("- 挂起：无"));
+    assert.ok(cs.includes("- 停修（residue）：无"));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CS2 冷启动卡视图新鲜：两次 dispatch 间补齐 delta 报告 → 再生欠账表反映新态（本轮无物化也再生）", () => {
+  const dir = makeWorkdir(3);
+  try {
+    pushThroughVerify(dir, 1);
+    writeReviews(dir, 1, ["s2"]);
+    run(dir, { verb: "dispatch" });
+    const before = fs.readFileSync(path.join(dir, "handoff", "cold-start.md"), "utf-8");
+    const rowBefore = before.split("\n").find((l) => l.startsWith("| 01 "));
+    assert.ok(rowBefore.includes("重审中（节 stale）") && rowBefore.includes("s2"), `前置：chunk 01 欠账在场（${rowBefore}）`);
+    // 状态变化：补齐 s2 × 4 维 delta 报告 → chunk 01 清欠
+    const s2 = sectionSlices(fs.readFileSync(path.join(dir, "translated-chunks", "translated-chunk-01.md"), "utf-8")).find((s) => s.id === "s2");
+    for (const dim of DIMS) {
+      fs.writeFileSync(path.join(dir, "reviews", `review-${dim}-chunk-01-s2.md`), `sha: ${s2.sha}\nmodel: test\ntime: 2026-10-17T00:00:00Z\n结论：${dim} delta 补审通过（CS2）。\n`, "utf-8");
+    }
+    const r2 = run(dir, { verb: "dispatch" });
+    assert.equal(r2.exitCode, 0);
+    assert.equal(r2.queue.q.length, 0, "本轮无审止单元（动作位让给 chunk 2 翻译）——仍须再生冷启动卡");
+    const after = fs.readFileSync(path.join(dir, "handoff", "cold-start.md"), "utf-8");
+    assert.notEqual(after, before, "卡片整体重写（重跑覆盖非增量追加）");
+    assert.equal(after.split("\n").find((l) => l.startsWith("| 01 ")), "| 01 | 完成 | - |", "欠账表反映新状态（视图新鲜）");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------- S3④ 人话行同源 ----------
+
+test("PL1 plainLines 与 renderStatus 同源：人话段正文 = plainLines(...).join（重构不改字节）", () => {
+  const grab = (r, md) => md.slice(md.indexOf("## 人话\n\n") + "## 人话\n\n".length, md.indexOf("\n\n## 动作指令"));
+  // 场景 1：per-chunk 审校中（cur 行 + ⚠ 空集）
+  const dir = makeWorkdir(3);
+  try {
+    pushThroughVerify(dir, 1);
+    writeReviews(dir, 1, ["s2"]);
+    const r = run(dir, {});
+    const md = fs.readFileSync(path.join(dir, "status.md"), "utf-8");
+    assert.equal(grab(r, md), plainLines(dir, r.inv, r.state, r.queue, {}).join("\n"), "段 1 正文须逐字节等于 plainLines 输出");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  // 场景 2：冻结窗全局阶段（全局行 + 冻结窗轮次行）
+  const dir2 = makeWorkdir(1);
+  try {
+    pushToFreeze(dir2);
+    const r2 = run(dir2, {});
+    const md2 = fs.readFileSync(path.join(dir2, "status.md"), "utf-8");
+    assert.ok(md2.includes("内容冻结窗"), "前置：冻结窗行在场");
+    assert.equal(grab(r2, md2), plainLines(dir2, r2.inv, r2.state, r2.queue, {}).join("\n"), "冻结窗场景同源");
+  } finally {
+    fs.rmSync(dir2, { recursive: true, force: true });
+  }
+});
+
+test("PL2 plainSelfCheck：健康空失配；篡改 lines 报失配；失配经 run() 通道进 state.warnings（人话+--json 双通道）", () => {
+  const dir = makeWorkdir(3);
+  try {
+    pushThroughVerify(dir, 1);
+    writeReviews(dir, 1, ["s2"]);
+    // 健康：零失配；run() 正常路径不注入
+    const r = run(dir, {});
+    const healthy = plainLines(dir, r.inv, r.state, r.queue, {});
+    assert.deepEqual(plainSelfCheck(healthy, r.state), [], "健康夹具：零失配");
+    assert.ok(!r.state.warnings.some((w) => w.includes("人话自检失配")), "健康 run() 不注入失配");
+    assert.ok(!r.statusText.includes("人话自检失配"), "健康人话段干净");
+    // 篡改 1：进度分子（已完成 X/Y → X+2/Y）
+    const t1 = healthy.map((l) => l.replace(/已完成 (\d+)\/(\d+)/, (_, a, b) => `已完成 ${Number(a) + 2}/${b}`));
+    const issues1 = plainSelfCheck(t1, r.state);
+    assert.ok(issues1.length > 0 && issues1.some((x) => x.includes("进度分子失配") && x.includes("done 0")), "篡改进度数字须报失配");
+    // 篡改 2：当前 chunk 行阶段名
+    const t2 = healthy.map((l) => (l.includes("重审中（节 stale）") ? l.replace("重审中（节 stale）", "审校中") : l));
+    assert.ok(plainSelfCheck(t2, r.state).some((x) => x.includes("当前阶段失配")), "篡改阶段名须报失配");
+    // 篡改 3：⚠ 行数（追加一条假 ⚠ 行 → 与 warnings 条数失配）
+    const t3 = [...healthy, "⚠ 假警告"];
+    assert.ok(plainSelfCheck(t3, r.state).some((x) => x.includes("⚠ 行数失配")), "⚠ 行数失配须报");
+    // run() 注入通道（渲染前三步注入模拟——同源设计下健康态不可能自然失配，tripwire 防未来漂移）：
+    // tamper → plainSelfCheck → push "人话自检失配：…" 进 state.warnings（run() 同款前缀，--json 通道）；
+    // 失配非持久（state 是推导物化——重推导即复原）
+    const issues = plainSelfCheck(t1, r.state);
+    for (const x of issues) r.state.warnings.push(`人话自检失配：${x}`);
+    assert.ok(r.state.warnings.some((w) => w.startsWith("人话自检失配：")), "失配进 state.warnings（--json 通道）");
+    const again = run(dir, {});
+    assert.ok(!again.state.warnings.some((w) => w.includes("人话自检失配")), "重推导即复原（物化视图非持久态）");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("PL3 suspend 史无 pending → PENDING-USER 菜单（①②③）；消解后不触发；常规挂起菜单不回归", () => {
+  const dir = makeWorkdir(1);
+  try {
+    appendEvents(dir, { ev: "suspend", detail: "legacy-run" }); // 无载荷历史事件（未消解）
+    let r = run(dir, {});
+    assert.equal(r.state.suspendUnresolved, true, "deriveState 须标记挂起史未消解");
+    assert.ok(!fs.existsSync(path.join(dir, "pending.md")), "前置：pending.md 缺失（无载荷禁重建）");
+    const body = r.statusText.slice(r.statusText.indexOf("## 人话"), r.statusText.indexOf("## 动作指令"));
+    assert.ok(body.includes("挂起史未消解而 pending.md 缺失"), "前缀披露在场");
+    assert.ok(body.includes("①") && body.includes("②") && body.includes("③"), "同款三选项菜单");
+    assert.ok(body.includes("永不自动重翻") && body.includes("自动补空格"), "菜单②文案与常规挂起一致（G7）");
+    // 消解（pending-clear 在后）→ 不再触发菜单
+    appendEvents(dir, { ev: "pending-clear", detail: "人工核对完毕" });
+    r = run(dir, {});
+    assert.equal(r.state.suspendUnresolved, false, "已消解不复现");
+    assert.ok(!r.statusText.includes("挂起史未消解"), "消解后人话段干净");
+    // 常规挂起（pending.md 在场）菜单不回归
+    fs.writeFileSync(path.join(dir, "pending.md"), "type: pending-user\n原因：限流挂起\n", "utf-8");
+    r = run(dir, {});
+    assert.ok(r.statusText.includes("挂起中（pending-user）"), "常规挂起菜单不回归");
+    assert.ok(!r.statusText.includes("挂起史未消解"), "常规挂起走 pending 分支");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("PL4 ARCH-B 四态：secFresh 单点收敛——deriveState 与 final-gate 完备性两侧同判（BOM 不产生分歧）", () => {
+  const forms = {
+    "preamble-only": "前言正文段：数字 1 与术语 alpha。\n\n## 甲\n\n正文段落二。",
+    "无标题全文": "只有一段正文：数字 2 在场。\n\n再一段正文。",
+    "空节": "## 甲\n\n## 乙\n\n正文段落：数字 3。",
+    "BOM 开头": "﻿## 甲\n\n正文段落：数字 4。",
+  };
+  const secFailsOf = (g) => [...new Set(g.fails.filter((f) => f.check === "completeness" && /节 (s\d+)/.test(f.message)).map((f) => f.message.match(/节 (s\d+)/)[1]))].sort();
+  for (const [name, text] of Object.entries(forms)) {
+    const dir = makeWorkdir(1);
+    try {
+      pushThroughVerify(dir, 1, text);
+      writeReviews(dir, 1); // sec 表按 sectionSlices 派生 → fresh
+      const a1 = run(dir, {});
+      const staleA = Object.keys(a1.state.chunks[0].staleSections).sort();
+      const b1 = runGate(dir, {});
+      assert.deepEqual(staleA, [], `${name}：fresh 侧 status 无 stale（实得 ${staleA}）`);
+      assert.deepEqual(secFailsOf(b1), [], `${name}：fresh 侧 final-gate 完备性无节级 FAIL`);
+      // 篡改：s1 报告 sha 清零 → 两侧同判 stale
+      writeReviews(dir, 1, ["s1"]);
+      const a2 = run(dir, {});
+      const staleA2 = Object.keys(a2.state.chunks[0].staleSections).sort();
+      const b2 = runGate(dir, {});
+      assert.deepEqual(staleA2, ["s1"], `${name}：篡改侧 status 判 s1 stale`);
+      assert.deepEqual(secFailsOf(b2), ["s1"], `${name}：篡改侧 final-gate 同判 s1（两侧一致）`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   }
 });
