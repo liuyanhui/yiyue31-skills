@@ -167,6 +167,29 @@ SKILL.md Step 10 只保留指针与运行时纪律（半径分级/PENDING-USER/�
 | SP1 | 确定性蒸馏 ≤2,000B：全标题逐字保留（原顺序）+ 每节首条内容行（列表前缀原样、>80 字符截断加 …）+ 超预算自最后一个节起逐节弃内容行（标题保留）直至达标 + 尾行截断披露（`源卡 N B → 投影 M B`，未截断也附同款——披露口径统一）+ 源卡 sha 锚；同输入重跑字节相同（幂等，无时间戳）；产物恒 ≤ budget 字节 | 卡全文进审校包超 §5 红线 / 投影不可复现 | unit/handoff.test.mjs "SP1…"（含收紧预算驱动弃内容路径）；unit/sizes.test.mjs 档 3b（>6KB 合成卡 → renderStyleProjection 实测 ≤2,000B、全标题与 sha 在场、ATTACH = 投影实测 +1,400+400 ≤3,800） |
 | SP2 | handoff.mjs 第三机器件：工作目录有 style-card.md → `handoff/style-card-proj.md` 落盘（入 generated 与 --json 结果，附字节数），既有 projection/context 两件不回归；缺卡 → warns 提示且不阻断（exit 0）、投影不落盘 | 缺卡硬失败阻断交接 / 第三件与既有件相互回归 | unit/handoff.test.mjs "SP2…" |
 
+## 冻结窗判据（S2③ 落地）
+
+**判据权威登记于此**——改判据 = 改 `status.mjs`（`FREEZE_STAGES`/`FREEZE_ROUND_MAX` 常量区、冻结窗队列/派发/计数派生）+ 本表 + 对应用例，三处同步。G2 rider 口径：本表是**两批既有用例的判据契约补登记**（非新用例）。
+
+| # | 判据 | 防什么 | 钉死用例（unit/status.test.mjs） |
+|---|------|--------|----------------------------------|
+| FR1 | 冻结窗开启 = 统稿完成后（`FREEZE_STAGES` 一处可调：cold-read/pm-review/final-gate） | 窗口起点散落各处漂移（统稿前误冻结漏修 / 窗晚开漏计数） | （由「S2③ 冻结窗复欠队列…」前置断言隐式覆盖：统稿完成 → global=cold-read 且人话段披露冻结窗；常量本身无具名用例） |
+| FR2 | 补审轮派发批口径：冻结窗内一次补审派发批 = 一轮 freeze-round 事件；计数器事实源 = 事件流派生（freezeRounds） | 轮次凭会话记忆/渲染口径计数（重启丢轮或重复计） | 「S2③ 冻结窗复欠队列…」（批落 1 条 freeze-round）；「GR3 ENG-1 dispatchEventsBatch 纯函数…」「GR3 ENG-1 集成…」（同批原子落流） |
+| FR3 | 项目级 ≤2 硬门：超限 dispatch exit 3 + pending.md 上报 + 不物化 + 不追加派发事件（suspend 事件落流） | 冻结窗补审无限膨胀（点名修复变相重译） | 「S2③ 冻结窗补审轮 >2 硬门：第 3 轮 dispatch → 非零退出 + pending.md 上报 + 不物化」 |
+| FR4 | 双计数器不挤占：freezeRounds（项目级）与 reviewRounds（per-chunk 修复环轮）分开派生；修复环每 chunk ≤3 超限停 chunk 登 residue、项目不停 | 两轮互占额度（冻结窗轮耗尽阻断正常修复 / 修复轮虚增冻结窗轮） | 「S2③ 双计数器不挤占：冻结窗轮已耗 2 不影响 per-chunk 阶段派发；fix/freeze-round 分开派生」＋「S2④ 修复环轮每 chunk ≤3…」（residue 停修半段） |
+| FR5 | 窗内修复优先级：变化节 × 4 维补审队列优先于全局动作（pm-review 等），复欠清零才回全局 | 点名修复的复欠被全局动作插队（欠账沉到终检才爆） | 「S2③ 冻结窗复欠队列…」（action 空、队列 = s2×4 维；复欠清零回 pm-review） |
+
+## fixer 闭环判据（S2④ 落地）
+
+**判据权威登记于此**——改判据 = 改 `status.mjs`（`fixDispatch`/`renderFixerPkg`）+ 本表 + 对应用例，三处同步。G2 rider 口径同上：既有用例的判据契约补登记（非新用例）。
+
+| # | 判据 | 防什么 | 钉死用例 |
+|---|------|--------|----------|
+| FX1 | `--verb fix` 物化 fixer 包 `staging/fixer-chunk-NN.md` = 定位块（sec 表，c4 同构）+ 译文全文 + FAIL 报告全文（主上下文不进报告）；`--dims` 选维；fix 事件计轮 | 主上下文被报告全文撑爆 / 修复无定位无依据 | 「S2④ fixer 包物化：报告全文+译文+定位块进包；--dims 选维；fix 事件计轮；入参校验」（unit/status.test.mjs） |
+| FX2 | 全链路 FAIL → fixer → verify 真跑 → 复欠 = 变化节 × 4 维 → done（事件流 fix/verify-pass/dispatch 各环节在场） | 机制各自为绿、链路断点（修了没验、验了没复欠） | 「S2④ 全链路：FAIL→fixer→verify→复欠（事件流各环节在场；verify 事件由 verify-mech CLI 落流）」 |
+| FX3 | 修复环轮每 chunk ≤3：超限停该 chunk + 登记 residue-chunk-NN.md + residue 事件、项目不停（无 pending.md；已停修 chunk 拒再派修复） | 无限修复循环 / 单 chunk 拖死整个项目 | 「S2④ 修复环轮每 chunk ≤3：第 4 次物化被拒 → 停该 chunk + residue 登记，项目不停」 |
+| FX4 | 包尺寸 ≤40,000B（sizes 档 3a：max 尺寸译文 + 四维报告全文实测物化）；fixer 按真 chunk 派发（`--nn` 须在 manifest——探针虚拟 NN 进不了 fixer）、chunk 原文不占包 | 包超上下文预算 / 探针混入修复流 | 「档 3a：fixer 包 ≤ 40,000B（max 尺寸译文 + 四维报告全文，--verb fix 实测物化）」（unit/sizes.test.mjs）；"探针不进 fixer/原文不占包"由「S2④ fixer 包物化…」入参校验断言隐式覆盖（nn 不在 manifest exit 1） |
+
 ## 事件流事务判据（events/pending 同事务，S2⑤ 落地）
 
 **判据权威登记于此**——改判据 = 改 `status.mjs`（events 收口/对账）或 `final-gate.mjs`（suspend 调用点）+ 本表 + 对应用例，三处同步。防造假红线：事件流**禁补记**——原子写只改写入机制不补历史；对账只检测不回填（无载荷历史 suspend 只 WARN 不重建）。

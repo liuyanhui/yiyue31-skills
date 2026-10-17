@@ -18,10 +18,10 @@ author: Yiyue31
 ## Directory
 
 - `{skill-dir}` = 本 SKILL.md 所在目录；`{translator-skill-dir}` = `../yiyue31-translator`（Step 0 交接用，读不到按既定退化路径）。引用文件封闭集（`{skill-dir}/references/<file>`、`{skill-dir}/scripts/<file>`）：
-  - **references/（14）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md、unify.md、fix-loop.md、env-playbook.md、verbs.md、analysis.md。（terms.md 系运行时用户态：自 translator 拷贝种子至工作目录，非本目录资产。）
-  - **scripts/（11，运行时封闭集）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、derive-bilingual.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs、import-draft.mjs。另有 `test/`（开发期测试资产，判据契约登记于其 README，不计入运行时封闭集）。
+  - **references/（15）**：translate-prompt.md、adjudicate-prompt.md、evaluate-accuracy.md、evaluate-translationese.md、evaluate-ai-tone.md、evaluate-readability.md、cold-reader.md、style-card.md、delivery-template.md、bilingual.md、unify.md、fix-loop.md、env-playbook.md、verbs.md、analysis.md。（terms.md 系运行时用户态：自 translator 拷贝种子至工作目录，非本目录资产。）
+  - **scripts/（12，运行时封闭集）**：segment/、verify-mech.mjs、status.mjs、merge.mjs、derive-bilingual.mjs、consistency.mjs、final-gate.mjs、probe.mjs、handoff.mjs、word-counter.mjs、import-draft.mjs、cli-guard.mjs。**调用一律真实路径**——经 .claude/skills 等 symlink 调用会被 cli-guard 拒绝（exit 4，防静默 no-op）。另有 `test/`（开发期测试资产，判据契约登记于其 README，不计入运行时封闭集）。
 - 工作目录 `xl-translator/<title>/`（refined-stock 仓库根下）；文件命名遵循下方命名三条红线，status/final-gate 按脚本内建 glob 工作。
-- 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生（PASS 前全目录不得命中发布模式）；`translated-<title>-bilingual.md` 为 PASS 后机械派生只读视图（非交付物、不经终检、sha 不锚、不受手修保护、幂等，永不以 `-zh.md` 结尾）。
+- 命名三条红线：①中间产物禁止以 `-zh.md` 结尾；②禁止 `summary-/talk-/merge-/final-/recommendation-` 前缀；③唯一交付物 `translated-<title>-zh.md` 由终检 PASS 原子改名产生（PASS 前全目录不得命中发布模式）；`translated-<title>-bilingual.md` 为 PASS 后只读派生视图（非交付物，永不以 `-zh.md` 结尾）。
 - 报告/台账的机器解析格式：各 prompt 与产物按 `{skill-dir}/references/` 对应文件的契约逐字执行，不得改写格式。
 
 ## 工作流程
@@ -31,7 +31,7 @@ author: Yiyue31
 ### Step 0 发起与预检 `[主+脚本]`
 - 取文→markdown 化→落 `original-<title>.md`（**落盘即归一 LF**——sha 按落盘字节算，防 CRLF 假错死锁）。brief 缺省（技术读者/意译/中等注释密度/发布用途/**标题双语锚开**/**双语对照关**）直接落盘**不问用户**；可得时附可选行 `来源:`/`作者:`（终检元信息头字段源）。
 - 规模预检（`word-counter.mjs`）：**>40KB 单条件**才走 xl，否则自动交接 translator（读 `{translator-skill-dir}/SKILL.md` 执行 + 披露一行；不可读时退化本 skill 单 chunk 跑完——零运行时依赖）；`--xl-force` 为测试旁路。
-- brief 扁平 key:value 逐行落盘，`双语对照: 关` 为缺省行（交付配置非翻译参数——见「交付」；不入 KEYMAP、机械校验零可见）。
+- brief 扁平 key:value 逐行落盘，`双语对照: 关` 为缺省行（交付配置非翻译参数——细则见 references/bilingual.md）。
 - 原文完整性 WARN（末句截断/围栏不配对，不阻塞）；预算公告（chunk 数/调用基线/预计会话数 + **一行 brief 披露**："按技术读者/意译/中等注释密度/发布用途/标题双语锚开/双语对照关处理——想改就说'换成直译/注释少点/标题不加英文/要双语对照'"——通知非询问，用户须从此处知晓全部可改项）+ **原文 sha1（前 12 位）与 chunk 数**（聊天留痕分母锚，交付回显）+ 喊停方式与样张入口（"先翻第 N 章出样张"，确认风格后放全量）。
 - 关卡：无（本步不改翻译产物）。
 
@@ -49,7 +49,7 @@ author: Yiyue31
 - 关卡：glossary 零双选；keep-list 非空（若原文有机械元素）。
 
 ### Step 3 翻译·阶段A `[subagent]` ×N 串行
-- 派发前跑 `{skill-dir}/scripts/handoff.mjs <workdir>` 生成**机器件**：`handoff/projection-chunk-<NN>.md`（R8-b 投影）+ `handoff/context-chunk-<NN>.md`（串行增强段：邻 chunk 已审末段 + sha 锚）；**判断件** `handoff/chunk-<NN>.md`（①地图②"留下了什么"④台账⑤文风卡引用）主 agent 组装。
+- 派发前跑 `{skill-dir}/scripts/handoff.mjs <workdir>` 生成**机器件**：`handoff/projection-chunk-<NN>.md`（R8-b 投影）+ `handoff/context-chunk-<NN>.md`（串行增强段：邻 chunk 已审末段 + sha 锚）+ `handoff/style-card-proj.md`（风格卡投影 ≤2KB）；**判断件** `handoff/chunk-<NN>.md`（①地图②"留下了什么"④台账⑤文风卡引用）主 agent 组装。
 - prompt = `{skill-dir}/references/translate-prompt.md`。输入 = **交接包五件套**：①chunk 地图（含标题既定译名）②前 chunk 末段摘要③译法投影（含标题条目）④贯穿比喻/叙事台账⑤文风卡；另附 chunk 原文 + keep-list + special-phrases + brief。
 - 串行增强：脚本**追加邻 chunk 已审中文末段 300-500 字**（sha 绑定）；chunk 1 过审节选定稿入 `handoff/anchor.md` 作**范文锚点**。
 - 输出带 `«english»` 标记的译文；**硬禁止直接括注**；金句按精选表；**标题锚按 Step 2 双语对执行**（锚行逐字取自原文）；**glossary 外自裁定术语回传清单**（主 agent 一条一译入表、更新下游投影）。
@@ -70,8 +70,8 @@ author: Yiyue31
 ### Step 6 审校 `[subagent]` 串行
 - **四维独立、全覆盖、不合并、不抽样**：准确性 / 翻译腔 / AI 味 / 可读性——prompt 分别为 `{skill-dir}/references/evaluate-accuracy.md`、`evaluate-translationese.md`、`evaluate-ai-tone.md`、`evaluate-readability.md`；可读性维度**每 4 chunk 加文风对漂抽查**（派发消息注明触发）。
 - **送审单元（节级锚）**：首审 = **整 chunk × 4 维**一次送审（§8 选型）；修复后仅 **sha 变化节 × 4 维 delta 补审**（只审变化节 + 邻节只读语境）；单元经 `staging/` 统一物化同构派发；**派发附该 chunk 原文全文作只读对照**（逐项核对依据；探针单元无原文，正常）；分节报告 + 每节独立结论。
-- **C4 派发口径**（机械归属拆分，S2②）：staging 总行数/起止标题/节名枚举由 `status.mjs` 派发清单自动派生（`c4:` 行，随派发指令附给审校者——报告 sha 表逐字照抄）；agent 派发前自觉 `grep -n "^#" staging/<file>` 核对节序一致；终检随机抽核 ≥3 份兜底（`--seed N` 可复现，结果落 events）。
-- 输入含 **per-chunk glossary 投影** + brief + **文风基准卡全文 + anchor 节选**（判卷口径 = 对照文风卡判偏离，四维均附）+ 翻译腔维度另附**已裁定保留术语聚合视图**（括注 (a) 类首现口径）；**报告头三行 `sha:/model:/time:`，整 chunk 首审另附逐节 sha 表（`sec:` 行）**——由 `status.mjs` 自译文内容派生，随派发指令附给审校者**逐字照抄、禁手算**（机器解析契约）；undersize/模板签名阈值随单元大小缩放；异模型尽量，环境不可控时 REPORT 披露。
+- **C4 派发口径**（S2②）：staging 总行数/起止标题/节名枚举由 `status.mjs` 派发清单自动派生（`c4:` 行，随派发指令附给审校者——报告 sha 表逐字照抄）；agent 派发前自觉 `grep -n "^#" staging/<file>` 核对节序一致；终检随机抽核 ≥3 份兜底（`--seed N` 可复现，结果落 events）。
+- 输入含 **per-chunk glossary 投影** + brief + **文风卡投影（handoff/style-card-proj.md，≤2KB）+ anchor 节选**（判卷口径 = 对照文风卡判偏离，四维均附；卡全文仅主上下文——包预算红线 §5）+ 翻译腔维度另附**已裁定保留术语聚合视图**（括注 (a) 类首现口径）；**报告头三行 `sha:/model:/time:`，整 chunk 首审另附逐节 sha 表（`sec:` 行）**——由 `status.mjs` 自译文内容派生，随派发指令附给审校者**逐字照抄、禁手算**（机器解析契约）；undersize/模板签名阈值随单元大小缩放；异模型尽量，环境不可控时 REPORT 披露。
 - 关卡：四维报告齐备且非 stale。
 
 ### Step 7 修复闭环 `[主+脚本]`
@@ -80,18 +80,18 @@ author: Yiyue31
 - **修复环轮每 chunk ≤3**（`fix` 事件派生）：超限**停该 chunk** 登 `residue-chunk-NN.md`（项目不停）——与 Step 8 冻结窗补审轮分开计数，不挤占。
 
 ### Step 8 合并与统稿 `[脚本+subagent×1]`
-- merge **只由 `merge.mjs` 执行**（判据契约见 `scripts/test/README.md`）→ `merged-draft.md`；final-gate 重导出复用其纯函数。**统稿先于终轮**（次序冻结：终轮读到统稿后的稳定稿）。
+- merge **只由 `merge.mjs` 执行**（判据契约见 `scripts/test/README.md`）→ `merged-draft.md`；final-gate 重导出复用其纯函数。**统稿先于终轮**（终轮读到统稿后的稳定稿）。
 - 统稿三段式与变更 stale 分类（修复类/统稿替换类/句式级改写）细则见 `{skill-dir}/references/unify.md`；统稿轮 ≤2（冷读定点修计入，单套），超限转 PENDING-USER。
-- **内容冻结窗（S2③）**：统稿完成后（冷读/PM 通读/终检阶段）内容冻结——pm-review 类发现**只登记不修**（落 analysis-notes / residue），**用户点名才修**；点名修复走 Step 7 fixer 闭环，其 delta 补审由 `status.mjs` 派发计数，**冻结窗补审轮项目级 ≤2 硬门：超限 dispatch 非零退出 + 写 pending.md 上报**（与修复环轮分开计数不挤占）。
+- **内容冻结窗（S2③）**：统稿完成后（冷读/PM 通读/终检阶段）内容冻结——pm-review 类发现**只登记不修**（落 analysis-notes / residue），**用户点名才修**；点名修复走 Step 7 fixer 闭环，其 delta 补审由 `status.mjs` 派发计数，**冻结窗补审轮项目级 ≤2 硬门：超限 dispatch 非零退出 + 写 pending.md 上报**。
 
 ### Step 9 全稿通读与验收准备 `[subagent×1-2 + 主]`（终检之前）
-- 终稿**冷读者** subagent ×1-2（prompt = `{skill-dir}/references/cold-reader.md`）：以读者身份对照**文风基准卡**通读全稿，找文风断裂/明显错误/跨章不一致；>30KB 分段接力（重叠 ~2KB + 递进台账 + 收尾专读接缝/首末段；派发附 chunk 定位表；接力段只回传分段发现，主 agent 合并落盘）；**>100KB 强制 ≥2 名独立通读、发现取并集（分歧标注来源）**。台账覆盖行格式冻结：`- chunk <NN>: sha <12hex>`（终检对账）。
+- 终稿**冷读者** subagent ×1-2（prompt = `{skill-dir}/references/cold-reader.md`）：以读者身份对照**文风基准卡**通读全稿，找文风断裂/错误/跨章不一致；分段接力与多名独立通读细则见该 prompt。台账覆盖行格式冻结：`- chunk <NN>: sha <12hex>`（终检对账）。
 - **发现分流**：错误类→Step 7 修复闭环；文风类→统稿式定点修 + 接缝复查 + 冷读者复核；**发现清零（或复核通过）才放行**；定点修**计入统稿轮 ≤2**（单套），超限转 PENDING-USER。
 - 主 agent PM 通读：**脚本化分层选样 ≥20%**（每 5 抽 1 + 升级/接缝必抽；final-gate 同规则重推导，漏抽即 FAIL）+ 标题快扫；结论写 `pm-review-<title>.md`（头部 `merged-sha: <12hex>` 锚不豁免 + 选样行 `- chunk <NN>: <实质结论>`——格式冻结）+ 步骤合规表（质量维度无 SKIPPED 合法标记）。
 - 关卡：冷读发现清零（或复核通过）+ pm-review 落盘。
 
 ### Step 10 终检与交付 `[脚本]` ——**流程真正的最后一个动作**
-- `final-gate.mjs` **重执行一切确定性检查**（不信任何落盘日志）——判据 F1-F13 权威登记于 `scripts/test/README.md`（机械重跑/重导出 diff/拼接 sha/完备性矩阵（准确性缺失 = 无条件 FAIL）/签名/G3/R23/标题锚/G4/探针命中每维每 run ≥1）。
+- `final-gate.mjs` **重执行一切确定性检查**（不信任何落盘日志）——判据 F1-F13 权威登记于 `scripts/test/README.md`。
 - 探针：伪审校单元由 status 队列经 `staging/` 同构注入（与真 chunk 同构，照单派发）；ground truth 不落工作区。
 - 新鲜度：豁免 glob 精确到文件（**pm-review 的 merged-sha 内容锚不豁免**）；固定顺序 = 冷读发现清零 → pm-review 最后写 → 终检最后跑；mtime 只作 WARN，硬判 = 内容 sha + 重执行结果。
 - FAIL **半径分级**：单 chunk 根因 = scoped 重做（该 chunk 回 Step 6/7 + 接缝复查 + pm-review 重生成，其余成果保留）；全局根因（拼接 sha/完备性/探针未命中）= 全局作废重走；连续 ≥3 次 FAIL 转 PENDING-USER。
@@ -99,25 +99,26 @@ author: Yiyue31
 
 ## 横切机制
 
-- **状态命令 = resume oracle**（`status.mjs`）：冷启动入口；再触发自动检测续跑；**双段契约**（人话一行 + 动作指令）。**C3 拆分**：`progress` 默认只读渲染零副作用；`dispatch` 才物化 + 追加事件。状态纯推导自文件系统，**唯一续跑文档 `status.md`**。
-- **节级锚与 delta 队列生于脚本**：审校锚 = 逐节 sha 表（`sectionSlices`——与分段同款 fence 感知节边界；status/final-gate/verify-mech 三脚本同源派生）；修复后重审队列 = 变化节 × 4 维差集。报告锚一律脚本从内容派生，**禁止人工拼接**；夹具钉死（`scripts/test/README.md` 判据契约）。
+- **状态命令 = resume oracle**（`status.mjs`）：冷启动入口；再触发自动检测续跑；**双段契约**（人话一行 + 动作指令）。**C3 拆分**：`progress` 默认只读渲染零副作用；`dispatch` 才物化 + 追加事件。状态纯推导自文件系统，**唯一续跑文档 `status.md`**；人话行与 --json 同源推导（plainLines 单源+自一致性断言；suspend 史无 pending 亦出 PENDING-USER 菜单）。
+- **冷启动卡（S3③）**：`--verb dispatch` 自动再生 `handoff/cold-start.md`（机器生成视图：欠账表与 --json 同源、含下次动作口令；守卫收尾退出同样再生）——新会话先读它再跑 status.mjs 冷启动。
+- **节级锚与 delta 队列生于脚本**：审校锚 = 逐节 sha 表（`sectionSlices`——与分段同款 fence 感知节边界；status/final-gate/verify-mech 三脚本同源派生）；修复后重审队列 = 变化节 × 4 维差集。报告锚一律脚本从内容派生，**禁止人工拼接**（夹具钉死 test/README）。
 - **决策落盘纪律（S2③）**：审校建议/统稿清单/历史参考的**采纳或不采纳当场落 analysis-notes**（逐条一句理由）——禁口头决策、禁事后补记。
-- **D1 环境处置与限流保证**（429 分型 / 流停滞核验 / 并发 ≤5 两波制 / 退避四层 / 上下文溢出同路径恢复）细则见 `{skill-dir}/references/env-playbook.md`。
-- **探针注入**：run 开始跑 `{skill-dir}/scripts/probe.mjs` 生成源侧 truth（`probe/truth/<run>.json`，不落工作区；新审校轮=`--run <name>`）；status 注入与 final-gate 命中比对均以 `--probe-truth` 传入。
+- **D1 环境处置与限流保证**细则见 `{skill-dir}/references/env-playbook.md`。
+- **探针注入**：run 开始跑 `{skill-dir}/scripts/probe.mjs` 生成源侧 truth（truth 不落工作区；新审校轮=`--run <name>`）；status 注入与 final-gate 命中比对均以 `--probe-truth` 传入。
 - **draft 导入（S2⑥）**：外部半成品目录经 `import-draft.mjs` 按边界清单受/拒/隔离导入；旧 status.md 无 `schema:` 戳非零拒收；events 归档新建禁补记。
 - **派发纪律**：派发指令 inputs/outputs 一律**绝对路径**（status 输出相对路径，subagent cwd 不定）；prompt 内相对路径以派发指令为准。
 - **用户动词表**（继续/进度/停止/重翻/重新翻译/样张/双语对照）逐动词出口见 `{skill-dir}/references/verbs.md`。
 - **brief 中途变更按性质分类**：注释密度档→不重翻（`«»` 仍在，按新档重跑 Step 4）；文风类→仅下游生效 + 登记统稿重点扫描；根本类（受众/用途）→披露代价由用户选。brief.md 更新落盘，status.md 记变更点。
-- **会话预算**：每会话 N 单元后干净退出；单元幂等；N 同约束内存与主上下文增长；**单元 = 一次 subagent 调用**（基线 ~11/chunk）。
+- **会话预算与派发守卫（S3①②）**：每会话 N 单元干净退出（N=保险丝兜底，水位为主信号；单元=一次 subagent 调用 ~11/chunk）；dispatch 前置守卫——RAM 可用 <500MB 拒派发收尾退出（exit 4，GUARD_RAM_MB 可注入测试）、剩余上下文水位 <20% 干净退出（exit 0）再生交接卡；剩余上下文百分比由主 agent 每轮派发前按已处理单元×实测成本估算、经 GUARD_CTX_PCT 注入（代理计数=events dispatchedSinceSessionEnd，缺省 WARN 放行）；守卫/水位/预算收尾均落 session-end 事件（R14 跨会话复位）。
 - **subagent 回传纪律**：仅回传 落盘路径 + 一行结论 + FAIL 项计数，报告/产物全文只落盘——保主上下文 O(1)。
-- **PENDING-USER 挂起态**：`pending.md` 存在即挂起；处理后自动续跑——零介入唯一合法例外；待决终态一律走此门（不带病交付）。菜单：①继续（换模型/调参并记录）②手修后说"继续翻译"（按新 sha 重审）③终止；status 挂起态人话行输出此菜单。
+- **PENDING-USER 挂起态**：`pending.md` 存在即挂起；处理后自动续跑——零介入唯一合法例外；待决终态一律走此门（不带病交付）。菜单：①继续（换模型/调参并记录）②手修后说"继续翻译"（按新 sha 重审）③终止。
 - **并发参数** `--concurrency N` 默认 1；仅限"尴尬并行"阶段（翻译/裁定/校验/审校）；统稿/冷读/终检永远单发；**禁止自动上调**。
 - **原文变更 re-keying**：chunk 按内容 sha 匹配保留成果（非序号）；原文 sha 变更 → 仅内容 sha 变更的 chunk 作废重翻，下游仅 **N+1 邻 chunk** handoff②/串行增强段重生成，全局阶段（merge/统稿/冷读/终检）作废重走。
-- **交付后**：交付物 sha 已锚入 REPORT，再入不符 = 用户手改 → 询问"保留手修 or 重新交付"（手修永不覆盖）。**术语统一轻命令**：glossary 更新 → 全稿机械替换（逐条 diff 落盘）→ 受影响 chunk 重跑 Step 5 → final-gate 重入（复用统稿类通道，不重翻译）。
+- **交付后**：交付物 sha 已锚入 REPORT，再入不符 = 用户手改 → 询问"保留手修 or 重新交付"（手修永不覆盖）。**术语统一轻命令**：glossary 更新 → 全稿机械替换（逐条 diff 落盘）→ 受影响 chunk 重跑 Step 5 → final-gate 重入（不重翻译）。
 
 ## 交付
 
-- 交付即止：不自动触发发布——refined-stock 的 Stop/SessionEnd hook 自然发布 PASS 交付物（只发 `-zh.md`；bilingual 不命中发布模式）。
-- **双语对照**：入口两形态——brief `双语对照: 开`（PASS 后跑 `{skill-dir}/scripts/derive-bilingual.mjs <workdir>`）或交付后动词 `双语对照 <title>`（幂等）。产物 `translated-<title>-bilingual.md` = 交付物 × 原文机械交错的只读派生视图：中文上英文下，节配对锚优先/配不齐降级节级，降级清单随尾注与 stdout；头部嵌源交付物 sha（status 三态：未生成/已生成/已过期）。双语字段归交付配置非翻译参数（双语模式不放宽注释政策）；派生只读不覆盖交付物、不触发 sha 不符询问（WARN 一行）。
+- 交付即止：不自动触发发布——refined-stock 的 Stop/SessionEnd hook 自然发布 PASS 交付物（只发 `-zh.md`）。
+- **双语对照**：入口两形态——brief `双语对照: 开`（PASS 后派生）或动词 `双语对照 <title>`；产物 `translated-<title>-bilingual.md` 只读派生视图。细则见 `{skill-dir}/references/bilingual.md`。
 - 动词 `审计翻译` / `查翻译质量`：以 REPORT.md 使用说明兜底（audit 脚本未实现）。
-- `REPORT.md`：final-gate 渲染机器段（首屏结论/覆盖矩阵/sha 锚/FAIL 清单）+ 主 agent 按 `{skill-dir}/references/delivery-template.md` 追加人工段；内部术语附人话括注（如"探针 = 故意埋错看审校能否抓到"）。
+- `REPORT.md`：final-gate 渲染机器段（首屏结论/覆盖矩阵/sha 锚/FAIL 清单）+ 主 agent 按 `{skill-dir}/references/delivery-template.md` 追加人工段；内部术语附人话括注。
