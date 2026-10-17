@@ -25,11 +25,21 @@
 //   清空：staging（无条件重物化）
 //   注：probe truth 系源侧文件（probe/truth/），不在工作目录——新 run+truth 属 S2⑦。
 //
-// 幂等：事件流首事件 ev=import ⇒ 已导入过——跳过全部移动，仅重导 status.md（exit 0 披露）。
+// 幂等：事件流首事件 ev=import ⇒ 已导入过——跳过全部移动，仅重导 status.md（exit 0 披露；
+// statusRun 失败码与 errors 照常传播——ENG-3，原实现恒 exit 0 吞码）。
+//
+// 重入收敛（ARCH-A，S3b）：边界执行中断后的半态重入必须收敛——
+//   ① 已移件识别：归档产物（reviews-r1/、events-r1.jsonl、verify-results-r1.json）与
+//     writeAtomic 中断残留（*.tmp，下次写入覆盖清理）识别为**已完成标记跳过**，不进缺省
+//     隔离（原缺陷：重入命中缺省规则 → 二次挪进 quarantine + WARN → exit 0 假象收敛）；
+//   ③ 在途态续完：events 已迁（events-r1.jsonl 在场）而 import 事件未落 ⇒ 以 import 事件
+//     为提交点续完（补落新流首事件 + 重建 status.md），不拒绝不重做已迁移部分；
+//   ④ 真冲突保留：源 + 目标并存（如 reviews/ 与 reviews-r1/ 同场、隔离区同名）= 真冲突，
+//     保留 exit 1 人工确认——收敛修复不得"修复"掉真冲突。
 //
 // CLI: node import-draft.mjs <draftDir> [--json]
 // 退出码: 0 成功（含幂等跳过）/ 1 拒收（旧格式 status.md 无戳 / 版本不识 / 用法错 / 归档目标冲突）
-//         / 2 工作目录异常（缺 original / manifest）
+//         / 2 工作目录异常（缺 original / manifest；幂等分支 statusRun 失败同传播）
 
 import fs from "node:fs";
 import path from "node:path";
@@ -80,6 +90,16 @@ export function classifyEntry(name) {
   return BOUNDARY.find((r) => r.re.test(name)) ?? null; // null = 缺省：隔离 + WARN
 }
 
+// ARCH-A①（S3b）：已移件识别——归档产物（-r1 sibling，本脚本或上次中断的边界执行产物）与
+// writeAtomic 中断残留（*.tmp——status.mjs writeAtomic 语义：下次写入时被覆盖清理，不入流不被扫）
+// 重入时识别为"已完成标记"直接跳过，不进缺省隔离。缺省隔离规则只应捕**来历不明的新产物**，
+// 不应捕本机制自己的中间态（原缺陷：重入时 -r1/*.tmp 命中缺省规则 → 二次挪进 quarantine +
+// WARN → exit 0 假象收敛的静默再分桶半态）。
+const ARCHIVE_ARTIFACTS = new Set(["reviews-r1", "events-r1.jsonl", "verify-results-r1.json"]);
+export function isCompletedMarker(name) {
+  return ARCHIVE_ARTIFACTS.has(name) || name.endsWith(".tmp");
+}
+
 // ---------- 导入主流程 ----------
 
 export function runImport(dir, opts = {}) {
@@ -109,6 +129,11 @@ export function runImport(dir, opts = {}) {
   const existing = fs.existsSync(evFile) ? readEvents(dir) : [];
   if (existing.length && existing[0].ev === "import") {
     const st = statusRun(dir, {});
+    // ENG-3（G2 工程师位，S3b 修）：已导入分支传播 statusRun 失败码与 errors（原恒 return
+    // exitCode 0 吞码——幂等跳过移动 ≠ 状态重建也成功；--json 通道同随 r.errors 出）
+    if (st.exitCode !== 0) {
+      return { exitCode: st.exitCode, errors: st.errors ?? [], alreadyImported: true, disclosure: "已导入过（事件流首事件 = import）——幂等跳过边界执行；但 status.md 重导失败（ENG-3：失败码传播）" };
+    }
     return {
       exitCode: 0,
       alreadyImported: true,
@@ -117,11 +142,14 @@ export function runImport(dir, opts = {}) {
     };
   }
 
-  // ---- 边界执行（§7 数据驱动） ----
+  // ---- 边界执行（§7 数据驱动；ARCH-A③：本段幂等可重入——已移件由 isCompletedMarker 跳过，
+  //      未移件照常执行，真冲突（源+目标并存）由各分支 existsSync 门保留 exit 1） ----
   const qdir = path.join(dir, QUARANTINE);
   const result = { schema: SCHEMA_VERSION, kept: [], archived: [], quarantined: [], cleared: [], warns: [] };
   for (const name of entries) {
-    if (name === "status.md" || name === QUARANTINE || name === "events.jsonl") continue; // 门/隔离区/事件流单独处理
+    // 门/隔离区/事件流单独处理；ARCH-A①：已移件（-r1 归档产物 / writeAtomic *.tmp 残留）
+    // = 已完成标记跳过，不进缺省隔离（防静默再分桶半态——G3 架构位 major）
+    if (name === "status.md" || name === QUARANTINE || name === "events.jsonl" || isCompletedMarker(name)) continue;
     const rule = classifyEntry(name);
     const p = path.join(dir, name);
     if (!rule) {
@@ -161,6 +189,9 @@ export function runImport(dir, opts = {}) {
   }
 
   // ---- events：旧流整体归档 + 新流自零新建（禁补记；首事件 = import 携对账明细） ----
+  // ARCH-A③：events 已迁（events-r1.jsonl 在场）而 import 事件未落的在途态 → 上方 rename
+  // 自然跳过、直接走 appendEvents 落首事件 = 以 import 事件为提交点续完；两侧并存（旧流未迁
+  // 而 -r1 已在场）= 真冲突保留 exit 1（④）
   if (fs.existsSync(evFile)) {
     const target = path.join(dir, "events-r1.jsonl");
     if (fs.existsSync(target)) return { exitCode: 1, errors: ["归档目标已存在：events-r1.jsonl——人工确认后重试"] };
@@ -212,7 +243,9 @@ const __help = `import-draft.mjs — 旧流程半成品目录导入（S2⑥ 最�
   - 受类原样保留；拒类 sibling 归档 -r1（reviews/events/verify-results）；隔离类与
     未列缺省入 quarantine/（缺省附 WARN 不导入）；staging 清空（无条件重物化）
   - 防造假红线：events.jsonl 禁补记——旧流归档（events-r1.jsonl），新流自零新建
-  - 幂等：事件流首事件 = import ⇒ 跳过边界执行，仅重导 status.md
+  - 幂等：事件流首事件 = import ⇒ 跳过边界执行，仅重导 status.md（statusRun 失败码传播，ENG-3）
+  - 重入收敛（ARCH-A）：中断半态重入——已移件（-r1/*.tmp 残留）识别为已完成标记跳过；
+    events 已迁而 import 未落 → 以 import 事件为提交点续完；源+目标并存 = 真冲突保留 exit 1
 
 产物: reviews-r1/、events-r1.jsonl、verify-results-r1.json、quarantine/、新 events.jsonl（首事件 import）、status.md（重建，头带 schema: 戳）
 退出码: 0 成功（含幂等）/ 1 拒收（旧格式/版本不识/用法/归档冲突）/ 2 工作目录异常 / 4 symlink 调用防呆（S3⑤）`;

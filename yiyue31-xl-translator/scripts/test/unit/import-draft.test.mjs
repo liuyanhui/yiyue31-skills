@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { run as segRun } from "../../segment/segment.mjs";
 import { run as statusRun, readEvents, parseStatusSchema, SCHEMA_VERSION, sectionSlices } from "../../status.mjs";
-import { runImport, classifyEntry } from "../../import-draft.mjs";
+import { runImport, classifyEntry, isCompletedMarker } from "../../import-draft.mjs";
 import { probeCheck } from "../../final-gate.mjs";
 
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
@@ -31,7 +31,12 @@ const PROBE_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 
 // S3① RAM 守卫测试环境钉死（status.mjs availableRamMb 注入点）：真实系统读数随机器波动，
 // 不进断言路径——D5 全流程含 in-process dispatch，守卫须恒放行。
-process.env.GUARD_RAM_MB ??= "99999";
+// E1+Q2（S3b）：无条件赋值（??= 会被外层 shell 残留值放行）+ 剥 GUARD_CTX_PCT（外层残留
+// 会让 in-process 用例整体假红）+ 自证行（钉死失败即文件级失败，不静默）。
+process.env.GUARD_RAM_MB = "99999";
+delete process.env.GUARD_CTX_PCT;
+assert.equal(process.env.GUARD_RAM_MB, "99999", "守卫 env 钉死自证：GUARD_RAM_MB");
+assert.equal(process.env.GUARD_CTX_PCT, undefined, "守卫 env 钉死自证：GUARD_CTX_PCT 已剥");
 
 const sha12Of = (p) => crypto.createHash("sha1").update(fs.readFileSync(p, "utf-8"), "utf-8").digest("hex").slice(0, 12);
 const sha12Text = (s) => crypto.createHash("sha1").update(s, "utf-8").digest("hex").slice(0, 12);
@@ -262,5 +267,269 @@ test("D5 探针小文档全流程：导入→verify 重跑→dispatch（真+探�
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(truthDir, { recursive: true, force: true });
+  }
+});
+
+// ---------- S3b：ARCH-A 重入收敛 + ENG-3 失败码传播 ----------
+//
+// ARCH-A（G3 架构位 major）：边界执行中断后的半态重入必须收敛——已移件（-r1 sibling /
+// quarantine 居民 / writeAtomic *.tmp 残留）识别为已完成标记跳过（①）；events 已迁而
+// import 未落 → 以 import 事件为提交点续完（③）；源+目标并存 = 真冲突保留 exit 1（④）。
+// ② 收敛性机械枚举（QA 收紧版）：monkey-patch fs 变异计数器，k=1..N 全遍历。
+
+test("ARCH-A①③ 在途半态重入续完：已移件识别（-r1/tmp 跳过不隔离）+ events 已迁而 import 未落 → exit 0 收敛", () => {
+  // 纯函数口径：已完成标记谓词
+  assert.ok(isCompletedMarker("reviews-r1") && isCompletedMarker("events-r1.jsonl") && isCompletedMarker("verify-results-r1.json"), "-r1 归档产物 = 已完成标记");
+  assert.ok(isCompletedMarker("events.jsonl.tmp") && isCompletedMarker("status.md.tmp"), "writeAtomic 中断残留（*.tmp）= 已完成标记");
+  assert.ok(!isCompletedMarker("reviews") && !isCompletedMarker("events.jsonl") && !isCompletedMarker("stray-notes.txt"), "源名/缺省产物不是已完成标记");
+  assert.equal(classifyEntry("reviews-r1"), null, "r1 产物不命中任何边界规则（无已完成标记则落缺省隔离——缺陷入口）");
+  const dir = makeDraft();
+  try {
+    fs.rmSync(path.join(dir, "status.md"), { force: true });
+    // 手工构造中断半态：三条归档已完成、一条隔离已完成、events 已迁而新流未建（③ 在途态）、
+    // 顶层 writeAtomic *.tmp 残留（appendEvents 中断形态）
+    fs.renameSync(path.join(dir, "reviews"), path.join(dir, "reviews-r1"));
+    fs.renameSync(path.join(dir, "verify-results.json"), path.join(dir, "verify-results-r1.json"));
+    fs.renameSync(path.join(dir, "events.jsonl"), path.join(dir, "events-r1.jsonl"));
+    fs.mkdirSync(path.join(dir, "quarantine"));
+    fs.renameSync(path.join(dir, "REPORT.md"), path.join(dir, "quarantine", "REPORT.md"));
+    fs.writeFileSync(path.join(dir, "events.jsonl.tmp"), '{"t":"2026-10-17T', "utf-8");
+    const r = runImport(dir);
+    assert.equal(r.exitCode, 0, (r.errors ?? []).join(";"));
+    // ①：已移件不进缺省隔离（无针对 r1/tmp 的 WARN；它们绝不出现在 quarantine/ 内）
+    assert.ok(!(r.warns ?? []).some((w) => /reviews-r1|events-r1|verify-results-r1|\.tmp/.test(w)), "已完成标记不触发缺省隔离 WARN");
+    const q = fs.readdirSync(path.join(dir, "quarantine"));
+    assert.ok(!q.includes("reviews-r1") && !q.includes("events-r1.jsonl") && !q.includes("verify-results-r1.json"), "r1 产物不入 quarantine");
+    assert.ok(!q.some((f) => f.endsWith(".tmp")), "tmp 残留不入 quarantine（下次写入覆盖清理）");
+    assert.ok(fs.existsSync(path.join(dir, "reviews-r1", "review-accuracy-chunk-01-a.md")), "已归档 reviews 保持在 sibling 位");
+    assert.equal(fs.readFileSync(path.join(dir, "events-r1.jsonl"), "utf-8"), LEGACY_EVENTS, "已迁移旧流逐字节保留（不重做）");
+    // ③：在途态以 import 事件为提交点续完——新流自零、首事件 = import
+    const evs = readEvents(dir);
+    assert.equal(evs.length, 1, "新流恰 1 条");
+    assert.equal(evs[0].ev, "import", "import 事件 = 提交点");
+    // 未移件照常执行（续完而非全跳过）
+    assert.ok(!fs.existsSync(path.join(dir, "merged-draft.md")) && q.includes("merged-draft.md"), "未移隔离件照常隔离");
+    assert.ok(!fs.existsSync(path.join(dir, "staging")), "staging 照常清空");
+    assert.ok(fs.existsSync(path.join(dir, "verify-results-r1.json")), "未迁 verify-results 照常归档");
+    assert.ok(r.warns.some((w) => w.includes("stray-notes.txt")), "缺省隔离 WARN 照常（来历不明新产物仍受捕）");
+    // 二次重入 = 幂等不动点
+    const r2 = runImport(dir);
+    assert.equal(r2.exitCode, 0);
+    assert.equal(r2.alreadyImported, true, "续完后重入走幂等分支");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ARCH-A④ 真冲突保留：源+目标并存 → 重入 exit 1 不\"修复\"（归档/隔离区/events 三形态）", () => {
+  const dir = makeDraft();
+  try {
+    fs.rmSync(path.join(dir, "status.md"), { force: true });
+    assert.equal(runImport(dir).exitCode, 0, "前置：干净导入完成");
+    // 形态 1：events 两侧并存（导入后旧流被人为恢复——真冲突，人工裁决域）
+    fs.copyFileSync(path.join(dir, "events-r1.jsonl"), path.join(dir, "events.jsonl"));
+    let r = runImport(dir);
+    assert.equal(r.exitCode, 1, "events 两侧并存须 exit 1");
+    assert.ok(r.errors.some((e) => e.includes("归档目标已存在") && e.includes("events-r1.jsonl")), "可操作文案");
+    assert.equal(fs.readFileSync(path.join(dir, "events-r1.jsonl"), "utf-8"), LEGACY_EVENTS, "冲突不覆盖既有归档");
+    fs.rmSync(path.join(dir, "events.jsonl"));
+    // 形态 2：隔离区同名（源重新出现在顶层而隔离区已有同名件）
+    fs.writeFileSync(path.join(dir, "REPORT.md"), "# 重新出现的 REPORT\n", "utf-8");
+    r = runImport(dir);
+    assert.equal(r.exitCode, 1, "隔离区同名须 exit 1");
+    assert.ok(r.errors.some((e) => e.includes("隔离区已存在同名") && e.includes("REPORT.md")), "可操作文案");
+    fs.rmSync(path.join(dir, "REPORT.md"));
+    // 形态 3：reviews 源再现而 reviews-r1 已在场（sibling 归档目标冲突）
+    fs.mkdirSync(path.join(dir, "reviews"));
+    fs.writeFileSync(path.join(dir, "reviews", "review-accuracy-chunk-01.md"), "新出现的审校报告\n", "utf-8");
+    r = runImport(dir);
+    assert.equal(r.exitCode, 1, "归档目标并存须 exit 1");
+    assert.ok(r.errors.some((e) => e.includes("归档目标已存在") && e.includes("reviews-r1")), "可操作文案");
+    // 处置后（移走来历不明源）重入恢复收敛 exit 0——exit 1 是可操作出口而非死路
+    fs.rmSync(path.join(dir, "reviews"), { recursive: true, force: true });
+    const r2 = runImport(dir);
+    assert.equal(r2.exitCode, 0, "人工处置后重入恢复收敛（events 已迁 → 以 import 事件续完）");
+    const evs = readEvents(dir);
+    assert.ok(evs.length >= 1 && evs[0].ev === "import", "新流首事件 = import");
+    const r3 = runImport(dir);
+    assert.equal(r3.exitCode, 0);
+    assert.equal(r3.alreadyImported, true, "续完后重入走幂等分支");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 归一化树快照：path → sha（目录记 "dir"）；归一化两处跨运行差异——① 夹具根路径（manifest
+// "- 原文：<abs>/" 行内嵌 mkdtemp 随机目录）→ <ROOT>；② ISO 时间戳（status.md 推导时间 /
+// events.jsonl t 字段）→ <TS>。归一后不同夹具实例的终态可逐件比对。
+function treeSnapshot(rootDir) {
+  const map = new Map();
+  const rootRe = new RegExp(rootDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+  const walk = (rel) => {
+    const abs = path.join(rootDir, rel);
+    if (fs.statSync(abs).isDirectory()) {
+      map.set(rel, "dir");
+      for (const c of fs.readdirSync(abs).sort()) walk(rel ? `${rel}/${c}` : c);
+    } else {
+      const norm = fs.readFileSync(abs, "utf-8")
+        .replace(rootRe, "<ROOT>")
+        .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, "<TS>")
+        .replace(/产物指纹 [0-9a-f]{12}/g, "产物指纹 <FP>") // 指纹内嵌 manifest 原始 sha（含 mkdtemp 路径）→ 跨夹具实例必然不同
+        .replace(/("ev":"import","schema":\d+,"detail":)"(?:[^"\\]|\\.)*"/g, "$1\"<IMPORT>\""); // 对账明细 = 本执行的动作计数（重入续完只计本轮剩余，与一次执行天然不同——非placement语义）
+      map.set(rel, sha12Text(norm));
+    }
+  };
+  for (const c of fs.readdirSync(rootDir).sort()) walk(c);
+  return map;
+}
+
+// monkey-patch fs 变异计数器：包住 import-draft 执行路径上的 fs 变异调用（mkdir/rename/rm/
+// writeFile/writeSync/fsync/write 型 open），第 k 次变异**执行前**抛错模拟中断（已执行的
+// 变异全部完整落地 = fs 一致前缀态）；只读调用与 closeSync 不计。N 随实现自动演进——新增
+// fs 变异点自动纳入枚举范围。
+function installMutationCounter(k) {
+  let count = 0;
+  const saved = [];
+  const wrapPlain = (name) => {
+    const orig = fs[name];
+    fs[name] = function (...args) {
+      count++;
+      if (count === k) throw new Error(`interrupt-at-mutation-${k}`);
+      return orig.apply(fs, args);
+    };
+    saved.push([name, orig]);
+  };
+  for (const n of ["mkdirSync", "renameSync", "rmSync", "writeFileSync", "writeSync", "fsyncSync", "appendFileSync", "copyFileSync", "unlinkSync"]) wrapPlain(n);
+  const origOpen = fs.openSync;
+  fs.openSync = function (p, flags, ...rest) {
+    if (/[wax+]/.test(String(flags ?? "r"))) {
+      count++;
+      if (count === k) throw new Error(`interrupt-at-mutation-${k}`);
+    }
+    return origOpen.call(fs, p, flags, ...rest);
+  };
+  saved.push(["openSync", origOpen]);
+  return {
+    count: () => count,
+    uninstall: () => { for (const [n, o] of saved) fs[n] = o; },
+  };
+}
+
+test("ARCH-A② 收敛性机械枚举：k=1..N 全遍历——重入 ∈ {exit 0 二次重入不动点+零漂移, exit 1 可操作文案}", () => {
+  // N 发现：干净跑一次数变异总数（k=Infinity 永不触发 = 只计数）
+  let N = 0;
+  {
+    const dir = makeDraft();
+    try {
+      fs.rmSync(path.join(dir, "status.md"), { force: true });
+      const c = installMutationCounter(Infinity);
+      try {
+        assert.equal(runImport(dir).exitCode, 0, "计数跑须正常完成");
+      } finally {
+        c.uninstall();
+      }
+      N = c.count();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  assert.ok(N >= 15, `夹具自证：变异点 N=${N} 足够多（防枚举空转）`);
+  // 参照终态：无中断干净导入的归一化树快照（一切再分桶/错位都表现为与它的树差）
+  const refDir = makeDraft();
+  let refSnap;
+  try {
+    fs.rmSync(path.join(refDir, "status.md"), { force: true });
+    assert.equal(runImport(refDir).exitCode, 0);
+    refSnap = treeSnapshot(refDir);
+  } finally {
+    fs.rmSync(refDir, { recursive: true, force: true });
+  }
+  const refQuar = [...refSnap.keys()].filter((p) => p.startsWith("quarantine/")).sort();
+  const R1_ARTIFACTS = ["reviews-r1", "events-r1.jsonl", "verify-results-r1.json"];
+  const outcomes = { fixedPoint: 0, conflictExit1: 0 };
+  let swallowed = 0; // best-effort 容错吞没的变异点（writeAtomic 目录 fsync catch——非可观测中断点）
+  for (let k = 1; k <= N; k++) {
+    const dir = makeDraft();
+    try {
+      fs.rmSync(path.join(dir, "status.md"), { force: true });
+      // 首次部分执行：第 k 次变异前中断
+      const c = installMutationCounter(k);
+      let interrupted = false;
+      try {
+        runImport(dir);
+        // 正常返回的两种情形：① 第 k 次变异的抛错被 best-effort 容错吞没（writeAtomic 目录
+        // fsync 的 catch——E3 语义：平台不支持时跳过）——不构成可观测中断点，跳过该 k；
+        // ② k 从未到达（计数口径漂移）——须 fail 暴露
+        assert.ok(c.count() >= k, `k=${k}：正常返回而第 ${k} 次变异未发生（计数 N 漂移：实计 ${c.count()}）`);
+        swallowed++;
+        continue;
+      } catch (e) {
+        assert.match(String(e.message), new RegExp(`interrupt-at-mutation-${k}$`), `k=${k}：中断注入（前 ${k - 1} 次变异已落地）`);
+        interrupted = true;
+      } finally {
+        c.uninstall();
+      }
+      assert.ok(interrupted);
+      const snap1 = treeSnapshot(dir);
+      const quar1 = [...snap1.keys()].filter((p) => p.startsWith("quarantine/"));
+      // 重入
+      const r2 = runImport(dir);
+      if (r2.exitCode === 0) {
+        outcomes.fixedPoint++;
+        // 出口一（成员判定前半）：二次重入不动点
+        const r3 = runImport(dir);
+        assert.equal(r3.exitCode, 0, `k=${k}：二次重入 exit 0`);
+        assert.equal(r3.alreadyImported, true, `k=${k}：二次重入走幂等分支`);
+        assert.ok(String(r3.disclosure ?? "").includes("已导入过"), `k=${k}：输出含"已导入过"披露`);
+        const snap2 = treeSnapshot(dir);
+        const snap3 = treeSnapshot(dir);
+        assert.deepEqual([...snap3.keys()].sort(), [...snap2.keys()].sort(), `k=${k}：二次重入文件集合不动点`);
+        for (const [p, h] of snap2) assert.equal(snap3.get(p), h, `k=${k}：二次重入 ${p} sha 不动点`);
+        const evs = readEvents(dir);
+        assert.ok(evs.length >= 1 && evs[0].ev === "import", `k=${k}：events 首事件 = import`);
+        // 终态 = 参照终态（归一化时间戳后逐件全等）
+        assert.deepEqual([...snap2.keys()].sort(), [...refSnap.keys()].sort(), `k=${k}：重入终态文件集合 = 参照`);
+        for (const [p, h] of refSnap) assert.equal(snap2.get(p), h, `k=${k}：终态 ${p} 与参照归一化逐字节相同`);
+        // 零漂移（钉死静默再分桶死路）：partial 已在场件不被二次挪动 + quarantine 终集 = 参照
+        const quar2 = [...snap2.keys()].filter((p) => p.startsWith("quarantine/")).sort();
+        assert.deepEqual(quar2, refQuar, `k=${k}：quarantine 终集 = 参照（相对 partial 零漂移：partial=${quar1.length} → final=${quar2.length} = ref）`);
+        for (const p of quar1) assert.equal(snap2.get(p), snap1.get(p), `k=${k}：partial 已隔离件 ${p} 原路径原样（不再挪动）`);
+        for (const a of R1_ARTIFACTS) {
+          if (snap1.has(a)) assert.equal(snap2.get(a), snap1.get(a), `k=${k}：已归档产物 ${a} 保持在 sibling 位`);
+        }
+        assert.ok(!quar2.some((p) => /(^|\/)(reviews-r1|events-r1\.jsonl|verify-results-r1\.json)$/.test(p) || p.endsWith(".tmp")), `k=${k}：r1/tmp 残件绝不在 quarantine 内`);
+      } else {
+        // 出口二：真冲突/拒收类合法中断态——exit 1 且 errors 含可操作文案
+        outcomes.conflictExit1++;
+        assert.equal(r2.exitCode, 1, `k=${k}：非 0 重入只允许 exit 1（实得 ${r2.exitCode}：${(r2.errors ?? []).join(";")}）`);
+        assert.ok((r2.errors ?? []).length > 0 && r2.errors.some((e) => /归档目标已存在|隔离区已存在同名|拒收/.test(e)), `k=${k}：exit 1 须含可操作文案`);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  console.log(`  ARCH-A② 机械枚举：N=${N}（exit0 不动点 ${outcomes.fixedPoint} / exit1 真冲突 ${outcomes.conflictExit1} / 容错吞没跳过 ${swallowed}）`);
+});
+
+test("ENG-3 已导入分支失败码传播：manifest 损毁 → 重入返回 statusRun 非零码 + errors（--json 通道同断言）", () => {
+  const dir = makeDraft();
+  try {
+    fs.rmSync(path.join(dir, "status.md"), { force: true });
+    assert.equal(runImport(dir).exitCode, 0, "前置：导入完成");
+    // 确定性损毁夹具：manifest.md 目录化——runImport 预检（existsSync）通过、statusRun 读侧失败
+    fs.rmSync(path.join(dir, "manifest.md"));
+    fs.mkdirSync(path.join(dir, "manifest.md"));
+    const r = runImport(dir);
+    assert.equal(r.exitCode, 2, "幂等分支传播 statusRun 失败码（原恒 exit 0 吞码）");
+    assert.ok((r.errors ?? []).some((e) => e.includes("manifest")), "errors 传播（含可操作处置）");
+    assert.equal(r.alreadyImported, true, "仍披露幂等上下文");
+    // --json 通道（CLI 真实进程）：exitCode 与 errors 同出
+    const cli = spawnSync(process.execPath, [SCRIPT, dir, "--json"], { encoding: "utf-8" });
+    assert.equal(cli.status, 2, "CLI exit 2" + cli.stdout + cli.stderr);
+    const j = JSON.parse(cli.stdout.slice(cli.stdout.indexOf("{")));
+    assert.equal(j.exitCode, 2, "--json exitCode 传播");
+    assert.ok((j.errors ?? []).some((e) => e.includes("manifest")), "--json errors 传播");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
