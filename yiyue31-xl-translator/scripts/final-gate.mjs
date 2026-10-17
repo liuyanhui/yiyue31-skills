@@ -50,6 +50,7 @@ import { fenceAwareHeadings } from "./segment/segment.mjs";
 import { verify, loadKeepList, loadBrief, fenceAwareAnnotationMatches } from "./verify-mech.mjs";
 import { assemble } from "./merge.mjs";
 import { parseGlossary, projectionFor, renderProjection } from "./handoff.mjs";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
 const PM_QUALITY_DIMS = [
@@ -757,9 +758,12 @@ const __help = `final-gate.mjs — xl-translator Step 10 终检与交付（交�
   - PASS → 原子改名 translated-<title>-zh.md + REPORT 定稿（交付物 sha 内容锚）；
     手改交付物不被覆盖（R18-⑥）；FAIL → 半径分级（scoped/global），连续 ≥3 转 PENDING-USER
 
-退出码: 0 PASS / 1 用法 / 2 工作目录异常 / 3 FAIL(scoped) / 4 FAIL(global)`;
+退出码: 0 PASS / 1 用法 / 2 工作目录异常 / 3 FAIL(scoped) / 4 FAIL(global)
+补充: 经 symlink 调用 → S3⑤ 防呆守卫前置 exit 4（stderr 警示——与 4 FAIL(global) 共用码，以 stderr 区分）`;
 
 // CLI 守卫用 fileURLToPath（Windows 下 new URL().pathname 形态不匹配，见 merge.mjs 同注）
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时 CLI 守卫将静默失配——前置拦截
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const { pos, opts } = parseArgs(process.argv.slice(2));
   if (opts.help || pos.length < 1) {

@@ -35,6 +35,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { run as statusRun, readEvents, appendEvents, parseStatusSchema, SCHEMA_VERSION } from "./status.mjs";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 const QUARANTINE = "quarantine";
 
@@ -214,9 +215,11 @@ const __help = `import-draft.mjs — 旧流程半成品目录导入（S2⑥ 最�
   - 幂等：事件流首事件 = import ⇒ 跳过边界执行，仅重导 status.md
 
 产物: reviews-r1/、events-r1.jsonl、verify-results-r1.json、quarantine/、新 events.jsonl（首事件 import）、status.md（重建，头带 schema: 戳）
-退出码: 0 成功（含幂等）/ 1 拒收（旧格式/版本不识/用法/归档冲突）/ 2 工作目录异常`;
+退出码: 0 成功（含幂等）/ 1 拒收（旧格式/版本不识/用法/归档冲突）/ 2 工作目录异常 / 4 symlink 调用防呆（S3⑤）`;
 
 // CLI 守卫用 fileURLToPath（Windows pathname 坑，见 status.mjs 同注）
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时 CLI 守卫将静默失配——前置拦截
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const { pos, opts } = parseArgs(process.argv.slice(2));
   if (opts.help || pos.length < 1) {

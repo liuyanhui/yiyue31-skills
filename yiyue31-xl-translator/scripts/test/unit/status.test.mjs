@@ -8,6 +8,8 @@
 //   - PENDING-USER 菜单（R2）+ 菜单②手修路径文案（G7：自动补空格、永不自动重翻）
 //   - 计数器三条款（G6）+ 机械打回 ≤2 / 累计升级 ≥2 转挂起（R4）
 //   - 会话预算干净退出点（R14）；progress.json 不再写出（status.md 吸收）
+//   - S3①②⑤ 守卫批：RAM 守卫正反 / 水位退出（含缺省 WARN）/ dispatchEventsBatch 合并原子追加
+//     / writeAtomic 目录 fsync / symlink 调用防呆 / 预算收尾 session-end（GR1-GR6）
 //
 // 夹具程序化生成：segment.run 真跑出 chunks+manifest（min/max 调小造多 chunk 小文档），
 // 再手工补 translated/adjudication/reviews/verify-results/events 模拟各阶段。
@@ -40,8 +42,17 @@ import {
   plainLines,
   plainSelfCheck,
   fingerprint,
+  dispatchEventsBatch,
+  availableRamMb,
+  ctxPctFromEnv,
 } from "../../status.mjs";
+import { symlinkCliGuard } from "../../cli-guard.mjs";
 import { runGate } from "../../final-gate.mjs";
+
+// S3① 测试环境钉死（availableRamMb 注入点，优先级最高）：真实系统读数随机器波动（本机
+// 1.87GB 低内存机），不进断言路径——in-process dispatch 用例（CS/S2③/GR3 等）守卫须恒放行。
+// 子进程用例显式传 env 覆盖（GR1 正反例）。
+process.env.GUARD_RAM_MB ??= "99999";
 
 const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "status.mjs");
@@ -1108,5 +1119,214 @@ test("PL4 ARCH-B 四态：secFresh 单点收敛——deriveState 与 final-gate 
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  }
+});
+
+// ---------- S3①②⑤ 守卫批 + ENG-1/2/4（GR1-GR6） ----------
+
+const HANDOFF_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "handoff.mjs");
+
+// CLI 子进程助手：默认剥掉 GUARD_CTX_PCT（缺省场景可控），覆盖项后到优先（仿 L509 子进程模式）
+function cli(dir, args, envOverrides = {}) {
+  const env = { ...process.env };
+  delete env.GUARD_CTX_PCT;
+  Object.assign(env, envOverrides);
+  return spawnSync(process.execPath, [SCRIPT, dir, ...args], { encoding: "utf-8", env });
+}
+
+test("GR1 S3① RAM 守卫：GUARD_RAM_MB=1 → exit 4 + session-end(ram-guard) + 不物化 + 冷启动卡/人话守卫行；99999 → 正常物化", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushThroughVerify(dir, 1);
+    // 正例：RAM 1MB < 500MB → 守卫拒绝派发（子进程注入 env——CLI 真实通道）
+    const r = cli(dir, ["--verb", "dispatch"], { GUARD_RAM_MB: "1" });
+    assert.equal(r.status, 4, "守卫命中须 exit 4\n" + r.stdout + r.stderr);
+    assert.ok(r.stderr.includes("守卫拒绝派发"), "stderr 含守卫文");
+    assert.ok(!fs.existsSync(path.join(dir, "staging")) || fs.readdirSync(path.join(dir, "staging")).length === 0, "不得物化");
+    const evs = readEvents(dir);
+    assert.ok(!evs.some((e) => e.ev === "dispatch"), "无 dispatch 事件");
+    const se = evs.filter((e) => e.ev === "session-end");
+    assert.equal(se.length, 1, "session-end 恰一条（ENG-4 生产者）");
+    assert.ok(String(se[0].detail).includes("ram-guard:1MB"), "detail 含 ram-guard");
+    const cs = fs.readFileSync(path.join(dir, "handoff", "cold-start.md"), "utf-8");
+    assert.ok(cs.includes("## 下次动作") && cs.includes("继续翻译 testdoc"), "冷启动卡在场且含下次动作（收尾再生）");
+    const md = fs.readFileSync(path.join(dir, "status.md"), "utf-8");
+    assert.ok(md.includes("RAM 可用 1MB < 500MB"), "status 人话含守卫行（plainLines guard 分支）");
+    assert.ok(md.includes("⚠ RAM 可用 1MB"), "人话 ⚠ 行（state.warnings 同源双通道）");
+    // 反例：RAM 充足 → 正常物化（默认路径冒烟另由 CS 用例覆盖——env 钉死确认不冲突）
+    const r2 = cli(dir, ["--verb", "dispatch"], { GUARD_RAM_MB: "99999" });
+    assert.equal(r2.status, 0, r2.stdout + r2.stderr);
+    assert.equal(fs.readdirSync(path.join(dir, "staging")).length, 4, "整 chunk 首审 4 单元照常物化");
+    assert.ok(readEvents(dir).some((e) => e.ev === "dispatch"), "dispatch 事件照常落流");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("GR2 S3② 水位退出：GUARD_CTX_PCT=5 → exit 0 不物化 + session-end(ctx-watermark:5%) + 冷启动卡/人话水位行；缺省 WARN 放行；50 正常", () => {
+  // 信号函数口径：ctxPctFromEnv 注入/域外/缺省；availableRamMb env 注入点优先级最高
+  process.env.GUARD_CTX_PCT = "5";
+  assert.equal(ctxPctFromEnv(), 5, "注入 5 → 5");
+  process.env.GUARD_CTX_PCT = "150";
+  assert.equal(ctxPctFromEnv(), null, "超 0-100 域 → null");
+  delete process.env.GUARD_CTX_PCT;
+  assert.equal(ctxPctFromEnv(), null, "缺省 → null");
+  assert.equal(availableRamMb(), 99999, "GUARD_RAM_MB 注入点优先级最高（测试钉死值）");
+  const dir = makeWorkdir(1);
+  try {
+    pushThroughVerify(dir, 1);
+    // 水位命中：5% < 20% → 干净退出（exit 0，跳过物化走正常收尾）
+    const r = cli(dir, ["--verb", "dispatch"], { GUARD_CTX_PCT: "5" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(!fs.existsSync(path.join(dir, "staging")) || fs.readdirSync(path.join(dir, "staging")).length === 0, "水位退出不物化");
+    const evs = readEvents(dir);
+    assert.ok(!evs.some((e) => e.ev === "dispatch"), "无 dispatch 事件");
+    const se = evs.filter((e) => e.ev === "session-end");
+    assert.equal(se.length, 1);
+    assert.equal(se[0].detail, "ctx-watermark:5%");
+    const cs = fs.readFileSync(path.join(dir, "handoff", "cold-start.md"), "utf-8");
+    assert.ok(cs.includes("## 下次动作") && cs.includes("继续翻译 testdoc"), "交接卡再生含下次动作（验收点）");
+    const md = fs.readFileSync(path.join(dir, "status.md"), "utf-8");
+    assert.ok(md.includes("剩余上下文水位 5% < 20%"), "人话水位行在场（plainLines guard 分支）");
+    // 缺省：GUARD_CTX_PCT 未注入 → 正常派发 + WARN 放行（--json state.warnings 同源）
+    const r2 = cli(dir, ["--verb", "dispatch", "--json"]);
+    assert.equal(r2.status, 0, r2.stdout + r2.stderr);
+    assert.equal(fs.readdirSync(path.join(dir, "staging")).length, 4, "缺省放行照常物化");
+    const j = JSON.parse(r2.stdout);
+    assert.ok(j.state.warnings.some((w) => w.includes("水位信号缺省")), "--json warnings 含缺省 WARN");
+    // 50% ≥ 20% → 正常派发，无水位行无缺省 WARN
+    const dir2 = makeWorkdir(1);
+    try {
+      pushThroughVerify(dir2, 1);
+      const r3 = cli(dir2, ["--verb", "dispatch", "--json"], { GUARD_CTX_PCT: "50" });
+      assert.equal(r3.status, 0, r3.stdout + r3.stderr);
+      assert.equal(fs.readdirSync(path.join(dir2, "staging")).length, 4, "50% 照常物化");
+      assert.ok(!fs.readFileSync(path.join(dir2, "status.md"), "utf-8").includes("剩余上下文水位"), "无水位行");
+      assert.ok(!JSON.parse(r3.stdout).state.warnings.some((w) => w.includes("水位信号缺省")), "无缺省 WARN");
+    } finally {
+      fs.rmSync(dir2, { recursive: true, force: true });
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("GR3 ENG-1 dispatchEventsBatch 纯函数：冻结 = dispatch×N + freeze-round 收尾；非冻结 = 无 freeze-round", () => {
+  const q = [
+    { dim: "accuracy", nn: 1, sec: null, kind: "real" },
+    { dim: "translationese", nn: 1, sec: "s2", kind: "real" },
+  ];
+  const dispatch = [
+    { input: "staging/review-accuracy-unit-001.md", output: "reviews/x.md", c4: { sha: "aaaaaaaaaaaa", lines: 3 } },
+    { input: "staging/review-translationese-unit-002.md", output: "reviews/y.md", c4: { sha: "bbbbbbbbbbbb", lines: 5 } },
+  ];
+  const frozen = dispatchEventsBatch(q, dispatch, true);
+  assert.equal(frozen.length, 3, "冻结 = 2 dispatch + 1 freeze-round");
+  assert.deepEqual(frozen.map((e) => e.ev), ["dispatch", "dispatch", "freeze-round"], "freeze-round 批内收尾");
+  assert.equal(frozen[0].nn, 1);
+  assert.equal(frozen[0].sec, null);
+  assert.equal(frozen[0].detail, JSON.stringify(dispatch[0].c4), "c4 detail 与现行口径同构");
+  assert.equal(frozen[1].sec, "s2");
+  assert.equal(frozen[2].units, 2, "units = 队列长度");
+  const plain = dispatchEventsBatch(q, dispatch, false);
+  assert.equal(plain.length, 2);
+  assert.ok(plain.every((e) => e.ev === "dispatch"), "非冻结无 freeze-round");
+});
+
+test("GR3 ENG-1 集成：冻结窗 dispatch → events 末条 freeze-round、此前恰为本批 dispatch（同批原子落流）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushToFreeze(dir);
+    freezeFix(dir);
+    const r = run(dir, { verb: "dispatch" });
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.queue.q.length, 4, "s2 × 4 维补审");
+    assert.equal(fs.readdirSync(path.join(dir, "staging")).length, 4, "物化在场");
+    const evs = readEvents(dir);
+    assert.equal(evs.at(-1).ev, "freeze-round", "末条 = freeze-round（批内收尾）");
+    assert.equal(evs.at(-1).units, 4);
+    assert.deepEqual(evs.slice(-5, -1).map((e) => e.ev), ["dispatch", "dispatch", "dispatch", "dispatch"], "freeze-round 之前恰为本批 4 条 dispatch（单次 appendEvents）");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("GR4 ENG-2 目录 fsync：appendEvents 后对 events.jsonl 所在目录有 fsync 调用（行为级断言）", () => {
+  const dir = makeWorkdir(1);
+  try {
+    const fsyncedPaths = [];
+    const fdPaths = new Map();
+    const origOpen = fs.openSync;
+    const origFsync = fs.fsyncSync;
+    fs.openSync = function (p, ...rest) {
+      const fd = origOpen.call(fs, p, ...rest);
+      fdPaths.set(fd, String(p));
+      return fd;
+    };
+    fs.fsyncSync = function (fd, ...rest) {
+      if (fdPaths.has(fd)) fsyncedPaths.push(fdPaths.get(fd));
+      return origFsync.call(fs, fd, ...rest);
+    };
+    try {
+      appendEvents(dir, { ev: "resume" });
+    } finally {
+      fs.openSync = origOpen; // patch 还原（finally）
+      fs.fsyncSync = origFsync;
+    }
+    const dirPath = path.dirname(path.join(dir, "events.jsonl"));
+    assert.ok(fsyncedPaths.includes(dirPath), `rename 后须 fsync events.jsonl 所在目录（实 fsync 路径：${fsyncedPaths.join(", ")}）`);
+    assert.ok(fsyncedPaths.includes(path.join(dir, "events.jsonl.tmp")), "tmp 内容 fsync 仍在（写入语义不回退）");
+    assert.equal(readEvents(dir).length, 1, "追加本身不受影响");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("GR5 S3⑤ symlink 防呆：经 symlink 调用 status/handoff → exit 4 + stderr 警示；直连不受影响", () => {
+  // 纯函数口径：真实路径 → null；缺文件（realpath 失败）→ null 不误伤
+  assert.equal(symlinkCliGuard(SCRIPT), null, "真实路径直连不命中");
+  assert.equal(symlinkCliGuard(path.join(os.tmpdir(), "gr5-no-such-file.mjs")), null, "realpath 失败不误伤");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gr5-"));
+  try {
+    const fake = path.join(tmp, "fake-status.mjs");
+    fs.symlinkSync(SCRIPT, fake);
+    const g = symlinkCliGuard(fake);
+    assert.ok(g && g.real === SCRIPT, "命中并披露真实路径");
+    assert.ok(g.msg.includes("symlink 防呆") && g.msg.includes(SCRIPT), "msg 含警示与真实路径");
+    const r = spawnSync(process.execPath, [fake, "--help"], { encoding: "utf-8" });
+    assert.equal(r.status, 4, "经 symlink 调用须 exit 4（防 no-op 假绿）");
+    assert.ok(r.stderr.includes("symlink 防呆"), "stderr 警示在场");
+    assert.ok(!r.stdout.includes("status.mjs —"), "--help 未被放行（守卫先于 CLI 入口）");
+    // handoff.mjs 同法一遍（第二脚本抽查——其余 9 个接同一守卫模块）
+    const fakeH = path.join(tmp, "fake-handoff.mjs");
+    fs.symlinkSync(HANDOFF_SCRIPT, fakeH);
+    const r2 = spawnSync(process.execPath, [fakeH, "--help"], { encoding: "utf-8" });
+    assert.equal(r2.status, 4);
+    assert.ok(r2.stderr.includes("symlink 防呆"));
+    // 真实路径直接调用不受影响：既有 227 用例（CLI 冒烟走真实 SCRIPT）即证，不重复
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("GR6 ENG-4 预算收尾 session-end：--budget 1 dispatch → exit 0 不物化 + session-end(budget:1)；重读计数器归零", () => {
+  const dir = makeWorkdir(1);
+  try {
+    pushThroughVerify(dir, 1);
+    appendEvents(dir, { ev: "dispatch", nn: 1, dim: "accuracy", sec: null }); // 夹具先派 1 单元（本会话窗）
+    assert.equal(deriveCounters(readEvents(dir)).dispatchedSinceSessionEnd, 1, "前置：窗内已 1 单元");
+    const r = run(dir, { verb: "dispatch", budget: 1 });
+    assert.equal(r.exitCode, 0, "预算到点 = 干净退出点（exit 0）");
+    assert.equal(r.queue.dispatch.length, 0, "不物化");
+    assert.ok(!fs.existsSync(path.join(dir, "staging")) || fs.readdirSync(path.join(dir, "staging")).length === 0, "无暂存");
+    const evs = readEvents(dir);
+    const se = evs.filter((e) => e.ev === "session-end");
+    assert.equal(se.length, 1, "session-end 恰一条（一次性）");
+    assert.equal(se[0].detail, "budget:1");
+    // R14 跨会话复位自此真正工作：重读事件流推导 → 窗计数归零
+    assert.equal(deriveCounters(readEvents(dir)).dispatchedSinceSessionEnd, 0, "跨会话复位生效");
+    assert.ok(r.statusText.includes("干净退出点"), "人话仍按已渲染口径（预算退出点文案不重推导）");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });

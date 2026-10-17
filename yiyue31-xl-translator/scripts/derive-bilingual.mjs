@@ -33,6 +33,7 @@ import { scanWorkdir, appendEvents } from "./status.mjs";
 import { fenceAwareHeadings, protectedRanges } from "./segment/segment.mjs";
 import { manifestChunkShas, assemble } from "./merge.mjs";
 import { anchorOff, stripMetaHeader } from "./final-gate.mjs";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 const sha12 = (s) => crypto.createHash("sha1").update(s, "utf-8").digest("hex").slice(0, 12);
 const fileSha = (p) => sha12(fs.readFileSync(p, "utf-8"));
@@ -365,10 +366,12 @@ const __help = `derive-bilingual.mjs — xl-translator 双语对照派生视图�
   - 幂等：同输入重跑字节相同；头部嵌源交付物 sha（status 三态数据源）
 
 产物: <workdir>/translated-<title>-bilingual.md + events.jsonl 追加 derive-bilingual 事件
-退出码: 0 成功 / 1 用法 / 2 工作目录异常 / 3 输入损坏（无交付物、chunk 配对失败）`;
+退出码: 0 成功 / 1 用法 / 2 工作目录异常 / 3 输入损坏（无交付物、chunk 配对失败）/ 4 symlink 调用防呆（S3⑤）`;
 
 // CLI 守卫用 fileURLToPath：new URL().pathname 在 Windows 是 /D:/... 形态，
 // path.resolve 会拼出 D:\D:\... 与 argv[1] 恒不等（入口静默空转、退出码 0 的假绿）
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时 CLI 守卫将静默失配——前置拦截
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const { pos, opts } = parseArgs(process.argv.slice(2));
   if (opts.help || pos.length < 1) {

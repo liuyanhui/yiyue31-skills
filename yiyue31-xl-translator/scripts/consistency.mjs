@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractCode, countEnglishAnnotations, spacingViolations, stripMechanical } from "./verify-mech.mjs";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 // ---------- ① 术语表面形式（fork 源继承） ----------
 
@@ -268,6 +269,8 @@ export function runConsistency(dir, opts = {}) {
 
 // ---------- CLI ----------
 
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时 CLI 守卫将静默失配——前置拦截
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const args = process.argv.slice(2);
   const json = args.includes("--json");
@@ -280,7 +283,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
 
 产出: consistency-<title>.md——① 术语表面形式 ② 密度离群 ③ 格式 ④ 标题译法（双语锚对）
       ⑤ 间距清点 ⑥ 接缝拼料 ⑦ 文风遵从拼料；供决策 subagent 只读清单下结论。
-退出码: 0 出清单（无 FAIL 语义）/ 1 用法错 / 2 工作目录异常`);
+退出码: 0 出清单（无 FAIL 语义）/ 1 用法错 / 2 工作目录异常 / 4 symlink 调用防呆（S3⑤）`);
     process.exit(dir ? 0 : 1);
   }
   const r = runConsistency(path.resolve(dir), { output: getOpt("--output") });

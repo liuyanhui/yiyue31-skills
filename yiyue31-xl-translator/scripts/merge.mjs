@@ -30,6 +30,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { scanWorkdir, appendEvents } from "./status.mjs";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 const MERGED = "merged-draft.md";
 const sha12 = (s) => crypto.createHash("sha1").update(s, "utf-8").digest("hex").slice(0, 12);
@@ -201,10 +202,13 @@ const __help = `merge.mjs — xl-translator Step 8 确定性组装（M1c）
   - 输入损坏（缺 chunk/乱序号/分母 sha 不符/无校验依据）非零退出，绝不静默拼残稿
 
 产物: <workdir>/merged-draft.md（临时名，不命中任何发布模式）+ events.jsonl 追加 merge 事件
-退出码: 0 成功 / 1 用法 / 2 工作目录异常 / 3 输入损坏 / 4 «» 残留`;
+退出码: 0 成功 / 1 用法 / 2 工作目录异常 / 3 输入损坏 / 4 «» 残留
+补充: 经 symlink 调用 → S3⑤ 防呆守卫前置 exit 4（stderr 警示——与 4 «» 残留共用码，以 stderr 区分）`;
 
 // CLI 守卫用 fileURLToPath：new URL().pathname 在 Windows 是 /D:/... 形态，
 // path.resolve 会拼出 D:\D:\... 与 argv[1] 恒不等（入口静默空转、退出码 0 的假绿）
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时 CLI 守卫将静默失配——前置拦截
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const { pos, opts } = parseArgs(process.argv.slice(2));
   if (opts.help || pos.length < 1) {

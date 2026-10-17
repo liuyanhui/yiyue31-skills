@@ -10,7 +10,7 @@ scripts/test/
 ├── README.md                       # 本文件
 ├── unit/                           # 单元层：程序化合成夹具（确定性，不落盘），钉死算法行为
 │   ├── segment.test.mjs            #   分段算法：fence 感知/拼接 sha/落带/R11-B/产物/CLI
-│   ├── status.test.mjs             #   状态机（M1b+S2③④⑤⑦+S3③④）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账/派发 >90 WARN/冷启动卡/人话同源
+│   ├── status.test.mjs             #   状态机（M1b+S2③④⑤⑦+S3③④+S3①②⑤守卫）：推导/双段契约/统一物化/stale/动词/计数器/预算/CLI/冻结窗硬门/fixer 闭环/双计数器/events 原子写/撕裂容错/suspend 同事务/mtime 对账/派发 >90 WARN/冷启动卡/人话同源/RAM·水位·symlink 守卫/合并追加·目录 fsync·session-end 生产者
 │   ├── import-draft.test.mjs       #   draft 导入（S2⑥）：版本戳拒旧格式/§7 边界执行/events 归档新建禁补记/幂等/探针小文档全流程
 │   ├── verify-mech.test.mjs        #   机械校验：原五+新四硬判、fork 源对照、CLI 冒烟
 │   ├── merge.test.mjs              #   合并（M1c）：M1-M7 纯函数与病态输入、CLI 冒烟
@@ -213,6 +213,19 @@ E5 审计集口径：agent 步调产物（reviews/adjudications/translated-chunk
 | PL2 | 自一致性断言：`plainSelfCheck(lines, state)` 从 state（--json 同一对象）重推关键事实（done/total 进度分数、当前 chunk nn 与 stageCn、冻结窗轮次 freezeRounds/FREEZE_ROUND_MAX（行在场时）、residue 行、⚠ 行数 = warnings 条数）对 lines 断言——健康空失配、篡改报失配、失配 push 进 state.warnings（"人话自检失配：…"前缀，人话 + --json 双通道同源可见）且不改退出码；失配非持久（重推导即复原） | 人话与 --json 双通道静默分叉 | "PL2 plainSelfCheck…" |
 | PL3 | suspend 史无 pending → PENDING-USER 菜单：`deriveState.suspendUnresolved`（未消解 suspend 判定与 reconcileSuspend cleared 扫描同款）为真而 pending.md 缺失 → 人话段输出与挂起态同款菜单（①继续 ②手修后继续 ③停止），前缀披露"挂起史未消解而 pending.md 缺失（历史事件无载荷不可重建）"；消解后不触发；常规挂起菜单不回归 | 无载荷挂起史静默丢失（状态机无出口卡死） | "PL3 suspend 史无 pending…" |
 | PL4 | ARCH-B secFresh 单点收敛：节新鲜度判定（whole sec 表命中 ∨ delta 头 sha 命中）收敛为单一导出函数，deriveState 完备性 / buildQueue 冻结窗队列 / buildQueue review 队列 / final-gate 完备性矩阵四消费点同源；preamble-only（首标题前正文）/ 无标题全文 / 空节（标题后无正文）/ BOM 开头四态两侧同判（BOM 不产生两侧分歧） | 谓词拷贝漂移（status 判 fresh、终检判 stale 的对立裁判） | "PL4 ARCH-B 四态…" |
+
+## 守卫判据（S3①②⑤ + ENG-1/2/4 落地）
+
+**判据权威登记于此**——改判据 = 改 `status.mjs`（守卫信号/事件生产/writeAtomic）或 `cli-guard.mjs` + 本表 + 对应用例，三处同步。S3② 语义：**水位为主信号、budget 为兜底上限**（N 降级为保险丝——只改措辞与文档，budget 判定逻辑不动）。守卫信号 env 注入点：`GUARD_RAM_MB` / `GUARD_CTX_PCT`（测试经 CLI 子进程传 env 钉死正反；两测试文件顶部 `GUARD_RAM_MB=99999` 钉死缺省，真实系统读数不进断言路径）。
+
+| # | 判据 | 防什么 | 钉死用例（unit/status.test.mjs） |
+|---|------|--------|----------------------------------|
+| GR1 | S3① RAM 守卫：`availableRamMb()`（env `GUARD_RAM_MB` 可解析 ≥0 → 直接返回（注入点优先级最高）→ `free -m` Mem: 行 available 列（无则退 buff/cache）→ `os.freemem()` → null fail-open）< `GUARD_RAM_MIN_MB`(500) → dispatch 拒绝：不物化不追加 dispatch，appendEvents `session-end`(ram-guard:NMB) + cold-start.md/status.md 再生收尾，exit 4；env 钉死正反（1 → 拒 / 99999 → 正常物化；默认路径冒烟由 CS 用例覆盖不冲突） | 低内存机器派发打满 OOM 死机（CLAUDE.md 纪律） | "GR1 S3① RAM 守卫…" |
+| GR2 | S3② 水位退出：`ctxPctFromEnv()`（env `GUARD_CTX_PCT` 0-100 有限数 → 值，否则 null）< `GUARD_CTX_MIN_PCT`(20) → 不物化但走正常收尾（mtime 对账 / status.md / cold-start.md 含"## 下次动作"），appendEvents `session-end`(ctx-watermark:N%)，exit 0（干净退出点）；缺省（未注入且本轮确要派发）→ WARN 放行（人话 ⚠ + `--json` state.warnings 同源）；≥20 → 正常派发无水位行 | 上下文耗尽硬截断丢交接 | "GR2 S3② 水位退出…" |
+| GR3 | ENG-1 合并单次原子追加：`dispatchEventsBatch(q, dispatch, inFreeze)` 导出纯函数（每单元 dispatch（c4 detail 同现行口径）+ 冻结窗末尾一条 freeze-round(units=q.length)）——run() 单次 appendEvents 落流，双追加窗关闭（原 dispatch 与 freeze-round 两次追加间崩溃可超 ≤2 门一格，有界于崩溃次数）；集成：冻结窗 dispatch → events 末条 freeze-round、此前恰为本批 dispatch | 崩溃窗内计数器越门一格 | "GR3 ENG-1 dispatchEventsBatch 纯函数…"、"GR3 ENG-1 集成…" |
+| GR4 | ENG-2 目录 fsync：writeAtomic rename 后 best-effort fsync 目标所在目录（平台不支持（如 Windows 目录句柄）catch 跳过）——断电下目录项持久（文件内容 fsync 而目录项丢失 → rename 丢失）；行为级断言（monkey-patch fs.openSync/fs.fsyncSync 记录 fsync 路径，patch finally 还原），禁 source grep | rename 后断电目录项未持久 | "GR4 ENG-2 目录 fsync…" |
+| GR5 | S3⑤ symlink 调用防呆：`cli-guard.mjs` `symlinkCliGuard(argv1)`（resolve ≠ realpath → 命中 {real, msg}；realpath 失败 → null 不误伤）接入全部 11 个 CLI 脚本（既有 CLI 守卫之前顶层执行，segment 从 `../cli-guard.mjs` import）——经 symlink 调用 → stderr 警示（含真实路径）+ exit 4；真实路径直连不受影响 | symlink 目录（.claude/skills 等）下 CLI 入口守卫静默失配 no-op 假绿（memory 记载事故） | "GR5 S3⑤ symlink 防呆…" |
+| GR6 | ENG-4 预算收尾 session-end 生产者：`wantDispatch && overBudget && !pending` 且本轮因此未物化 → 渲染前一次性 appendEvents `session-end`(budget:N)（追加后不重推导 state，人话仍按已渲染口径）；重读 `deriveCounters` → `dispatchedSinceSessionEnd=0`——R14 计数器跨会话复位自此真正工作（RAM 守卫/水位退出同产 session-end，守卫出口也是会话边界） | 预算退出只渲染不落流，窗计数永不归零 | "GR6 ENG-4 预算收尾 session-end…" |
 
 ## 维护规约
 

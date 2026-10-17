@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 const VIRTUAL_NN_MIN = 901; // 与 status.mjs 同段（901-999，真实上界 640 永不冲突）
 const VIRTUAL_NN_MAX = 999;
@@ -208,8 +209,10 @@ const __help = `probe.mjs — xl-translator 源侧探针生成（M1c）
   - 探针文本经 status.mjs probeTruth 接口混入审校队列（staging 同构物化，R25）
 
 产物: <truth-dir>/<run>.json —— [{ virtualNn(901-999), dim, text, defectType, expectedHit }]
-退出码: 0 成功 / 1 用法错 / 2 写入失败（含已存在）`;
+退出码: 0 成功 / 1 用法错 / 2 写入失败（含已存在）/ 4 symlink 调用防呆（S3⑤）`;
 
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时 CLI 守卫将静默失配——前置拦截
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const { opts } = parseArgs(process.argv.slice(2));
   if (opts.help || opts.perDim < 1 || opts.perDim > 3) {

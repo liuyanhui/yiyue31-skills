@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 export function countWords(text) {
   if (!text || text.trim().length === 0) return 0;
@@ -97,6 +98,8 @@ export function formatStatistics(stats, filePath) {
 
 // ---------- CLI ----------
 
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时 CLI 守卫将静默失配——前置拦截
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const args = process.argv.slice(2);
   const json = args.includes("--json");

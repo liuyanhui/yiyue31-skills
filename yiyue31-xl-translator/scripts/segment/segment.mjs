@@ -28,6 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { symlinkCliGuard } from "../cli-guard.mjs";
 
 // ---------- 常量 ----------
 
@@ -606,6 +607,9 @@ function parseArgs(argv) {
 }
 
 const __filename = fileURLToPath(import.meta.url);
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时下方 CLI 守卫将静默失配
+// （no-op、退出码 0）——前置拦截：stderr 警示 + exit 4
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
   const { pos, opts } = parseArgs(process.argv.slice(2));
   if (opts.help || pos.length < 1 || !opts.out) {
@@ -623,7 +627,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
 
 产物: <out>/chunks/chunk-<NN>[-X]-<slug>.md + manifest.md
 路径防护: 产物路径 >240 字符自动缩 slug；目录本身超限退出码 4
-退出码: 0 成功 / 1 用法 / 2 文件问题 / 3 sha 关卡失败 / 4 路径超长`);
+退出码: 0 成功 / 1 用法 / 2 文件问题 / 3 sha 关卡失败 / 4 路径超长
+     （S3⑤：经 symlink 调用 → 守卫前置 exit 4——与路径超长共用码，以 stderr 区分）`);
     process.exit(pos.length < 1 || !opts.out ? 1 : 0);
   }
   const r = run(pos[0], opts.out, { minKB: opts.min, maxKB: opts.max });

@@ -24,6 +24,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { scanWorkdir } from "./status.mjs";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 const sha12 = (s) => crypto.createHash("sha1").update(s, "utf-8").digest("hex").slice(0, 12);
 const nn2 = (n) => String(n).padStart(2, "0");
@@ -190,8 +191,10 @@ const __help = `handoff.mjs — 交接包机器件生成器（投影 + 串行增
   projection-chunk-<NN>.md   既定译法投影（R8-b；verify-mech --projection 消费，R8-c）
   context-chunk-<NN>.md      串行增强段（邻 chunk 已审末段 + sha 锚）
 
-退出码: 0 成功 / 1 用法错（--nn 不在 manifest） / 2 工作目录异常`;
+退出码: 0 成功 / 1 用法错（--nn 不在 manifest） / 2 工作目录异常 / 4 symlink 调用防呆（S3⑤）`;
 
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时 CLI 守卫将静默失配——前置拦截
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   const { pos, opts } = parseArgs(process.argv.slice(2));
   if (opts.help || pos.length < 1) {

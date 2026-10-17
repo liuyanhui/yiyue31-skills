@@ -24,14 +24,18 @@
 //
 // CLI: node status.mjs <workdir> [--verb progress|continue|stop|retranslate|sample|restart|fix|dispatch]
 //                     [--chapter N] [--budget N] [--nn N] [--dims a,b] [--probe-truth <file>] [--json]
-// 退出码: 0 = 正常（含挂起/预算退出点）；1 = 用法错；2 = 工作目录异常（无 original/manifest）；
-//         3 = 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 / S2④ 修复环轮 >3）
+// 退出码: 0 = 正常（含挂起/预算退出点/水位退出 S3②）；1 = 用法错；2 = 工作目录异常（无 original/manifest）；
+//         3 = 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 / S2④ 修复环轮 >3）；
+//         4 = S3 守卫拒绝（RAM <500MB / symlink 调用防呆）
 
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { buildIndex, parseSections } from "./segment/segment.mjs";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 // ---------- 常量 ----------
 
@@ -52,6 +56,13 @@ export const SCHEMA_VERSION = 1;
 // S2⑦ §12 tripwire 观测点：事件流派生总派发 >90 → WARN（P1 审校派发 >90 即停重评——
 // 迁移+重审成本逼近重头译；只 WARN 不阻塞，停不停由人按 §12 裁决）。含探针派发。
 const DISPATCH_WARN_MAX = 90;
+// S3① RAM 守卫线（低内存机器纪律——CLAUDE.md：内存打满会 OOM 死机）：dispatch 前可用内存
+// < 500MB → 拒绝派发收尾退出（exit 4，不物化不派新单元），释放后重跑 dispatch 续派。
+const GUARD_RAM_MIN_MB = 500;
+// S3② 上下文水位线：剩余上下文百分比（主 agent preflight 注入 GUARD_CTX_PCT）< 20% →
+// 干净退出点（exit 0，跳过物化走正常收尾）。水位为主信号，budget 降级为兜底上限
+//（保险丝语义——只改措辞与文档，budget 判定逻辑不动）。
+const GUARD_CTX_MIN_PCT = 20;
 
 // ---------- 基础工具 ----------
 
@@ -88,6 +99,13 @@ function writeAtomic(file, data) {
     fs.closeSync(fd);
   }
   fs.renameSync(tmp, file); // 原子替换；遗留 .tmp（中断残留）下次写入时被覆盖清理，不入流不被扫
+  // ENG-2（G2 工程师位）：rename 后无目录 fsync——文件内容已 fsync 而目录项未持久，断电下
+  // rename 本身可能丢失（目标文件回退为旧内容或缺失）。补 best-effort 目录 fsync：
+  try {
+    const dfd = fs.openSync(path.dirname(file), "r");
+    fs.fsyncSync(dfd);
+    fs.closeSync(dfd);
+  } catch { /* 目录 fsync best-effort：平台不支持（如 Windows 目录句柄）跳过 */ }
 }
 
 // S2⑤ events 追加收口：唯一写点（status/final-gate/merge/derive-bilingual/verify-mech 全经此）。
@@ -104,6 +122,60 @@ export function appendEvents(dir, events) {
     prev += "\n";
   }
   writeAtomic(file, prev + adds);
+}
+
+// ENG-1（G2 工程师位：双追加窗可超 ≤2 门一格，有界于崩溃次数——合并后同批原子落流）：
+// dispatch 批事件与 freeze-round 轮记原为两次 appendEvents——两追加窗之间崩溃，可使冻结窗
+// ≤2 硬门超格一格（freeze-round 落而 dispatch 未落，或反之）。合并为单批事件数组（冻结窗时
+// 末尾追加一条 freeze-round），run() 一次 appendEvents 原子落流——双追加窗关闭。
+export function dispatchEventsBatch(q, dispatch, inFreeze) {
+  const evs = q.map((u, i) => ({
+    ev: "dispatch",
+    nn: u.nn,
+    dim: u.dim,
+    sec: u.sec ?? null,
+    detail: JSON.stringify(dispatch[i].c4),
+  }));
+  if (inFreeze) evs.push({ ev: "freeze-round", units: q.length });
+  return evs;
+}
+
+// ---------- S3①② 守卫信号（RAM / 上下文水位） ----------
+
+// S3① 可用内存（MB）：
+// ① env GUARD_RAM_MB 可解析为有限数 ≥0 → 直接返回（测试注入点，优先级最高）；
+// ② spawn free -m 解析 Mem: 行 available 列（无 available 列的旧版退 buff/cache）；
+// ③ free 不可用/不可解析 → Math.round(os.freemem()/1048576)；
+// ④ 彻底失败 → null（fail-open——守卫信号缺失不阻塞派发）。
+export function availableRamMb() {
+  const env = Number(process.env.GUARD_RAM_MB);
+  if (Number.isFinite(env) && env >= 0) return env;
+  try {
+    const out = spawnSync("free", ["-m"], { encoding: "utf-8", timeout: 5000 });
+    if (out.status === 0 && out.stdout) {
+      const rows = out.stdout.split("\n");
+      const memRow = rows.find((l) => /^Mem:/.test(l));
+      const header = rows.find((l) => /\btotal\b/.test(l)) ?? "";
+      if (memRow) {
+        const cols = memRow.trim().split(/\s+/).slice(1).map(Number);
+        const val = /available/.test(header) ? cols[5] : cols[4]; // 无 available 列退 buff/cache
+        if (Number.isFinite(val) && val >= 0) return val;
+      }
+    }
+  } catch { /* free 不可用 → 退 os.freemem */ }
+  try {
+    return Math.round(os.freemem() / 1048576);
+  } catch {
+    return null; // ④ 彻底失败 → fail-open
+  }
+}
+
+// S3② 剩余上下文水位（%）：主 agent preflight 注入 env GUARD_CTX_PCT（按已处理单元 × 实测
+// 成本估算；代理计数 = events dispatchedSinceSessionEnd）；可解析为 0-100 有限数 → 值，
+// 否则 null（缺省 → WARN 放行，不阻塞）。
+export function ctxPctFromEnv() {
+  const v = Number(process.env.GUARD_CTX_PCT);
+  return Number.isFinite(v) && v >= 0 && v <= 100 ? v : null;
 }
 
 // S2⑤ 撕裂尾行容错（①7）：不可解析行 WARN + 忽略，其余完整行照常解析——
@@ -740,6 +812,12 @@ export function plainLines(dir, inv, state, queue, opts = {}) {
     // S3④：挂起史未消解而 pending.md 缺失（无载荷历史事件不可重建，禁补记）——按挂起态给菜单兜底
     L.push(`挂起史未消解而 pending.md 缺失（历史事件无载荷不可重建）——按挂起态处理。`);
     L.push(`菜单：① 说"继续翻译"由系统换模型/调参重试 ② 手修后说"继续翻译"（按新 sha 重审，间距类由脚本自动补空格，永不自动重翻）③ 说"停止翻译"封存。`);
+  } else if (opts.guard?.type === "ram") {
+    // S3①：RAM 守卫拒绝派发——不派新单元收尾退出（释放内存后重跑 dispatch 续派）
+    L.push(`RAM 可用 ${opts.guard.value}MB < ${GUARD_RAM_MIN_MB}MB——守卫拒绝派发（S3①），不派新单元收尾退出；释放内存后说"继续翻译 ${state.title}"重跑派发。`);
+  } else if (opts.guard?.type === "ctx") {
+    // S3②：水位退出——干净退出点（交接卡已再生，含下次动作）
+    L.push(`剩余上下文水位 ${opts.guard.value}% < ${GUARD_CTX_MIN_PCT}%——水位退出（S3②，干净退出点）：本轮不派发，交接卡已再生（handoff/cold-start.md）。下次对我说：继续翻译 ${state.title}。`);
   } else if (overBudget) {
     L.push(`本会话预算 ${budget} 单元已用完（干净退出点）。进度 ${done}/${total} chunk，已耗时 ${elapsedH}h。下次对我说：继续翻译 ${state.title}。`);
   } else if (state.global === "delivered") {
@@ -1003,17 +1081,46 @@ export function run(dir, opts = {}) {
       suspendTxn(dir, `type: pending-user\n原因：冻结窗补审轮超限（已 ${state.counters.freezeRounds} 轮，硬门 ≤${FREEZE_ROUND_MAX}，S2③）——统稿完成后内容冻结，pm-review 类发现只登记不修；用户点名修复的补审轮已尽，须用户裁决（菜单：①继续（换模型/调参）②手修后说"继续翻译"③说"停止翻译"封存）\n`, { detail: `freeze-rounds:${state.counters.freezeRounds}` });
       return { exitCode: 3, errors: [`冻结窗补审轮 ${state.counters.freezeRounds}/${FREEZE_ROUND_MAX} 已达硬门——拒绝补审派发，已写 pending.md 上报（S2③）`] };
     }
-    queue.dispatch = materialize(dir, queue.q);
-    // S2②：dispatch 事件携带 c4 detail（JSON——final-gate 抽核对象；events 禁补记，只在物化时落）
-    appendEvents(dir, queue.q.map((u, i) => ({
-      ev: "dispatch",
-      nn: u.nn,
-      dim: u.dim,
-      sec: u.sec ?? null,
-      detail: JSON.stringify(queue.dispatch[i].c4),
-    })));
-    // S2③：冻结窗内补审派发批记一轮（freeze-round 事件——计数器事实源，脚本落流禁人工补记）
-    if (inFreeze) appendEvents(dir, { ev: "freeze-round", units: queue.q.length });
+    // S3① RAM 守卫：可用内存 < GUARD_RAM_MIN_MB → 拒绝派发（低内存机器纪律——派发打满 =
+    // OOM 死机）。不物化、不追加 dispatch 事件；session-end（ENG-4 生产者——守卫退出也是
+    // 会话边界，预算窗复位）+ 冷启动卡 / status.md 再生收尾（与 dispatch 收尾同款）后 exit 4。
+    // fail-open：信号不可得（null）不阻塞。
+    const ram = availableRamMb();
+    if (ram != null && ram < GUARD_RAM_MIN_MB) {
+      appendEvents(dir, { ev: "session-end", detail: `ram-guard:${ram}MB` });
+      opts.guard = { type: "ram", value: ram };
+      // 人话 ⚠（renderStatus 由 state.warnings 渲染）与 --json（state 同对象）双通道同源
+      state.warnings.push(`RAM 可用 ${ram}MB < ${GUARD_RAM_MIN_MB}MB——S3① 守卫拒绝派发（不派新单元收尾退出；释放内存后重跑 dispatch 续派）`);
+      fs.mkdirSync(path.join(dir, "handoff"), { recursive: true });
+      fs.writeFileSync(path.join(dir, "handoff", "cold-start.md"), renderColdStart(dir, inv, state, queue, opts), "utf-8");
+      fs.writeFileSync(path.join(dir, STATUS), renderStatus(dir, inv, state, queue, opts), "utf-8");
+      return { exitCode: 4, errors: [`RAM 可用 ${ram}MB < ${GUARD_RAM_MIN_MB}MB——S3① 守卫拒绝派发（不派新单元收尾退出；释放内存后重跑 dispatch 续派）`], state };
+    }
+    // S3② 水位退出：剩余上下文百分比（GUARD_CTX_PCT preflight 注入）< GUARD_CTX_MIN_PCT →
+    // 本轮不派发——跳过物化但走正常收尾（mtime 对账 / renderStatus / 写 status.md / 冷启动卡
+    // 含"## 下次动作"）→ exit 0（干净退出点）。水位为主信号、budget 为兜底上限（N 降级为保险丝）。
+    const pct = ctxPctFromEnv();
+    if (pct != null && pct < GUARD_CTX_MIN_PCT) {
+      appendEvents(dir, { ev: "session-end", detail: `ctx-watermark:${pct}%` }); // ENG-4 生产者
+      opts.guard = { type: "ctx", value: pct };
+      // 追加后不重推导 state：人话仍按已渲染口径（退出点文案不依赖追加后计数）
+    } else {
+      // 缺省 WARN：水位信号未注入（本轮确要派发而 GUARD_CTX_PCT 缺席）——WARN 放行不阻塞
+      if (pct == null) {
+        state.warnings.push("水位信号缺省：GUARD_CTX_PCT 未注入——WARN 放行（S3② 纪律：主 agent 按已处理单元×实测成本估算剩余上下文百分比注入 preflight；代理计数 = events dispatchedSinceSessionEnd）");
+      }
+      queue.dispatch = materialize(dir, queue.q);
+      // S2②：dispatch 事件携带 c4 detail（JSON——final-gate 抽核对象；events 禁补记，只在物化时落）。
+      // S2③：冻结窗内补审派发批记一轮（freeze-round 事件——计数器事实源，脚本落流禁人工补记）。
+      // ENG-1：两批合并 dispatchEventsBatch 单次 appendEvents 原子落流（双追加窗关闭）
+      appendEvents(dir, dispatchEventsBatch(queue.q, queue.dispatch, inFreeze));
+    }
+  }
+  // ENG-4：预算收尾也产 session-end（R14 计数器跨会话复位自此才真正工作——此前只渲染退出点
+  // 不落事件，dispatchedSinceSessionEnd 永不归零）。一次性：本轮因 overBudget 未物化才落；
+  // 追加后不重推导 state——人话仍按已渲染口径（overBudget 分支文案已就绪）。
+  if (wantDispatch && overBudget && !inv.pending) {
+    appendEvents(dir, { ev: "session-end", detail: `budget:${opts.budget}` });
   }
   // S2⑤ §9：mtime 对账兜底（只 WARN 不阻塞；人话段 + --json state.warnings 双通道）
   const mtimeWarn = mtimeAudit(dir, inv);
@@ -1072,7 +1179,11 @@ const __help = `status.mjs — xl-translator 状态机与续跑（M1b）
 产物: status.md（唯一续跑文档，整体重写；头带 schema: 版本戳——S2⑥，import-draft 拒收无戳旧格式）
        + staging/（统一物化，每轮先清后写）+ events.jsonl（追加）
 
-退出码: 0 正常 / 1 用法或动词错 / 2 工作目录异常 / 3 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 / S2④ 修复环轮 >3）`;
+退出码: 0 正常 / 1 用法或动词错 / 2 工作目录异常 / 3 计数器硬门拒绝（S2③ 冻结窗补审轮 >2 / S2④ 修复环轮 >3） / 4 S3 守卫拒绝（RAM <${GUARD_RAM_MIN_MB}MB / symlink 调用防呆）`;
+
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时下方 CLI 守卫将静默失配
+// （no-op、退出码 0——memory 记载事故）——前置拦截：stderr 警示 + exit 4
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 
 // CLI 守卫用 fileURLToPath：new URL().pathname 在 Windows 是 /D:/... 形态，path.resolve
 // 拼出 D:\D:\... 与 argv[1] 恒不等——M1c 实测抓到的 M1b 潜伏 bug（CLI 静默空转、退出码 0）

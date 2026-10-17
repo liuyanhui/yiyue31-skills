@@ -29,6 +29,10 @@ const DIMS = ["accuracy", "translationese", "ai-tone", "readability"];
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "import-draft.mjs");
 const PROBE_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "probe.mjs");
 
+// S3① RAM 守卫测试环境钉死（status.mjs availableRamMb 注入点）：真实系统读数随机器波动，
+// 不进断言路径——D5 全流程含 in-process dispatch，守卫须恒放行。
+process.env.GUARD_RAM_MB ??= "99999";
+
 const sha12Of = (p) => crypto.createHash("sha1").update(fs.readFileSync(p, "utf-8"), "utf-8").digest("hex").slice(0, 12);
 const sha12Text = (s) => crypto.createHash("sha1").update(s, "utf-8").digest("hex").slice(0, 12);
 const nn2 = (n) => String(n).padStart(2, "0");

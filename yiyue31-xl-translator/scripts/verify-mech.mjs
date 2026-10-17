@@ -35,6 +35,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { sectionSlices, appendEvents } from "./status.mjs";
+import { symlinkCliGuard } from "./cli-guard.mjs";
 
 // ---------- 文本抽取（fork 源继承，行为不回归） ----------
 
@@ -694,6 +695,7 @@ function printHelp() {
 输入: chunk 原文 + 译文 + keep-list + brief（阈值来源；优先级 CLI > brief > 默认）
 输出: 退出码 0=过 / 1=打回；--json 出完整结果；译文在 */translated-chunks/ 下时追加 verify-results.json
       （终检不信任该文件，会对最终译文重跑）
+退出码补充: 4 = 经 symlink 调用防呆拒绝（S3⑤——CLI 守卫前置，先于上列判定）
 
 升级计数（同 chunk ≤2 次打回）归 status.mjs（M1b），本脚本不计数。`);
 }
@@ -777,6 +779,9 @@ export function runCli(args) {
 }
 
 const __filename = fileURLToPath(import.meta.url);
+// S3⑤ symlink 调用防呆：经 symlink 调用（argv[1] ≠ realpath）时下方 CLI 守卫将静默失配
+// （no-op、退出码 0）——前置拦截：stderr 警示 + exit 4
+{ const g = symlinkCliGuard(process.argv[1]); if (g) { console.error(g.msg); process.exit(4); } }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
   runCli(process.argv.slice(2));
 }
