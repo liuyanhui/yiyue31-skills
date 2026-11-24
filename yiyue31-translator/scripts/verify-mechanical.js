@@ -9,7 +9,8 @@
 //   3. URL：正则提取，原文每个 URL 必须在译文中原样出现。
 //   4. keep-list 存在性：原文中出现的 keep-list 条目（[KEEP] 术语 / 专名 / 全大写缩写）必须在译文中原样保留，未被改写成中文。
 //   5. «» 标记残留 = 0：阶段B 必须把所有 «english» 标记裁定完毕，残留即 FAIL。
-//   6. 注释密度（仅 WARN）：译文（英文）括注计数，超阈值仅告警（计数含金句原文/引用/专名括注，
+//   6. 注释密度（仅 WARN）：译文（英文）括注计数（已剔除 URL/代码/markdown 链接与图片目标），
+//      超阈值仅告警（计数含金句原文/引用/专名括注，
 //      无法机械区分词级 spam；过注硬判留给语义层）。默认 --max-annotations 10，可调。
 //
 // CLI: node verify-mechanical.js <original.md> <translated.md> [--keep-list <path>] [--max-annotations N] [--json]
@@ -64,11 +65,20 @@ function extractUrls(text) {
 }
 
 // 统计（英文）括注：半角 ( ) 与全角（ ）都计入，括注内须含 ≥2 个连续 ASCII 字母。
+// 防虚高（2026-11-24 实战：报 17/10、人工清点 13）——先剔除机械类英文再计数：
+//   fenced/行内代码、markdown 链接与图片的 (url) 目标（锚文本保留）、裸 URL。
+// 已知预期差（2026-11-24 评审 P4）：中英混排括注（如"中文（Slack/Teams）"）仍会计数——
+// 形式上就是中文（英文）括注，机械层无法与词级 spam 稳定区分；过注硬判留给语义层（Step 6）。
 function countEnglishAnnotations(text) {
+  const cleaned = text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`\n]+`/g, "")
+    .replace(/(!?\[[^\]]*\])\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/[^\s)>"'`，。、）]+/g, "");
   const re = /[（(]([^()（）]*?)[)）]/g;
   let count = 0;
   let m;
-  while ((m = re.exec(text)) !== null) {
+  while ((m = re.exec(cleaned)) !== null) {
     if (/[a-zA-Z]{2,}/.test(m[1])) count++;
   }
   return count;

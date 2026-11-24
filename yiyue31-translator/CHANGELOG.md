@@ -1,5 +1,38 @@
 # Changelog
 
+## v3.0.5 (2026-11-25)
+
+### v3.0.4 两篇 A/B 验证落地（回读形态项 + ai-tone 同步组修复）
+
+- **回读自查补形态项（P-1）**：四个 evaluate-*-prompt 的回读自查新增「形态合规」——建议改法**文本自身**不得使用中文破折号（——）等 AI 味标准在译文中明令禁用的形态（插入/补充说明改用逗号、冒号或括号）；问题描述列与原文引用列不受此限。A/B 验证（claude-code-verification + automate-anything-with-grok-bot 同文重译对照 v3.0.2 基线，全程见 refined-stock `translator/v304-validation-report.md`）：三运行 5 例建议层破折号复现（基① 3 / 新① 1 / 新② 1，其中②Step 9 #1 建议自附回读自查仍放行——原清单只查语义三项漏形态通道的直接证据）；此前拦截全靠 PM 综合改写单点，历史反例 glm-53 篇交付物 11 处破折号终检 PASS（审校自创「与原文结构对应不判」豁免）证明该单点不可靠。验证两篇总判：P5/P4/#6/D1 全部生效、chronology 0、密度计数诚实、Step 8 行为合规（短路条件②真实不满足走 subagent，短路路径无活体验证——已知缺口方向与预设相反，非缺陷）。
+- **ai-tone 同步组修复（评审发现，v3.0.3 遗留）**：v3.0.3 #7 给 translator 版 ai-tone 加回读条目时未同步共享组（`scripts/prompt-sync-manifest.json`，sourceOfTruth = hn-digest 版），`check-prompt-sync.js` 现红且时间戳格式退化。本次把回读 + 形态项写入 sourceOfTruth 并 cp 至 talk / translator 三副本一致、恢复秒级时间戳——回读规则对三消费者的建议表同样适用、无 N/A 项，故走同步修复而非退出组（paraphrase 2026-07-31 退出先例的理由是 1/3 检查项 N/A，此处不成立）。
+
+## v3.0.4 (2026-11-24)
+
+### 终检门禁三修（automate-grok-bot 实战 + 对抗评审 + 多角色评审三道收敛）
+
+- **披露解析 a-strict（P2）**：`disclosedSkipDims` 只认标准标记 `⏭️ SKIPPED(原因)`（新 `DISCLOSED_FORM_RE`），自由文本"跳过"通道整体关闭——实战中"跳过维度：无（⏭️ SKIPPED：不适用）"式否定句与合规表行内局部"跳过"措辞把 PASS 误降 WARN-SKIPPED；且自由文本披露（"Step 7 AI味审校跳过"式）与文档化通道不同信任级，关闭后回到 FAIL。顺修两个连带 bug：`translation⊂translationese` 关键词子串碰撞（加 `(?!ese)` 负向前瞻）；终判与 WARN 列表自相矛盾（报告齐全的披露维度不再降终判，改发措辞提示 WARN）。旧式自由文本披露失效，合规表改写标准标记即恢复。
+- **chronology 豁免改字节锚（P5）**：verify-results.json 含 `translated=translated-draft.md` 且 `translatedSha1` 与当前工作稿一致的记录 → 豁免"报告早于译文"WARN（审校→修复→重跑关团的闭环信号）。不用 time 字段作锚（agent 可写明文、可填未来时间、跨时钟域脆）。审计痕 `summary.gateClosedOnDraft` 写入 verify-report.json。四条/轮的结构性噪音归零，"修复后从未重跑"场景仍在此 + 第 7 项双报。
+- **注释密度计数防虚高（P4）**：`countEnglishAnnotations` 计数前剔除 fenced/行内代码、markdown 链接与图片的 (url) 目标（锚文本保留）、裸 URL。已知预期差：中英混排括注（"中文（Slack/Teams）"）仍计数——机械层无法与词级 spam 稳定区分，硬判留语义层（Step 6）。实测 automate-grok-bot：draft 17/10 虚报 → 14（13 合规 + 1 混排）。
+- 头注措辞同步 a-strict（删 `/ "跳过"` 残留，R2 评审发现）；derive-bilingual 报错"Step 10/12"改"Step 10/11"（xl fork 遗留）。
+- **R1 终审加固三项**：披露正则容忍裸 ⏭（无 U+FE0F 变体选择符——部分编辑器复制会剥）与中文破折号区间（`Step 5—7`，原只认 `-–~`）；字节锚豁免加 `passed` 过滤（FAIL 记录不构成闭环豁免，由零信任重跑以当前字节重判）。R1 另纠正任务书一处断言：`[^()（）]` 负字符类匹配换行，跨行括号配对存在但仅影响 WARN 计数粒度。
+- **单测落盘**：`scripts/test/gate.test.js`（node --test，6 用例：a-strict 披露边界/攻击形态/子串碰撞/机械类排除/混排预期差）——此前回归为一次性 node -e，无持久保护（R1 流程建议）。
+
+### 文档对齐（D1/D3，R2 评审背书无矛盾）
+
+- **路径约定消歧（D1）**：共享产物明写"同在 `{title}/translation/`——verify-pipeline 终检以该目录为扫描根，勿放 `{title}/` 上层"（实战曾按"同根目录"理解放 `{title}/` 导致终检 FAIL 一轮）。
+- **双语版定位中性化（D3）**：SKILL.md Step 11、derive-bilingual 头注与生成头行三处统一为"不经终检…是否随宿主仓库发布由该仓库约定"（refined-stock 自 2026-11-24 起 `*-bilingual.md` 已入站发布）；保留"不经终检"事实描述。
+
+## v3.0.3 (2026-11-24)
+
+### 流程文档四修（automate-grok-bot 实战复盘 #6/#7/#8/#9）
+
+- **金句/习语句级注释精确语法入 SKILL（#6）**：`**中文译文（English original）{golden quote}**` / `**中文译文（English original）{slang/idiom}**`——整体加粗、英文括注在内、临时标记紧跟括注内嵌于加粗内；表中没有的句子禁用。#2/#3 交叉引用 + Step 10 清理措辞同步对齐（删字样、保加粗与括注）。
+- **审校建议回读规则（#7）**：四个 evaluate-prompt 新增"建议改法自查（回读）"——每条建议改法须回读改后完整句，核对否定辖域/指代回溯/搭配自然，禁止把 A 症状修成 B 症状（实战中 Step 5 修复建议把过度翻译换成否定辖域歧义、被 Step 6 判 major 返工的针对性疫苗）；evaluate-translation-prompt 术语一致性维度补"特殊词句表译法逐字落地"检查。
+- **Step 8 短路条件（#8）**：terms.md 命中 0 且 Step 5 无术语误译 → PM 本地核对免派 subagent；合规表话术 `✅ 完成（本地核对：terms.md 命中 0、无漂移疑点）` 不含披露触发字样（终检完备性矩阵不查 Step 8 产物，短路零脚本配合）。
+- **功能描述分工写实（#9）**："各环节派 subagent"改为"Step 2/3 由 PM 亲自执行；翻译/审校/术语维护派独立 subagent"。
+- 复盘清单中两条精简项撤回（#10 优先级序列并无重复，系误报；#11 为操作性浓缩，保留）。
+
 ## v3.0.2 (2026-09-19)
 
 ### 真实任务验证发现落地（用户拍板三项）

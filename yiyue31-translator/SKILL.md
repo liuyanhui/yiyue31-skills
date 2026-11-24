@@ -1,7 +1,7 @@
 ---
 name: yiyue31-translator
 description: 当用户要求翻译英文内容（小文章 ≤40KB）时启用。触发词：翻译、translate、改成中文、要双语对照、双语对照。输入形式：URL、文件路径、粘贴内容。超过 40KB 的大文档请用 yiyue31-xl-translator（说「翻译大文档」）。
-version: 3.0.2
+version: 3.0.5
 author: Yiyue31
 ---
 
@@ -9,7 +9,7 @@ author: Yiyue31
 
 ## 功能描述
 
-你是翻译项目经理，统筹分析、翻译、审阅和术语维护，各环节派 subagent 执行。本 skill 只处理 ≤40KB 的小文章（全文单文件流水线）；大文档归 yiyue31-xl-translator。
+你是翻译项目经理，统筹分析、翻译、审阅和术语维护。分工：分析类步骤（Step 2/3）由 PM 亲自执行；翻译（Step 4/4.5）、审校（Step 5/6/7/9）、术语维护（Step 8，满足短路条件时可 PM 本地核对）派独立 subagent 执行。本 skill 只处理 ≤40KB 的小文章（全文单文件流水线）；大文档归 yiyue31-xl-translator。
 
 ---
 
@@ -38,7 +38,7 @@ author: Yiyue31
 5. **源含 YAML frontmatter（网页剪藏元数据）**：标题/来源/作者等元信息不进译文正文，改为在译文草稿顶部以引用块呈现（`> **来源**：…` 形态）——既供 Step 10 元信息头取材，也使 frontmatter 里的 URL 自然进入 URL 子集校验（否则机械校验必误报缺失）。
 6. 保存到 `{title}/translation/original-{title}.md`。
 
-**路径约定（全文单文件，相对路径基于 `{title}/translation/`）**：原文 `original-{title}.md`；译文 `translated-draft.md`（工作稿）→ `translated-{title}-zh.md`（交付物，Step 10 定稿）；审阅报告 `review-{type}.md`。共享产物（同根目录）：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`、`keep-list-{title}.json`（Step 2 产、Step 4.6 消费）、`pm-review-{title}.md`（Step 11 产）。
+**路径约定（全文单文件，相对路径基于 `{title}/translation/`）**：原文 `original-{title}.md`；译文 `translated-draft.md`（工作稿）→ `translated-{title}-zh.md`（交付物，Step 10 定稿）；审阅报告 `review-{type}.md`。共享产物（**同在 `{title}/translation/` 目录**——verify-pipeline 终检以该目录为扫描根，勿放 `{title}/` 上层）：`analysis-{title}.md`、`glossary-{title}.md`、`special-phrases-{title}.md`、`keep-list-{title}.json`（Step 2 产、Step 4.6 消费）、`pm-review-{title}.md`（Step 11 产）。
 
 ### Step 2: 文章分析 + 生成术语表
 
@@ -78,7 +78,7 @@ author: Yiyue31
 **注释保留标准（4 类，决定是否加括注）**：
 
 - **#1 词级（主战场）**：读者**无法从上下文推断含义**的术语 → 走 `«english»` 标记管线（阶段A 打标、阶段B 裁定），保留格式 `中文（English）`。
-- **#2 / #3 句级**：金句 / 习语、**翻译无法传递的修辞效果**（双关 / 对仗 / 韵律；门槛要高，"写得好"不够）→ 走 Step 3 精选清单，格式 `**中文译文（English original）**`。
+- **#2 / #3 句级**：金句 / 习语、**翻译无法传递的修辞效果**（双关 / 对仗 / 韵律；门槛要高，"写得好"不够）→ 走 Step 3 精选清单，格式 `**中文译文（English original）**`；金句/习语在此格式基础上内嵌临时标记（精确语法见"通用翻译规则·特殊词句"）。
 - **#4 强调 / 重要性**：**不触发注释**，改用中文加粗 / 短句 / 独占一行传达。
 
 **术语 / 机械类元素分流（两类处理方式不同）**：
@@ -90,7 +90,7 @@ author: Yiyue31
 
 - **术语规范**：使用标准译法；术语表 `[KEEP]` 项原样保留英文，其余按术语表统一译法。terms.md 中"首现括注"类口径**按本文受众裁量**（Step 2 受众判定：技术受众免注、通用受众首现注）——阶段B 与准确性审校以同一口径复核。
 - **格式保留**：保留所有 Markdown 格式（标题、加粗、斜体、图片、链接、代码块）。
-- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语使用临时标记：`**{golden quote}**` 和 `**{slang/idiom}**`。临时标记由 Step 10 定稿清理。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
+- **特殊词句**：金句、连字符词组、俚语和习语，按特殊词句表翻译。金句、俚语和习语的句级注释**精确语法**：`**中文译文（English original）{golden quote}**` / `**中文译文（English original）{slang/idiom}**`——整体加粗、英文括注在内、临时标记紧跟括注之后内嵌于加粗内；表中没有的句子不得使用该格式。临时标记由 Step 10 定稿清理（删标记字样，加粗与括注保留）。**表条目与 Step 3 提取规则冲突时（如普通复合形容词被标"保留英文"），以 Step 3 规则为准，直接译中文**——防止旧表/过度提取污染。
 - **原文链接**：保留链接地址不变，翻译链接文本。例如：`[原文](https://example.com)` → `[译文](https://example.com)`。
 
 **翻译风格**（默认意译，用户指定时用直译）：
@@ -141,7 +141,7 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/original-{tit
 
 ### Step 8: 术语维护
 
-启用 subagent 维护 terms.md。**输入**：原文（`original-{title}.md`）、译文（`translated-draft.md`）、当前 terms.md 内容。
+默认启用 subagent 维护 terms.md。**短路条件（满足时 PM 本地核对、免派 subagent，两项须同时成立）**：① Step 2 的 terms.md 匹配数 = 0；② Step 5 准确性报告未报任何术语误译/不一致。短路时 PM 抽查原文关键术语 × 译文全篇一致性即可，pm-review 合规表如实写 `✅ 完成（本地核对：terms.md 命中 0、无漂移疑点）`；任一条件不满足仍须派 subagent。**输入**：原文（`original-{title}.md`）、译文（`translated-draft.md`）、当前 terms.md 内容。
 
 **Subagent 任务：**
 
@@ -159,8 +159,7 @@ node {skill-dir}/scripts/verify-mechanical.js "{title}/translation/original-{tit
 从工作稿 `translated-draft.md` 产出交付物 `translated-{title}-zh.md`：
 
 1. **清理临时标记**（重要）：移除翻译阶段使用的临时处理标记
-   - 移除所有 `**{golden quote}**` 标记，保留加粗格式
-   - 移除所有 `**{slang/idiom}**` 标记，保留加粗格式
+   - 删除所有 `{golden quote}` / `{slang/idiom}` 字样（含其前多余空格）——标记内嵌在 `**中文译文（English original）…**` 加粗内，删除后加粗格式与（English）括注原样保留
    - 最终交付的译文中不应包含任何花括号标记
 
 2. 在译文前添加元信息头（正文自带 H1，头不另插标题——与 xl-translator 同形态）：
@@ -195,7 +194,7 @@ node {skill-dir}/scripts/verify-pipeline.js "{title}/translation"
 **③ 留痕 + 裁定**：把验收记录写到 `pm-review-{title}.md`，**必须包含步骤完成合规表**——每步一行：`步骤 | ✅ 完成 | 产物`，跳过的维度写 `⏭️ SKIPPED(原因)`（见审校纪律"资源约束下的合法降级"）。合规表是终检脚本判定"披露跳过（WARN）vs 静默缺失（FAIL）"的依据。附 verify-pipeline 终判结论。
 
 - **pass** → 交付 `translated-{title}-zh.md`，**交付即止**：不自动运行下游管线（如 refined-stock publish），仅在交付信息中提示其入口由用户自行执行。
-- **双语对照（两种触发）**：① 发起翻译时用户说了要双语 → 交付后自动跑 `node {skill-dir}/scripts/derive-bilingual.js "{title}/translation"`；② 交付后随时补说"要双语对照"或"双语对照 <title>"（两种说法等价；按工程布局路由——`{title}/translation/` 走本 skill，`xl-translator/<title>/` 布局走 yiyue31-xl-translator）→ 同命令幂等重生成。发起意图以会话为准，会话中断丢失时靠②补说兜底（幂等无损）。产物 `translated-{title}-bilingual.md` = （交付物 × 原文）机械交错的只读派生视图（非交付物、不经终检、中文在上英文在下、配不齐的节降级为节级对照并随文件尾披露覆盖率）。
+- **双语对照（两种触发）**：① 发起翻译时用户说了要双语 → 交付后自动跑 `node {skill-dir}/scripts/derive-bilingual.js "{title}/translation"`；② 交付后随时补说"要双语对照"或"双语对照 <title>"（两种说法等价；按工程布局路由——`{title}/translation/` 走本 skill，`xl-translator/<title>/` 布局走 yiyue31-xl-translator）→ 同命令幂等重生成。发起意图以会话为准，会话中断丢失时靠②补说兜底（幂等无损）。产物 `translated-{title}-bilingual.md` = （交付物 × 原文）机械交错的只读派生视图（不经终检、中文在上英文在下、配不齐的节降级为节级对照并随文件尾披露覆盖率；是否随宿主仓库发布由该仓库的交付物约定决定——如 refined-stock 自 2026-11-24 起 `*-bilingual.md` 已入站发布）。
 - **rework** → 把问题打回对应步骤（clutter→Step 6、准确性→Step 5），修完重跑本步。
 
 ---

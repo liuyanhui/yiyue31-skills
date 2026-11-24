@@ -26,7 +26,7 @@ manifest 是路径与分组的机器源真相；本文档保留各组的演化�
 
 ## 现状
 
-- **中文版**：hn-digest（sourceOfTruth）、talk、translator 三份内容一致、时间戳同步 `2026-07-03 17:52:56`（2026-07-22 对齐 translator）。
+- **中文版**：hn-digest（sourceOfTruth）、talk、translator 三份内容一致、时间戳同步 `2026-11-25 02:24:14`（2026-11-25 经 sourceOfTruth 同步回读 + 形态项，修复 v3.0.3 的未同步单方编辑，见文末"ai-tone 回读条目同步（2026-11-25）"）。
 - **英文版（summary）**：独立文档，结构与中文版对齐（三副面孔、节奏层、正向锚点），但例子与词表英文化，不绑时间戳、不做内容同步。
 
 ## sibling prompt 处理记录
@@ -89,3 +89,12 @@ paraphrase 的 `evaluate-ai-tone-prompt.md` 从 ai-tone 同步组移除，改为
 - **定制内容**：砍动作化叙述与模糊归因；把仍适用的戏剧化框架词/渲染旁白并入套路化（模式 A）；空话/元叙述移交 conciseness 门 R9；本门只留工整套路化 + 口语口水化两类。
 - **配置**：`scripts/prompt-sync-manifest.json` 的 ai-tone 组 `copies` 已移除 `yiyue31-paraphrase/references/evaluate-ai-tone-prompt.md`。
 - **校验**：`check-prompt-sync.js` 仍 exit 0（剩余 hn-digest / talk / translator 三副本继续同步）。
+
+## ai-tone 回读条目同步（2026-11-25）
+
+translator v3.0.3（#7 回读规则）给 translator 版 ai-tone 的「执行」节加了第 4 条（建议改法回读自查）但**未走同步流程**，`check-prompt-sync.js` 自该日起 exit 1（内容漂移 + 时间戳格式退化为日期）。v3.0.5 修复：
+
+- **决策：走同步（sourceOfTruth 路线）而非退出组**。回读条目（及其新增的形态自查项——建议改法文本自身禁中文破折号）对三消费者的建议表同样适用、无 N/A 项；paraphrase 2026-07-31 退出组的先例理由（1/3 检查项 N/A）在此不成立。
+- **操作**：回读 + 形态项写入 hn-digest 版（sourceOfTruth）→ cp 至 talk / translator，三副本内容一致、时间戳同步 `2026-11-25 02:24:14`（恢复秒级格式）。
+- **校验**：`check-prompt-sync.js` exit 0。
+- **动机与证据**：translator v3.0.4 两篇 A/B 验证（refined-stock `translator/v304-validation-report.md` P-1）——审校建议文本自身含禁用破折号在三运行 5 例复现，回读清单只查语义三项漏形态通道。

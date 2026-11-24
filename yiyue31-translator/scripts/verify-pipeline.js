@@ -14,7 +14,7 @@
 // 七类检查（反伪造骨架，逐项明示）：
 //   1. 完备性矩阵（FAIL）：四维审校报告（review-{dimension}.md，Step 5/6/7/9）+ 共享产物
 //      （analysis/glossary/keep-list/special-phrases/最终译文/pm-review）。
-//      维度级缺失若在 pm-review 合规表有跳过披露（⏭️ SKIPPED(原因) / "跳过"）→ WARN-SKIPPED（合法降级）；
+//      维度级缺失若在 pm-review 合规表有标准标记披露（⏭️ SKIPPED(原因)）→ WARN-SKIPPED（合法降级）；
 //      未披露 → FAIL（作弊）。
 //   2. 占位符检测（FAIL）：报告含未替换的 `Chunk XX`、`{title}` 等模板变量。
 //   3. 跨维度查重（FAIL）：四维报告两两字节级比对——一份模板 cp 四份维度报告（harness-v2 主杀器；
@@ -49,14 +49,17 @@ function safeRead(p) {
 }
 
 const DIMENSIONS = [
-  { key: "translation", label: "准确性(Step5)", keywords: /准确性|translation|step\s*5/i },
+  { key: "translation", label: "准确性(Step5)", keywords: /准确性|translation(?!ese)|step\s*5/i },
   { key: "translationese", label: "翻译腔(Step6)", keywords: /翻译腔|translationese|step\s*6/i },
   { key: "ai-tone", label: "AI味(Step7)", keywords: /ai\s*味|ai-tone|step\s*7/i },
   { key: "readability", label: "可读性(Step9)", keywords: /可读性|readability|step\s*9/i },
 ];
 
 const PLACEHOLDER_RE = /Chunk XX|\{title\}|\{nn\}|\{dimension\}/i;
-const SKIP_LINE_RE = /⏭️|SKIPPED|跳过/i;
+// 披露唯一合法形态 = SKILL.md Step 11③ 标准标记 ⏭️ SKIPPED(原因)。不再解析自由文本"跳过"
+// （2026-11-24 评审 a-strict：否定句/行内措辞的误报无法穷举；自由文本披露通道关闭后，
+// 该形态回到 FAIL——与文档化通道同信任级，verify-report.json 的 skippedDims 仍留审计痕）。
+const DISCLOSED_FORM_RE = /⏭️?\s*SKIPPED\s*[（(][^）)]*[）)]/;
 
 // ---------- 场景发现 ----------
 
@@ -68,20 +71,21 @@ function discoverTitle(dir) {
 }
 
 // 从 pm-review 提取已披露跳过的维度集合。
-// 兼容两种格式：新标准 `⏭️ SKIPPED(原因)`；旧自由文本（含"跳过"字样 + Step 范围如 "Step 5-7"）。
-// 否定句不是披露（评审②-7）："未跳过/没有跳过"无 ⏭️/SKIPPED 标记时不计——一句反话不能换合法降级。
+// 唯一合法披露形态 = 标准标记 `⏭️ SKIPPED(原因)`（SKILL.md Step 11③）。
+// 2026-11-24 a-strict 重构（automate-grok-bot 实战 PASS 误降 WARN-SKIPPED + 对抗评审）：
+//   自由文本"跳过"路径整体关闭——否定句/行内局部措辞的误报无法穷举，且自由文本披露
+//   与文档化通道不同信任级；关闭后旧式披露回到 FAIL（合规表改写标准标记即恢复）。
 function disclosedSkipDims(pmReviewText) {
   if (!pmReviewText) return new Set();
   const disclosed = new Set();
   const stepToDim = { 5: "translation", 6: "translationese", 7: "ai-tone", 9: "readability" };
   for (const line of pmReviewText.split(/\r?\n/)) {
-    if (!SKIP_LINE_RE.test(line)) continue;
-    if (!/⏭️|SKIPPED/i.test(line) && /(未|没有|不曾)跳过/.test(line)) continue;
+    if (!DISCLOSED_FORM_RE.test(line)) continue;
     for (const dim of DIMENSIONS) {
       if (dim.keywords.test(line)) disclosed.add(dim.key);
     }
-    // Step 区间（如 "Step 5-7"）：命中区间即视为区间内所有已知 step 均披露
-    const range = line.match(/step\s*(\d+)\s*[-–~]\s*(\d+)/i);
+    // Step 区间（如 "Step 5-7"，含中文破折号 "Step 5—7"）：命中区间即视为区间内所有已知 step 均披露
+    const range = line.match(/step\s*(\d+)\s*[-–~—]\s*(\d+)/i);
     if (range) {
       const lo = parseInt(range[1], 10);
       const hi = parseInt(range[2], 10);
@@ -143,6 +147,27 @@ function analyze(dir) {
     fails.push({ check: "scene", message: "缺工作稿 translated-draft.md——时序核验与机械校验重跑的比对对象不存在（SKILL Step 10 要求工作稿保留至终检）" });
   }
 
+  // 机械校验流水：工作稿字节锚（P5 时序豁免依据，2026-11-24 对抗评审改内容锚——
+  // verify-results.json 含 translated=translated-draft.md 且 translatedSha1 与当前工作稿一致
+  // 的记录 = "机械校验在这份精确字节上跑过"。不用 time 字段作锚：agent 可写明文、可填未来
+  // 时间，且 wall-clock 与 mtime 跨时钟域比较脆。哈希算法与 appendResultLog 严格一致
+  // （utf8 字符串、sha1、前 12 位）。审计痕写入 summary.gateClosedOnDraft。
+  const vrPath = path.join(dir, "verify-results.json");
+  let draftGateClosed = false;
+  if (fs.existsSync(vrPath) && fs.existsSync(draftPath)) {
+    try {
+      const draftSha12 = crypto.createHash("sha1").update(fs.readFileSync(draftPath, "utf-8")).digest("hex").slice(0, 12);
+      for (const e of JSON.parse(fs.readFileSync(vrPath, "utf-8"))) {
+        if (String(e.original || "").toLowerCase() !== `original-${title}.md`.toLowerCase()) continue;
+        if (String(e.translated || "") !== "translated-draft.md") continue;
+        // 加 passed 过滤（R1 评审加固）：字节命中且当时绿——FAIL 记录不构成闭环豁免，
+        // 该场景由零信任重跑以当前字节重判
+        if (String(e.translatedSha1 || "") === draftSha12 && e.passed) { draftGateClosed = true; break; }
+      }
+    } catch (_e) { /* 损坏不在此报——第 7 项会 FAIL */ }
+  }
+  summary.gateClosedOnDraft = draftGateClosed;
+
   // 1+2+4+6：逐维度完备性 + 真实性（每维度一份 review-{dimension}.md）
   for (const dim of DIMENSIONS) {
     const p = path.join(dir, `review-${dim.key}.md`);
@@ -160,8 +185,11 @@ function analyze(dir) {
         const floor = Math.max(200, Math.round(fileBytes(singleOriginalPath) / 25));
         if (bytes < floor) info.undersize.push(`全文(${bytes}B<${floor}B)`);
       }
-      // 时序：报告须晚于工作稿 translated-draft.md（最终交付物被 Step 10 重写过不作对象）
-      if (fs.existsSync(draftPath) && fs.statSync(p).mtimeMs < fs.statSync(draftPath).mtimeMs - 1000) {
+      // 时序：报告须晚于工作稿 translated-draft.md（最终交付物被 Step 10 重写过不作对象）。
+      // P5 豁免（字节锚）：verify-results.json 含与当前工作稿 translatedSha1 一致的机械校验记录
+      // = "审校→修复→重跑关卡"闭环——"报告早于译文"本是修复流必然形态、结构性噪音；
+      // 修复后从未重跑（无同字节记录）的场景仍会在此 + 第 7 项双报。
+      if (fs.existsSync(draftPath) && !draftGateClosed && fs.statSync(p).mtimeMs < fs.statSync(draftPath).mtimeMs - 1000) {
         info.lateWrite.push("全文");
       }
       crossDimMtimes.push(fs.statSync(p).mtimeMs);
@@ -209,8 +237,7 @@ function analyze(dir) {
     }
   }
 
-  // 7. 机械校验落盘核验 + 零信任重跑
-  const vrPath = path.join(dir, "verify-results.json");
+  // 7. 机械校验落盘核验 + 零信任重跑（vrPath 已在 P5 时序豁免处声明）
   if (fs.existsSync(vrPath)) {
     try {
       const entries = JSON.parse(fs.readFileSync(vrPath, "utf-8"));
@@ -266,7 +293,19 @@ function analyze(dir) {
 
 function buildReport(result) {
   const { title, dir, fails, warns, skippedDims, summary } = result;
-  const verdict = fails.length > 0 ? "FAIL" : skippedDims.size > 0 ? "WARN-SKIPPED" : "PASS";
+  // 终判自洽（2026-11-24 对抗评审：报告齐全时 disclosed 非空会把终判降为 WARN-SKIPPED，
+  // 但 WARN 列表无任何条目解释——只有"确实缺失 + 已披露"的维度才触发合法降级；
+  // 报告齐全却出现标准标记 → 单列一条提示，供人工核对合规表措辞）
+  const disclosedUnused = [];
+  for (const key of skippedDims) {
+    const info = summary.dims[key];
+    if (info && info.missing.length === 0) disclosedUnused.push(key);
+  }
+  const disclosedEffective = skippedDims.size - disclosedUnused.length;
+  const verdict = fails.length > 0 ? "FAIL" : disclosedEffective > 0 ? "WARN-SKIPPED" : "PASS";
+  if (disclosedUnused.length > 0) {
+    warns.push({ check: "skip-disclosed", message: `pm-review 含 ⏭️ SKIPPED 标准标记但对应维度报告齐全（${disclosedUnused.join(", ")}）——标准标记仅用于真实降级，请核对合规表措辞` });
+  }
   const lines = [];
   lines.push(`# 过程真实性终检报告：${title || "(未知)"}`);
   lines.push("");
@@ -331,7 +370,7 @@ function runCli(args) {
     fs.writeFileSync(path.join(result.dir, "verify-pipeline-report.md"), text, "utf-8");
     fs.writeFileSync(
       path.join(result.dir, "verify-report.json"),
-      JSON.stringify({ title: result.title, dir: result.dir, generatedAt: new Date().toISOString(), verdict, fails: result.fails, warns: result.warns, skippedDims: [...result.skippedDims], summary: { shared: result.summary.shared } }, null, 2),
+      JSON.stringify({ title: result.title, dir: result.dir, generatedAt: new Date().toISOString(), verdict, fails: result.fails, warns: result.warns, skippedDims: [...result.skippedDims], summary: { shared: result.summary.shared, gateClosedOnDraft: result.summary.gateClosedOnDraft === true } }, null, 2),
       "utf-8"
     );
     console.log(text);

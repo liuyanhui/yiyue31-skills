@@ -3,9 +3,9 @@
 // derive-bilingual.js — 双语对照派生视图（v3.0.0；fork 自 yiyue31-xl-translator/scripts/
 // derive-bilingual.mjs 的 interleave 算法，一次性移植为单文件 CJS，绝不回写源——零共享纪律）。
 //
-// 定位：交付后由（交付物 × 原文）机械派生的只读视图——非交付物、不经终检、不受手修保护、
-// 幂等可重生成、命名不以 -zh.md 结尾（refined-stock 根级 ^.+-zh\.md$ 发布模式只匹配根级裸 .md，
-// 嵌套 translation/ 目录天然不命中）。
+// 定位：交付后由（交付物 × 原文）机械派生的只读视图——不经终检、不受手修保护、
+// 幂等可重生成、命名不以 -zh.md 结尾（与纯中文交付物靠后缀区分；是否随宿主仓库发布
+// 由该仓库自己的交付物约定决定——refined-stock 自 2026-11-24 起 *-bilingual.md 入站发布）。
 //
 // 与 xl 版差异：无 chunk 层（original-{title}.md × translated-{title}-zh.md 两文件整篇交错）；
 // translator 无标题双语锚契约——锚行识别只认"紧随标题的无 CJK 斜体行"（恰为英文标题形态），
@@ -274,7 +274,7 @@ function runDerive(dir, opts = {}) {
   const deliverablePath = path.join(dir, deliverableName);
   const deliverableRaw = readNorm(deliverablePath);
   if (deliverableRaw == null) {
-    return { exitCode: 3, errors: [`无交付物 ${deliverableName}——双语派生是交付后视图（先走完 Step 10/12）`] };
+    return { exitCode: 3, errors: [`无交付物 ${deliverableName}——双语派生是交付后视图（先走完 Step 10/11）`] };
   }
   const deliverableSha = fileSha(deliverablePath);
   const warns = [];
@@ -283,7 +283,7 @@ function runDerive(dir, opts = {}) {
   const r = interleave(readNorm(path.join(dir, `original-${title}.md`)) || "", zhBody);
 
   // 头部（B6）：交付物头照抄（至首个 --- 含）+ 引用块内追加双语版行（源交付物 sha——确定性字段）
-  const bilingualLine = `> **双语版**：由源交付物与原文机械交错的只读派生视图（非交付物、不经终检、不受手修保护）——源交付物 sha1（前 12）：${deliverableSha}；重说「要双语对照」可幂等重生成`;
+  const bilingualLine = `> **双语版**：由源交付物与原文机械交错的只读派生视图（不经终检、不受手修保护；是否随宿主仓库发布由该仓库约定）——源交付物 sha1（前 12）：${deliverableSha}；重说「要双语对照」可幂等重生成`;
   let header;
   if (headerLines == null) {
     warns.push("交付物无元信息头（无 --- 行）——双语版头以最小形态生成");
